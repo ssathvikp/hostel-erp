@@ -1,0 +1,41 @@
+﻿# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# env - NEVER COMMIT SECRETS
+.env
+.env.*
+.env*
+!.env.example
+
+# local scratch / must never be committed
+.clickup/
+
+# tests & reports
+coverage/
+playwright-report/
+test-results/
+
+# supabase local
+supabase/.temp/
+
+# vercel
+.vercel
+
+# editor / os
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
