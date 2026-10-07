@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { confirmLink, waitForEmail } from "../support/mail";
+import { signIn, signOut, submitSignIn } from "./helpers";
 import { adminClient, createUserFactory } from "../support/supabase";
 
 const PASSWORD = "Hostel2026";
 
-// Next.js renders its own role="alert" route announcer; page messages are
-// always looked up inside <main>.
 const factory = createUserFactory();
 const signedUpEmails: string[] = [];
 
@@ -23,19 +22,6 @@ test.afterAll(async () => {
       .map((user) => admin.auth.admin.deleteUser(user.id)),
   );
 });
-
-async function signOut(page: Page) {
-  const openNav = page.getByRole("button", { name: "Open navigation" });
-  if (await openNav.isVisible()) await openNav.click();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page).toHaveURL(/\/login$/);
-}
-
-async function signIn(page: Page, email: string, password: string) {
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel(/^Password/).fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
 
 test("an owner signs up, confirms by email, signs out and signs back in", async ({ page }) => {
   const email = `e2e-${randomUUID()}@example.com`;
@@ -66,15 +52,15 @@ test("an owner signs up, confirms by email, signs out and signs back in", async 
 
   // Signed-in users are sent away from the sign-in page.
   await page.goto("/login");
-  await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: "Welcome, Lakshmi" })).toBeVisible();
+  // ...to the dashboard, which sends an owner without a hostel to onboarding.
+  await expect(page).toHaveURL(/\/onboarding$/);
 });
 
 test("a wrong password shows one generic error and keeps the email", async ({ page }) => {
   const user = await factory.createUser();
 
   await page.goto("/login");
-  await signIn(page, user.email, "Not-the-passw0rd");
+  await submitSignIn(page, user.email, "Not-the-passw0rd");
 
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "Incorrect email or password.",
@@ -97,6 +83,7 @@ test("signup validation errors appear next to their fields", async ({ page }) =>
 
 test("an owner resets a forgotten password from the emailed link", async ({ page }) => {
   const user = await factory.createUser({ fullName: "Farah Khan" });
+  await factory.createHostel(user.id);
 
   await page.goto("/login");
   await page.getByRole("link", { name: "Forgot password?" }).click();

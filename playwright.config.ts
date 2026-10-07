@@ -15,6 +15,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
+  // Server actions round-trip through a production build and local Supabase;
+  // 10s absorbs a slow machine running both device projects in parallel.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: "http://localhost:3000",
     trace: "retain-on-failure",
