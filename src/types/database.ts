@@ -3,6 +3,75 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      hostels: {
+        Row: {
+          address: string | null;
+          alt_phone: string | null;
+          city: string | null;
+          created_at: string;
+          email: string | null;
+          floors: number | null;
+          gstin: string | null;
+          id: string;
+          name: string;
+          owner_id: string;
+          phone: string;
+          pincode: string | null;
+          slug: string;
+          state: string | null;
+          status: string;
+          type: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          address?: string | null;
+          alt_phone?: string | null;
+          city?: string | null;
+          created_at?: string;
+          email?: string | null;
+          floors?: number | null;
+          gstin?: string | null;
+          id?: string;
+          name: string;
+          owner_id?: string;
+          phone: string;
+          pincode?: string | null;
+          slug?: string;
+          state?: string | null;
+          status?: string;
+          type: string;
+          updated_at?: string;
+        };
+        Update: {
+          address?: string | null;
+          alt_phone?: string | null;
+          city?: string | null;
+          created_at?: string;
+          email?: string | null;
+          floors?: number | null;
+          gstin?: string | null;
+          id?: string;
+          name?: string;
+          owner_id?: string;
+          phone?: string;
+          pincode?: string | null;
+          slug?: string;
+          state?: string | null;
+          status?: string;
+          type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hostels_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -32,7 +101,15 @@ export type Database = {
           role?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {
