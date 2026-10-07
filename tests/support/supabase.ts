@@ -1,0 +1,104 @@
+import { randomUUID } from "node:crypto";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/types/database";
+
+/**
+ * Test harness for access-rule tests. Fixtures are created with the service
+ * role; every assertion about what a user can or cannot do goes through a
+ * client signed in as that user with the publishable key, so the real RLS
+ * policies and grants are exercised.
+ */
+
+export type Client = SupabaseClient<Database>;
+
+/** Password given to every user the factory creates. */
+export const TEST_PASSWORD = "Test-passw0rd";
+
+function env(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `${name} is not set. Start Supabase with \`npm run db:start\`, then run \`npm run env:local\`.`,
+    );
+  }
+  return value;
+}
+
+const url = () => env("NEXT_PUBLIC_SUPABASE_URL");
+const options = { auth: { autoRefreshToken: false, persistSession: false } } as const;
+
+/** Bypasses RLS. Fixtures and cleanup only, never assertions about access. */
+export function adminClient(): Client {
+  return createClient<Database>(url(), env("SUPABASE_SERVICE_ROLE_KEY"), options);
+}
+
+/** A signed-out visitor. */
+export function anonClient(): Client {
+  return createClient<Database>(url(), env("NEXT_PUBLIC_SUPABASE_ANON_KEY"), options);
+}
+
+export interface TestUser {
+  id: string;
+  email: string;
+  /** A client signed in as this user. */
+  client: Client;
+}
+
+/**
+ * Tracks every user a test file creates so `cleanup()` can delete them. The
+ * profile (and anything else that cascades from auth.users) goes with them.
+ */
+export function createUserFactory() {
+  const admin = adminClient();
+  const created: string[] = [];
+
+  async function createUser(
+    options: {
+      fullName?: string;
+      metadata?: Record<string, unknown>;
+      /** Applied with the service role after signup, as an operator would. */
+      profile?: Partial<Database["public"]["Tables"]["profiles"]["Update"]>;
+    } = {},
+  ): Promise<TestUser> {
+    const email = `test-${randomUUID()}@example.com`;
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: TEST_PASSWORD,
+      email_confirm: true,
+      user_metadata: { full_name: options.fullName ?? "Test User", ...options.metadata },
+    });
+    if (error || !data.user) throw error ?? new Error("createUser returned no user");
+    created.push(data.user.id);
+
+    if (options.profile) {
+      const { error: updateError } = await admin
+        .from("profiles")
+        .update(options.profile)
+        .eq("id", data.user.id);
+      if (updateError) throw updateError;
+    }
+
+    const client = anonClient();
+    const { error: signInError } = await client.auth.signInWithPassword({
+      email,
+      password: TEST_PASSWORD,
+    });
+    if (signInError) throw signInError;
+
+    return { id: data.user.id, email, client };
+  }
+
+  /** Registers a user created outside the factory (e.g. by signUp) for cleanup. */
+  function track(id: string) {
+    created.push(id);
+  }
+
+  async function cleanup() {
+    await Promise.all(created.map((id) => admin.auth.admin.deleteUser(id)));
+    created.length = 0;
+  }
+
+  return { admin, createUser, track, cleanup };
+}
