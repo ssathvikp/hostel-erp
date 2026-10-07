@@ -10,12 +10,8 @@ export default function Home() {
           if this box renders green with white text, the utilities were generated.
           Covered by EP-01 subtask "Initialize Next.js + TypeScript + Tailwind scaffold".
         */}
-        <div
-          data-tailwind-probe="true"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-white"
-        >
-          Tailwind probe: a green box with white text proves Tailwind classes are
-          compiled.
+        <div data-tailwind-probe="true" className="rounded-md bg-emerald-600 px-4 py-2 text-white">
+          Tailwind probe: a green box with white text proves Tailwind classes are compiled.
         </div>
         <Image
           className="dark:invert"
@@ -33,9 +29,7 @@ export default function Home() {
             </code>
             .
           </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
+          <li className="tracking-[-.01em]">Save and see your changes instantly.</li>
         </ol>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">
@@ -71,13 +65,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
           Learn
         </a>
         <a
@@ -86,13 +74,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/window.svg" alt="Window icon" width={16} height={16} />
           Examples
         </a>
         <a
@@ -101,13 +83,7 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
+          <Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
           Go to nextjs.org →
         </a>
       </footer>
