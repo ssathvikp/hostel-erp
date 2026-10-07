@@ -50,3 +50,27 @@ export function validateFormData<S extends z.ZodType>(
   }
   return validate(schema, input);
 }
+
+/**
+ * State for forms driven by `useActionState`. `values` echoes back what the
+ * user typed (never passwords) so a failed submit does not clear the form.
+ */
+export interface FormState {
+  status: "idle" | "error" | "success";
+  formError?: string;
+  fieldErrors: FieldErrors;
+  message?: string;
+  values?: Record<string, string>;
+}
+
+export const initialFormState: FormState = { status: "idle", fieldErrors: {} };
+
+/** Reads the named text fields from a submission, for echoing back. */
+export function formValues(formData: FormData, names: readonly string[]): Record<string, string> {
+  return Object.fromEntries(
+    names.map((name) => {
+      const value = formData.get(name);
+      return [name, typeof value === "string" ? value : ""];
+    }),
+  );
+}
