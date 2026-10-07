@@ -30,9 +30,26 @@ avoid now and expensive to fix once real data exists.
 
 - Every business table carries `hostel_id uuid not null` and has RLS enabled
   in the same migration that creates it. No exceptions.
-- Policies resolve membership through one `SECURITY DEFINER` helper in the
+- Policies resolve membership through `SECURITY DEFINER` helpers in the
   `private` schema rather than querying `hostels` or `profiles` directly,
-  which avoids recursive policy evaluation.
+  which avoids recursive policy evaluation:
+  - `private.user_hostel_ids()`: hostels the user owns or staffs. Use it for
+    reads and for writes staff may make.
+  - `private.user_owned_hostel_ids()`: hostels the user owns. Use it for
+    owner-only writes.
+  - `private.current_user_role()`: the caller's role from their profile.
+
+  The standard child-table policy is therefore:
+
+  ```sql
+  create policy "rooms: members read" on public.rooms for select to authenticated
+    using (hostel_id in (select private.user_hostel_ids()));
+  ```
+
+- A select policy that relies only on a membership helper cannot see a row
+  inserted in the same statement, so `insert ... returning` fails. When the
+  inserting user is identified on the row itself (as `hostels.owner_id` is),
+  test that column directly as well.
 - Write `auth.uid()` as `(select auth.uid())` inside policies so Postgres
   evaluates it once per statement instead of once per row.
 - The `anon` role has no table privileges in `public` (see the foundation
