@@ -54,6 +54,48 @@ export type ProfileRole = (typeof PROFILE_ROLES)[number];
 export const HOSTEL_TYPES = ["boys", "girls", "co_ed"] as const;
 export type HostelType = (typeof HOSTEL_TYPES)[number];
 
+/** States and union territories: one spelling, so addresses can be grouped. */
+export const INDIAN_STATES = [
+  "Andaman and Nicobar Islands",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+] as const;
+
+export type IndianState = (typeof INDIAN_STATES)[number];
+
 export const HOSTEL_STATUSES = ["draft", "active", "suspended"] as const;
 export type HostelStatus = (typeof HOSTEL_STATUSES)[number];
 

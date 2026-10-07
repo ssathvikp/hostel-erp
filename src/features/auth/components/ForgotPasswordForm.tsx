@@ -20,7 +20,7 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form action={action} noValidate className="space-y-4">
+    <form key={state.id} action={action} noValidate className="space-y-4">
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
 
       <Input

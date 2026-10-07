@@ -54,8 +54,13 @@ export function validateFormData<S extends z.ZodType>(
 /**
  * State for forms driven by `useActionState`. `values` echoes back what the
  * user typed (never passwords) so a failed submit does not clear the form.
+ *
+ * `id` is new on every server response. Forms use it as their React `key`,
+ * so fields remount with the echoed values: React's automatic form reset
+ * restores text inputs but not the selected option of a <select>.
  */
 export interface FormState {
+  id: string;
   status: "idle" | "error" | "success";
   formError?: string;
   fieldErrors: FieldErrors;
@@ -63,7 +68,19 @@ export interface FormState {
   values?: Record<string, string>;
 }
 
-export const initialFormState: FormState = { status: "idle", fieldErrors: {} };
+export const initialFormState: FormState = { id: "initial", status: "idle", fieldErrors: {} };
+
+export function formFailure(
+  formError?: string,
+  values?: Record<string, string>,
+  fieldErrors: FieldErrors = {},
+): FormState {
+  return { id: crypto.randomUUID(), status: "error", formError, fieldErrors, values };
+}
+
+export function formSuccess(message?: string): FormState {
+  return { id: crypto.randomUUID(), status: "success", fieldErrors: {}, message };
+}
 
 /** Reads the named text fields from a submission, for echoing back. */
 export function formValues(formData: FormData, names: readonly string[]): Record<string, string> {

@@ -51,7 +51,6 @@ describe("hostel schemas", () => {
     name: "  Sunrise PG ",
     type: "boys",
     phone: "9876543210",
-    owner_name: "Owner",
   };
   const address = {
     address: "12 MG Road",
@@ -72,6 +71,15 @@ describe("hostel schemas", () => {
     expect(hostelSchema.safeParse({ ...basics, ...address }).success).toBe(true);
   });
 
+  it("normalises an optional GSTIN and rejects a malformed one", () => {
+    const withGstin = hostelSchema.parse({ ...basics, ...address, gstin: " 29abcde1234f1z5 " });
+    expect(withGstin.gstin).toBe("29ABCDE1234F1Z5");
+    expect(hostelSchema.parse({ ...basics, ...address, gstin: "" }).gstin).toBeNull();
+    expect(
+      errorsOf(validate(hostelSchema, { ...basics, ...address, gstin: "29ABCDE1234F1Z" })),
+    ).toHaveProperty("gstin");
+  });
+
   it("rejects an unknown hostel type and a bad PIN code", () => {
     expect(errorsOf(validate(hostelBasicsSchema, { ...basics, type: "mixed" }))).toHaveProperty(
       "type",
@@ -79,6 +87,34 @@ describe("hostel schemas", () => {
     expect(
       errorsOf(validate(hostelAddressSchema, { ...address, pincode: "012345" })),
     ).toHaveProperty("pincode");
+  });
+});
+
+describe("required numbers and codes", () => {
+  it("treats a blank number as missing, not as zero", () => {
+    expect(errorsOf(validate(hostelAddressSchema, { floors: "" }))).toMatchObject({
+      floors: ["Number of floors is required"],
+      pincode: ["PIN code is required"],
+    });
+    expect(
+      errorsOf(
+        validate(roomSchema, {
+          room_number: "101",
+          floor: "  ",
+          sharing_type: "single",
+          capacity: "1",
+        }),
+      ),
+    ).toEqual({
+      floor: ["Floor is required"],
+    });
+  });
+
+  it("still accepts zero where zero is valid", () => {
+    expect(
+      roomSchema.parse({ room_number: "G1", floor: "0", sharing_type: "single", capacity: "1" })
+        .floor,
+    ).toBe(0);
   });
 });
 
@@ -256,7 +292,7 @@ describe("result helpers", () => {
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
       const errors = toFieldErrors(parsed.error);
-      expect(Object.keys(errors).sort()).toEqual(["name", "owner_name", "phone", "type"]);
+      expect(Object.keys(errors).sort()).toEqual(["name", "phone", "type"]);
     }
   });
 
