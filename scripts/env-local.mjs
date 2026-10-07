@@ -30,6 +30,8 @@ const managed = {
   NEXT_PUBLIC_SUPABASE_URL: status.API_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: status.PUBLISHABLE_KEY,
   SUPABASE_SERVICE_ROLE_KEY: status.SECRET_KEY,
+  // Direct Postgres connection, used only by the database test suites.
+  SUPABASE_DB_URL: status.DB_URL,
 };
 
 for (const [name, value] of Object.entries(managed)) {
