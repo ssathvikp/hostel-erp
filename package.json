@@ -67,5 +67,8 @@
     "next": {
       "postcss": "8.5.28"
     }
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
   }
 }
