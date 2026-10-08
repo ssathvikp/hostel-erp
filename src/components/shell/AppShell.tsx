@@ -1,15 +1,38 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { focusRing } from "@/components/ui";
+import { focusRing, Spinner } from "@/components/ui";
 import { signOut } from "@/features/auth/actions";
 import { HostelSwitcher, type SwitcherHostel } from "@/features/hostels/components/HostelSwitcher";
 import { cn } from "@/lib/cn";
 
 import { NAV_ITEMS } from "./nav";
+
+/**
+ * The standard loading state for pages in the app shell: the link that was
+ * followed shows a spinner until the next page is ready, while the current
+ * page stays on screen.
+ *
+ * There is deliberately no route-level loading.tsx under (app). Its Suspense
+ * boundary wraps every page, and when a server action revalidates a page
+ * inside it, the React build bundled with Next.js 15.5 intermittently never
+ * commits the action's transition: the form stays "pending" forever even
+ * though the server finished (facebook/react#35518, vercel/next.js#88767).
+ * tests/unit/app-structure.test.ts keeps it from coming back.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span role="status" className="text-slate-400">
+      <Spinner className="size-4" />
+      <span className="sr-only">Loading</span>
+    </span>
+  );
+}
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -46,6 +69,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               )}
             >
               {item.label}
+              <NavPending />
             </Link>
           </li>
         );
