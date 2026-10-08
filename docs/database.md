@@ -91,3 +91,27 @@ avoid now and expensive to fix once real data exists.
   `before update ... execute function private.set_updated_at()`.
 - Full ID numbers are never stored: only the last 4 characters and a keyed
   hash for duplicate detection.
+
+## Rooms and beds (EP-04)
+
+- **Beds are generated, never written by users.** A room's active beds always
+  equal its capacity. Triggers on `rooms` call `private.sync_room_beds` in the
+  same statement as the insert or update: growing restores retired beds first,
+  then adds the next labels (`101-A`, `101-B`...); shrinking retires the
+  highest-labelled vacant beds and fails with hint `room_beds_occupied` when
+  there are not enough. Users may only update `beds.status` and
+  `beds.status_reason`.
+- **Occupancy has one source.** `private.bed_is_occupied(bed_id)` answers
+  "does this bed have a live allocation?". Until EP-06 it returns `false`;
+  E6-T1 replaces its body. Every occupancy rule (capacity reduction, archiving,
+  blocking) and the `bed_states` and `room_inventory` views already go through
+  it, so nothing else changes when allocations arrive.
+- **History blocks deletes.** Deleting a room cascades to its beds. Anything
+  that records history against a bed (allocations in EP-06) must reference
+  `beds` with `on delete restrict`, so a room with history can only be
+  archived. The delete action reports this as "archive it instead".
+- **Business-rule errors carry a hint.** Triggers raise `P0001` with a hint
+  such as `room_archived`, `room_occupied`, `bed_occupied` or `bed_retired`;
+  server actions map hints to plain-language messages.
+- `create_rooms_bulk` inserts a whole range in one statement, so one existing
+  room number rolls back the entire batch.
