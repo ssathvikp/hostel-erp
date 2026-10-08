@@ -158,7 +158,7 @@ describe("residentSchema", () => {
     gender: "female",
     dob: yearsAgo(20),
     id_proof_type: "aadhaar",
-    id_proof_number: "1234 5678 9012",
+    id_proof_number: "2345 6789 0123",
     guardian_name: "",
     guardian_phone: "",
     permanent_address: "Mysuru",
@@ -170,7 +170,7 @@ describe("residentSchema", () => {
     const parsed = residentSchema.parse(resident);
     expect(parsed.phone).toBe("9123456789");
     expect(parsed.email).toBe("asha@example.com");
-    expect(parsed.id_proof_number).toBe("123456789012");
+    expect(parsed.id_proof_number).toBe("234567890123");
     expect(parsed.guardian_name).toBeNull();
   });
 

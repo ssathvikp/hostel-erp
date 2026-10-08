@@ -9,6 +9,7 @@
  * Usage: npm run env:local
  */
 import { execSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const ENV_FILE = ".env.local";
@@ -41,6 +42,14 @@ for (const [name, value] of Object.entries(managed)) {
   }
 }
 
+// A local secret for hashing resident ID numbers. Generated once and then
+// kept: regenerating it would make existing hashes unmatchable.
+const ID_PROOF_KEY = "ID_PROOF_HMAC_KEY";
+const existing = existsSync(ENV_FILE) ? readFileSync(ENV_FILE, "utf8") : "";
+const generated = /^ID_PROOF_HMAC_KEY=\S+/m.test(existing)
+  ? []
+  : [`${ID_PROOF_KEY}=${randomBytes(32).toString("hex")}`];
+
 const HEADER = "# Local Supabase, written by `npm run env:local`. Safe to regenerate.";
 
 const kept = existsSync(ENV_FILE)
@@ -52,7 +61,12 @@ const kept = existsSync(ENV_FILE)
       .trim()
   : "";
 
-const body = [HEADER, ...Object.entries(managed).map(([name, value]) => `${name}=${value}`), kept]
+const body = [
+  HEADER,
+  ...Object.entries(managed).map(([name, value]) => `${name}=${value}`),
+  ...generated,
+  kept,
+]
   .filter(Boolean)
   .join("\n");
 
