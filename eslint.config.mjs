@@ -10,15 +10,11 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // "prettier" goes last: it switches off every stylistic rule that would
+  // conflict with Prettier, so ESLint owns correctness and Prettier owns format.
+  ...compat.extends("next/core-web-vitals", "next/typescript", "prettier"),
   {
-    ignores: [
-      "node_modules/**",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "next-env.d.ts",
-    ],
+    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"],
   },
 ];
 
