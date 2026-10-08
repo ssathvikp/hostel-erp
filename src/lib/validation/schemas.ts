@@ -5,6 +5,7 @@ import {
   HOSTEL_TYPES,
   ID_PROOF_TYPES,
   INDIAN_STATES,
+  MANUAL_BED_STATUSES,
   PAYMENT_MODES,
   SHARING_TYPES,
   VACATE_REASONS,
@@ -130,7 +131,7 @@ export const roomNumber = z
     error: "Use only letters, digits and dashes",
   });
 
-const MAX_BEDS_PER_ROOM = 12;
+export const MAX_BEDS_PER_ROOM = 12;
 
 /** Whether a capacity is consistent with the chosen sharing type. */
 export function capacityMatchesSharing(sharing: SharingType, capacity: number): boolean {
@@ -180,8 +181,27 @@ export const bulkRoomSchema = z
   })
   .refine((input) => capacityMatchesSharing(input.sharing_type, input.capacity), capacityRule);
 
+/** Editing a room: the room number is identity and never changes. */
+export const roomUpdateSchema = z
+  .object(roomFields)
+  .refine((room) => capacityMatchesSharing(room.sharing_type, room.capacity), capacityRule);
+
+/** Manual bed status. A reason is kept only while a bed is out of service. */
+export const bedStatusSchema = z
+  .object({
+    bed_id: uuid("Bed"),
+    status: z.enum(MANUAL_BED_STATUSES, { error: "Choose a status" }),
+    status_reason: optional(requiredText("Reason", 200)),
+  })
+  .transform((input) => ({
+    ...input,
+    status_reason: input.status === "available" ? null : input.status_reason,
+  }));
+
 export type RoomInput = z.output<typeof roomSchema>;
+export type RoomUpdateInput = z.output<typeof roomUpdateSchema>;
 export type BulkRoomInput = z.output<typeof bulkRoomSchema>;
+export type BedStatusInput = z.output<typeof bedStatusSchema>;
 
 // ---------------------------------------------------------------------------
 // Resident (EP-05)

@@ -8,7 +8,7 @@ export interface NavItem {
 /** Primary navigation. Flip `available` as each epic lands its route. */
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: "Dashboard", href: "/dashboard", available: true },
-  { label: "Rooms & beds", href: "/rooms", available: false },
+  { label: "Rooms & beds", href: "/rooms", available: true },
   { label: "Residents", href: "/residents", available: false },
   { label: "Occupancy", href: "/occupancy", available: false },
   { label: "Fees", href: "/fees", available: false },
