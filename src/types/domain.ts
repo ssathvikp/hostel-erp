@@ -373,3 +373,13 @@ export interface Payment {
 
 /** Payments are append-only: there is no update variant beyond voiding. */
 export type PaymentInsert = Omit<Payment, "id" | "created_at" | "voided_at" | "void_reason">;
+
+// ---------------------------------------------------------------------------
+// Read models (security_invoker views)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generated view types mark every column nullable because Postgres cannot
+ * prove otherwise. Use this for views whose columns are known to be set.
+ */
+export type ViewRow<T> = { [K in keyof T]-?: NonNullable<T[K]> };

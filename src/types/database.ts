@@ -3,6 +3,71 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      beds: {
+        Row: {
+          archived_at: string | null;
+          bed_label: string;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          room_id: string;
+          status: string;
+          status_changed_at: string | null;
+          status_changed_by: string | null;
+          status_reason: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          archived_at?: string | null;
+          bed_label: string;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          room_id: string;
+          status?: string;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          status_reason?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          archived_at?: string | null;
+          bed_label?: string;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          room_id?: string;
+          status?: string;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          status_reason?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "beds_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "beds_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "beds_status_changed_by_fkey";
+            columns: ["status_changed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       hostels: {
         Row: {
           address: string | null;
@@ -111,12 +176,154 @@ export type Database = {
           },
         ];
       };
+      rooms: {
+        Row: {
+          capacity: number;
+          created_at: string;
+          floor: number;
+          hostel_id: string;
+          id: string;
+          room_number: string;
+          sharing_type: string;
+          status: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          capacity: number;
+          created_at?: string;
+          floor: number;
+          hostel_id: string;
+          id?: string;
+          room_number: string;
+          sharing_type: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          capacity?: number;
+          created_at?: string;
+          floor?: number;
+          hostel_id?: string;
+          id?: string;
+          room_number?: string;
+          sharing_type?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
-      [_ in never]: never;
+      bed_states: {
+        Row: {
+          bed_label: string | null;
+          hostel_id: string | null;
+          id: string | null;
+          manual_status: string | null;
+          room_id: string | null;
+          status: string | null;
+          status_changed_at: string | null;
+          status_changed_by: string | null;
+          status_reason: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          bed_label?: string | null;
+          hostel_id?: string | null;
+          id?: string | null;
+          manual_status?: string | null;
+          room_id?: string | null;
+          status?: never;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          status_reason?: string | null;
+        };
+        Update: {
+          bed_label?: string | null;
+          hostel_id?: string | null;
+          id?: string | null;
+          manual_status?: string | null;
+          room_id?: string | null;
+          status?: never;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          status_reason?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "beds_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "beds_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "beds_status_changed_by_fkey";
+            columns: ["status_changed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      room_inventory: {
+        Row: {
+          available_beds: number | null;
+          capacity: number | null;
+          created_at: string | null;
+          floor: number | null;
+          hostel_id: string | null;
+          id: string | null;
+          out_of_service_beds: number | null;
+          room_number: string | null;
+          room_sort: string | null;
+          sharing_type: string | null;
+          status: string | null;
+          total_beds: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Functions: {
-      [_ in never]: never;
+      create_rooms_bulk: {
+        Args: {
+          p_capacity: number;
+          p_floor: number;
+          p_from: number;
+          p_hostel_id: string;
+          p_sharing_type: string;
+          p_to: number;
+        };
+        Returns: {
+          beds_created: number;
+          rooms_created: number;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;
