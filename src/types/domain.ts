@@ -269,12 +269,18 @@ export interface Resident {
   permanent_address: string;
   joining_date: IsoDate;
   status: ResidentStatus;
+  status_changed_by: Uuid | null;
+  status_changed_at: IsoTimestamp | null;
   notes: string | null;
+  created_by: Uuid | null;
   created_at: IsoTimestamp;
   updated_at: IsoTimestamp;
 }
 
-export type ResidentInsert = Omit<Resident, Generated | "status" | "id_proof_path"> &
+export type ResidentInsert = Omit<
+  Resident,
+  Generated | "status" | "id_proof_path" | "status_changed_by" | "status_changed_at" | "created_by"
+> &
   Partial<Pick<Resident, "status" | "id_proof_path">>;
 
 /** Status moves through its own lifecycle action, not a generic update. */

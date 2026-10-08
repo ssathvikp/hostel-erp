@@ -102,16 +102,51 @@ avoid now and expensive to fix once real data exists.
   there are not enough. Users may only update `beds.status` and
   `beds.status_reason`.
 - **Occupancy has one source.** `private.bed_is_occupied(bed_id)` answers
-  "does this bed have a live allocation?". Until EP-06 it returns `false`;
-  E6-T1 replaces its body. Every occupancy rule (capacity reduction, archiving,
-  blocking) and the `bed_states` and `room_inventory` views already go through
-  it, so nothing else changes when allocations arrive.
-- **History blocks deletes.** Deleting a room cascades to its beds. Anything
-  that records history against a bed (allocations in EP-06) must reference
-  `beds` with `on delete restrict`, so a room with history can only be
-  archived. The delete action reports this as "archive it instead".
+  "does this bed have a live allocation?". Every occupancy rule (capacity
+  reduction, archiving, blocking) and the `bed_states` and `room_inventory`
+  views go through it.
+- **History blocks deletes.** Deleting a room cascades to its beds, but
+  allocations reference beds, rooms and residents without cascading (the
+  default `no action`), so a room with history can only be archived. The
+  delete action reports this as "archive it instead".
 - **Business-rule errors carry a hint.** Triggers raise `P0001` with a hint
   such as `room_archived`, `room_occupied`, `bed_occupied` or `bed_retired`;
   server actions map hints to plain-language messages.
 - `create_rooms_bulk` inserts a whole range in one statement, so one existing
   room number rolls back the entire batch.
+
+## Residents and allocations (EP-05, E6-T1)
+
+- **ID numbers are never stored.** `residents` keeps `id_proof_last4` and
+  `id_proof_hash`, an HMAC-SHA256 of `<type>:<normalised number>` keyed by
+  `ID_PROOF_HMAC_KEY`. The key lives only in the app's environment; never
+  rotate it once residents exist, or duplicate detection stops matching
+  older records.
+- **One person, one record per hostel.** Unique `(hostel_id, phone)` and
+  `(hostel_id, id_proof_type, id_proof_hash)`. Identity columns (name,
+  gender, date of birth, ID proof) are not updatable; residents are never
+  deleted.
+- **Status lifecycle** is enforced by `private.residents_guard_status`:
+  active → notice or blocked; notice → active, vacated or blocked;
+  vacated → active; blocked → active. A resident holding a live bed cannot
+  be marked vacated, and vacated or blocked residents cannot be allocated.
+  Every change records `status_changed_by` and `status_changed_at`.
+- **Allocations have no status column.** An allocation is live when
+  `private.today_ist()` is between `start_date` and `end_date` (inclusive,
+  null end = open-ended). Partial unique indexes allow one open allocation
+  per bed and per resident; composite keys keep resident, bed and room in
+  the same hostel and the bed inside the named room. Closing an allocation
+  sets `end_date` and `vacate_reason` together.
+- `resident_directory` (security invoker) lists residents with their current
+  room and bed, for search by name, phone or room.
+
+## ID proof files (E5-T7)
+
+- Private bucket `id-proofs`, 5 MB, PDF, JPEG and PNG only (enforced by
+  Storage itself). Objects live at `<hostel_id>/<resident_id>/<file>`;
+  `private.id_proof_path_allowed` lets members of that hostel read, upload,
+  replace and delete, and nobody else. `residents.id_proof_path` is checked
+  to stay inside the resident's own folder.
+- Files are only ever served through 60-second signed URLs, created with the
+  user's own session (`/residents/[id]/id-proof`). The upload action checks
+  the real file type from its first bytes, not the name or declared type.
