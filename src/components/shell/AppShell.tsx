@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { focusRing } from "@/components/ui";
+import { signOut } from "@/features/auth/actions";
 import { cn } from "@/lib/cn";
 
 import { NAV_ITEMS } from "./nav";
@@ -63,11 +64,39 @@ function Brand() {
   );
 }
 
+export interface ShellUser {
+  fullName: string;
+  email: string;
+}
+
+/** Signed-in identity and the sign-out control, at the foot of the nav. */
+function UserMenu({ user }: { user: ShellUser }) {
+  return (
+    <div className="border-t border-slate-200 px-3 py-4">
+      <div className="px-3">
+        <p className="truncate text-sm font-medium text-slate-900">{user.fullName}</p>
+        <p className="truncate text-xs text-slate-500">{user.email}</p>
+      </div>
+      <form action={signOut} className="mt-3">
+        <button
+          type="submit"
+          className={cn(
+            "w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100",
+            focusRing,
+          )}
+        >
+          Sign out
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /**
  * Authenticated application chrome: a fixed sidebar on large screens and a
  * top bar with a slide-in drawer below the `lg` breakpoint.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ user, children }: { user: ShellUser; children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
 
@@ -101,6 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
           <NavLinks />
         </nav>
+        <UserMenu user={user} />
       </aside>
 
       {/* Mobile top bar */}
@@ -164,6 +194,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
               <NavLinks onNavigate={() => setDrawerOpen(false)} />
             </nav>
+            <UserMenu user={user} />
           </div>
         </div>
       )}

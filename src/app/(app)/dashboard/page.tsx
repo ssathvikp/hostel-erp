@@ -1,31 +1,20 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge, EmptyState } from "@/components/ui";
-import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/ui";
+import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  // getUser() revalidates the token with Supabase Auth, unlike getSession(),
-  // so it is the safe call for anything that gates data on the server.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await requireUser();
+  const firstName = user.fullName.split(/\s+/)[0];
 
   return (
     <>
       <PageHeader
-        title="Dashboard"
+        title={`Welcome, ${firstName}`}
         description="Occupancy and collections at a glance."
-        actions={
-          user ? (
-            <Badge tone="success">Signed in as {user.email}</Badge>
-          ) : (
-            <Badge tone="warning">Not signed in</Badge>
-          )
-        }
       />
       <EmptyState
         title="Nothing to show yet"

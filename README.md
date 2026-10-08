@@ -54,22 +54,23 @@ The app refuses to build or start when a required variable is missing.
 
 ## Scripts
 
-| Command                     | What it does                                               |
-| --------------------------- | ---------------------------------------------------------- |
-| `npm run dev`               | Dev server with Turbopack                                  |
-| `npm run build`             | Production build                                           |
-| `npm run lint`              | ESLint                                                     |
-| `npm run typecheck`         | `tsc --noEmit`                                             |
-| `npm run format`            | Prettier write (`format:check` to verify only)             |
-| `npm test`                  | Every test suite                                           |
-| `npm run test:unit`         | Unit tests; no database needed                             |
-| `npm run test:db`           | Schema, RLS and integration tests against local Supabase   |
-| `npm run db:start` / `stop` | Start or stop the local Supabase stack                     |
-| `npm run db:new -- <name>`  | Create a migration in `supabase/migrations/`               |
-| `npm run db:reset`          | Rebuild the local database from empty with every migration |
-| `npm run db:types`          | Regenerate `src/types/database.ts` from the local schema   |
-| `npm run db:lint`           | Lint the database schema                                   |
-| `npm run env:local`         | Write local Supabase values into `.env.local`              |
+| Command                     | What it does                                                  |
+| --------------------------- | ------------------------------------------------------------- |
+| `npm run dev`               | Dev server with Turbopack                                     |
+| `npm run build`             | Production build                                              |
+| `npm run lint`              | ESLint                                                        |
+| `npm run typecheck`         | `tsc --noEmit`                                                |
+| `npm run format`            | Prettier write (`format:check` to verify only)                |
+| `npm test`                  | Every test suite                                              |
+| `npm run test:unit`         | Unit tests; no database needed                                |
+| `npm run test:db`           | Schema, RLS and integration tests against local Supabase      |
+| `npm run test:e2e`          | Browser tests (desktop and mobile) against a production build |
+| `npm run db:start` / `stop` | Start or stop the local Supabase stack                        |
+| `npm run db:new -- <name>`  | Create a migration in `supabase/migrations/`                  |
+| `npm run db:reset`          | Rebuild the local database from empty with every migration    |
+| `npm run db:types`          | Regenerate `src/types/database.ts` from the local schema      |
+| `npm run db:lint`           | Lint the database schema                                      |
+| `npm run env:local`         | Write local Supabase values into `.env.local`                 |
 
 ## Database
 
@@ -85,6 +86,22 @@ After a schema change:
 npm run db:reset && npm run db:types && npm run test:db
 ```
 
+## Authentication
+
+Owners sign up with email and password and must confirm their email before
+signing in. Locally, every auth email (confirmation, password reset, password
+changed) lands in the mail catcher at <http://localhost:54324>.
+
+- Email links go to `/auth/confirm` with a one-time token hash, so they work in
+  any browser. The templates live in `supabase/templates/`; for the hosted
+  project they must be copied into Authentication → Email Templates, and a
+  custom SMTP provider configured, because Supabase's built-in email only
+  delivers to project team members.
+- `src/middleware.ts` refreshes the session and redirects signed-out visitors
+  away from app routes. Pages and server actions check again on their own:
+  `requireUser()` for pages and layouts, `requireRole([...])` first thing in
+  every server action (`src/lib/auth/session.ts`).
+
 ## Quality gates
 
 - **Pre-commit:** ESLint (zero warnings) and Prettier on staged files.
@@ -92,20 +109,20 @@ npm run db:reset && npm run db:types && npm run test:db
   request and push to `main`:
   - lint, typecheck, format check and unit tests;
   - local Supabase started from empty, schema lint, a check that
-    `src/types/database.ts` is up to date, the database test suites, and a
-    production build.
+    `src/types/database.ts` is up to date, the database test suites, a
+    production build, and the Playwright browser tests.
 
 ## Stack
 
-| Layer      | Choice                                                  |
-| ---------- | ------------------------------------------------------- |
-| Framework  | Next.js 15 (App Router, Turbopack)                      |
-| Language   | TypeScript, `strict: true`                              |
-| Styling    | Tailwind CSS v4 (CSS-first, no `tailwind.config.ts`)    |
-| Database   | Supabase (PostgreSQL 17) via `@supabase/ssr`            |
-| Validation | Zod (`src/lib/validation/`)                             |
-| Tests      | Vitest (`tests/unit`, `tests/integration`, `tests/rls`) |
-| Tooling    | ESLint 9, Prettier, Husky + lint-staged, npm            |
+| Layer      | Choice                                                    |
+| ---------- | --------------------------------------------------------- |
+| Framework  | Next.js 15 (App Router, Turbopack)                        |
+| Language   | TypeScript, `strict: true`                                |
+| Styling    | Tailwind CSS v4 (CSS-first, no `tailwind.config.ts`)      |
+| Database   | Supabase (PostgreSQL 17) via `@supabase/ssr`              |
+| Validation | Zod (`src/lib/validation/`)                               |
+| Tests      | Vitest (unit, integration, RLS), Playwright (`tests/e2e`) |
+| Tooling    | ESLint 9, Prettier, Husky + lint-staged, npm              |
 
 ## Project tracking
 

@@ -33,6 +33,49 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Authentication (EP-02)
+// ---------------------------------------------------------------------------
+
+/** bcrypt, which Supabase Auth uses, ignores everything past 72 bytes. */
+export const MAX_PASSWORD_LENGTH = 72;
+
+/** Mirrors supabase/config.toml: 8+ characters with letters and digits. */
+export const newPassword = z
+  .string({ error: "Password is required" })
+  .min(8, { error: "Use at least 8 characters" })
+  .max(MAX_PASSWORD_LENGTH, { error: `Use at most ${MAX_PASSWORD_LENGTH} characters` })
+  .refine((value) => /[A-Za-z]/.test(value) && /\d/.test(value), {
+    error: "Use both letters and numbers",
+  });
+
+export const signupSchema = z.object({
+  full_name: requiredText("Your name", 120),
+  email,
+  password: newPassword,
+});
+
+export const loginSchema = z.object({
+  email,
+  // Never re-check strength at login: a rule change must not lock anyone out.
+  password: z.string({ error: "Password is required" }).min(1, { error: "Password is required" }),
+});
+
+export const forgotPasswordSchema = z.object({ email });
+
+export const resetPasswordSchema = z
+  .object({
+    password: newPassword,
+    confirm_password: z.string({ error: "Confirm your new password" }),
+  })
+  .refine((input) => input.password === input.confirm_password, {
+    error: "Passwords do not match",
+    path: ["confirm_password"],
+  });
+
+export type SignupInput = z.output<typeof signupSchema>;
+export type LoginInput = z.output<typeof loginSchema>;
+
+// ---------------------------------------------------------------------------
 // Hostel (EP-03)
 // ---------------------------------------------------------------------------
 

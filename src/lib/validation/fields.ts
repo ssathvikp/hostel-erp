@@ -42,9 +42,10 @@ export const pincode = z
   .regex(/^[1-9]\d{5}$/, { error: "Enter a valid 6-digit PIN code" });
 
 export const email = z
-  .string()
+  .string({ error: "Email is required" })
   .trim()
   .toLowerCase()
+  .min(1, { error: "Email is required" })
   .pipe(z.email({ error: "Enter a valid email address" }));
 
 /** `YYYY-MM-DD` calendar date. */
