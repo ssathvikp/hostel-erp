@@ -7,6 +7,8 @@ import { safeNextPath } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
+  formFailure,
+  formSuccess,
   formValues,
   loginSchema,
   resetPasswordSchema,
@@ -22,14 +24,6 @@ function isRateLimited(error: AuthError) {
   return error.status === 429 || error.code === "over_request_rate_limit";
 }
 
-function failure(
-  formError: string | undefined,
-  values?: Record<string, string>,
-  fieldErrors: FormState["fieldErrors"] = {},
-): FormState {
-  return { status: "error", formError, fieldErrors, values };
-}
-
 // ---------------------------------------------------------------------------
 // Sign up (E2-T2)
 // ---------------------------------------------------------------------------
@@ -37,7 +31,7 @@ function failure(
 export async function signUp(_previous: FormState, formData: FormData): Promise<FormState> {
   const values = formValues(formData, ["full_name", "email"]);
   const parsed = validateFormData(signupSchema, formData);
-  if (!parsed.ok) return failure(undefined, values, parsed.fieldErrors);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
   const { full_name, email, password } = parsed.data;
   const supabase = await createClient();
@@ -48,11 +42,11 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
   });
 
   if (error) {
-    if (isRateLimited(error)) return failure(RATE_LIMITED, values);
+    if (isRateLimited(error)) return formFailure(RATE_LIMITED, values);
     if (error.code === "weak_password") {
-      return failure(undefined, values, { password: ["Choose a stronger password"] });
+      return formFailure(undefined, values, { password: ["Choose a stronger password"] });
     }
-    return failure(UNEXPECTED, values);
+    return formFailure(UNEXPECTED, values);
   }
 
   // Only reachable if email confirmation is switched off.
@@ -60,11 +54,7 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
 
   // Supabase answers an already-registered address exactly like a new one,
   // so this message never reveals whether an account exists.
-  return {
-    status: "success",
-    fieldErrors: {},
-    message: email,
-  };
+  return formSuccess(email);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,21 +64,21 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
 export async function signIn(_previous: FormState, formData: FormData): Promise<FormState> {
   const values = formValues(formData, ["email"]);
   const parsed = validateFormData(loginSchema, formData);
-  if (!parsed.ok) return failure(undefined, values, parsed.fieldErrors);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
-    if (isRateLimited(error)) return failure(RATE_LIMITED, values);
+    if (isRateLimited(error)) return formFailure(RATE_LIMITED, values);
     if (error.code === "email_not_confirmed") {
-      return failure(
+      return formFailure(
         "Confirm your email address first. The link is in the email we sent when you signed up.",
         values,
       );
     }
     // One message for unknown email and wrong password alike.
-    return failure("Incorrect email or password.", values);
+    return formFailure("Incorrect email or password.", values);
   }
 
   redirect(safeNextPath(formData.get("next")));
@@ -111,40 +101,40 @@ export async function requestPasswordReset(
 ): Promise<FormState> {
   const values = formValues(formData, ["email"]);
   const parsed = validateFormData(forgotPasswordSchema, formData);
-  if (!parsed.ok) return failure(undefined, values, parsed.fieldErrors);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email);
-  if (error && isRateLimited(error)) return failure(RATE_LIMITED, values);
+  if (error && isRateLimited(error)) return formFailure(RATE_LIMITED, values);
 
   // Same answer whether or not the address is registered.
-  return { status: "success", fieldErrors: {}, message: parsed.data.email };
+  return formSuccess(parsed.data.email);
 }
 
 export async function resetPassword(_previous: FormState, formData: FormData): Promise<FormState> {
   const parsed = validateFormData(resetPasswordSchema, formData);
-  if (!parsed.ok) return failure(undefined, undefined, parsed.fieldErrors);
+  if (!parsed.ok) return formFailure(undefined, undefined, parsed.fieldErrors);
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return failure("Your reset link has expired. Request a new one to choose a password.");
+    return formFailure("Your reset link has expired. Request a new one to choose a password.");
   }
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
-    if (isRateLimited(error)) return failure(RATE_LIMITED);
+    if (isRateLimited(error)) return formFailure(RATE_LIMITED);
     if (error.code === "same_password") {
-      return failure(undefined, undefined, {
+      return formFailure(undefined, undefined, {
         password: ["Choose a password you have not used before"],
       });
     }
     if (error.code === "weak_password") {
-      return failure(undefined, undefined, { password: ["Choose a stronger password"] });
+      return formFailure(undefined, undefined, { password: ["Choose a stronger password"] });
     }
-    return failure(UNEXPECTED);
+    return formFailure(UNEXPECTED);
   }
 
   // A reset usually means the old password may be known to someone else:

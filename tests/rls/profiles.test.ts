@@ -7,7 +7,7 @@ import { anonClient, createUserFactory, type TestUser } from "../support/supabas
 /** Postgres "insufficient_privilege": the grant or policy refused the call. */
 const PERMISSION_DENIED = "42501";
 
-const { admin, createUser, cleanup } = createUserFactory();
+const { admin, createUser, createHostel, cleanup } = createUserFactory();
 
 afterAll(cleanup);
 
@@ -45,8 +45,8 @@ describe("profile creation on signup", () => {
 });
 
 describe("profiles row-level security", () => {
-  const hostelA = randomUUID();
-  const hostelB = randomUUID();
+  let hostelA: string;
+  let hostelB: string;
   let owner: TestUser;
   let otherOwner: TestUser;
   let staffA1: TestUser;
@@ -54,9 +54,10 @@ describe("profiles row-level security", () => {
   let staffB: TestUser;
 
   beforeAll(async () => {
-    [owner, otherOwner, staffA1, staffA2, staffB] = await Promise.all([
-      createUser(),
-      createUser(),
+    [owner, otherOwner] = await Promise.all([createUser(), createUser()]);
+    hostelA = (await createHostel(owner.id)).id;
+    hostelB = (await createHostel(otherOwner.id)).id;
+    [staffA1, staffA2, staffB] = await Promise.all([
       createUser({ profile: { role: "staff", hostel_id: hostelA } }),
       createUser({ profile: { role: "staff", hostel_id: hostelA } }),
       createUser({ profile: { role: "staff", hostel_id: hostelB } }),
@@ -69,9 +70,9 @@ describe("profiles row-level security", () => {
     return (data ?? []).map((row) => row.id).sort();
   }
 
-  it("lets an owner read only their own profile", async () => {
-    expect(await visibleIds(owner)).toEqual([owner.id]);
-    expect(await visibleIds(otherOwner)).toEqual([otherOwner.id]);
+  it("lets an owner read their own profile and their hostel's staff, nobody else", async () => {
+    expect(await visibleIds(owner)).toEqual([owner.id, staffA1.id, staffA2.id].sort());
+    expect(await visibleIds(otherOwner)).toEqual([otherOwner.id, staffB.id].sort());
   });
 
   it("lets staff read peers in their own hostel and no one else", async () => {

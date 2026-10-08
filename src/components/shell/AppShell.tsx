@@ -1,14 +1,38 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { focusRing } from "@/components/ui";
+import { focusRing, Spinner } from "@/components/ui";
 import { signOut } from "@/features/auth/actions";
+import { HostelSwitcher, type SwitcherHostel } from "@/features/hostels/components/HostelSwitcher";
 import { cn } from "@/lib/cn";
 
 import { NAV_ITEMS } from "./nav";
+
+/**
+ * The standard loading state for pages in the app shell: the link that was
+ * followed shows a spinner until the next page is ready, while the current
+ * page stays on screen.
+ *
+ * There is deliberately no route-level loading.tsx under (app). Its Suspense
+ * boundary wraps every page, and when a server action revalidates a page
+ * inside it, the React build bundled with Next.js 15.5 intermittently never
+ * commits the action's transition: the form stays "pending" forever even
+ * though the server finished (facebook/react#35518, vercel/next.js#88767).
+ * tests/unit/app-structure.test.ts keeps it from coming back.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span role="status" className="text-slate-400">
+      <Spinner className="size-4" />
+      <span className="sr-only">Loading</span>
+    </span>
+  );
+}
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -45,6 +69,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               )}
             >
               {item.label}
+              <NavPending />
             </Link>
           </li>
         );
@@ -67,6 +92,13 @@ function Brand() {
 export interface ShellUser {
   fullName: string;
   email: string;
+}
+
+export interface ShellHostels {
+  hostels: readonly SwitcherHostel[];
+  activeId: string | null;
+  draftName: string | null;
+  canAddHostel: boolean;
 }
 
 /** Signed-in identity and the sign-out control, at the foot of the nav. */
@@ -96,7 +128,15 @@ function UserMenu({ user }: { user: ShellUser }) {
  * Authenticated application chrome: a fixed sidebar on large screens and a
  * top bar with a slide-in drawer below the `lg` breakpoint.
  */
-export function AppShell({ user, children }: { user: ShellUser; children: ReactNode }) {
+export function AppShell({
+  user,
+  hostels,
+  children,
+}: {
+  user: ShellUser;
+  hostels: ShellHostels;
+  children: ReactNode;
+}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
 
@@ -126,6 +166,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: ReactN
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
         <div className="flex h-16 items-center px-5">
           <Brand />
+        </div>
+        <div className="border-b border-slate-200 pb-4">
+          <HostelSwitcher idPrefix="sidebar" {...hostels} />
         </div>
         <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
           <NavLinks />
@@ -190,6 +233,9 @@ export function AppShell({ user, children }: { user: ShellUser; children: ReactN
                   <path strokeLinecap="round" d="M6 18 18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+            <div className="border-b border-slate-200 pb-4">
+              <HostelSwitcher idPrefix="drawer" {...hostels} />
             </div>
             <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
               <NavLinks onNavigate={() => setDrawerOpen(false)} />

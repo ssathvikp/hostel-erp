@@ -39,6 +39,7 @@ export const indianMobile = z
 export const pincode = z
   .string({ error: "PIN code is required" })
   .trim()
+  .min(1, { error: "PIN code is required" })
   .regex(/^[1-9]\d{5}$/, { error: "Enter a valid 6-digit PIN code" });
 
 export const email = z
@@ -53,12 +54,20 @@ export const isoDate = (label: string) => z.iso.date({ error: `${label} must be 
 
 export const uuid = (label: string) => z.uuid({ error: `${label} is invalid` });
 
+/**
+ * A whole number typed into a form. A blank field is "required", never 0:
+ * plain coercion would turn "" into 0 and silently accept it (for example as
+ * the ground floor).
+ */
 export const integer = (label: string, min: number, max: number) =>
-  z.coerce
-    .number({ error: `${label} must be a number` })
-    .int({ error: `${label} must be a whole number` })
-    .min(min, { error: `${label} must be at least ${min}` })
-    .max(max, { error: `${label} must be at most ${max}` });
+  z.preprocess(
+    emptyToUndefined,
+    z.coerce
+      .number({ error: `${label} is required` })
+      .int({ error: `${label} must be a whole number` })
+      .min(min, { error: `${label} must be at least ${min}` })
+      .max(max, { error: `${label} must be at most ${max}` }),
+  );
 
 /**
  * A rupee amount typed by a user (up to 2 decimal places), output as integer

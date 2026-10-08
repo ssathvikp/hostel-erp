@@ -4,6 +4,7 @@ import {
   GENDERS,
   HOSTEL_TYPES,
   ID_PROOF_TYPES,
+  INDIAN_STATES,
   PAYMENT_MODES,
   SHARING_TYPES,
   VACATE_REASONS,
@@ -79,27 +80,37 @@ export type LoginInput = z.output<typeof loginSchema>;
 // Hostel (EP-03)
 // ---------------------------------------------------------------------------
 
-/** Onboarding step 1. */
+/** Onboarding step 1. The owner's name comes from their account. */
 export const hostelBasicsSchema = z.object({
   name: requiredText("Hostel name", 120),
   type: z.enum(HOSTEL_TYPES, { error: "Choose boys, girls or co-ed" }),
   phone: indianMobile,
-  owner_name: requiredText("Owner name", 120),
 });
 
 /** Onboarding step 2. */
 export const hostelAddressSchema = z.object({
   address: requiredText("Address", 500),
   city: requiredText("City", 100),
-  state: requiredText("State", 100),
+  state: z.enum(INDIAN_STATES, { error: "Choose a state" }),
   pincode,
   alt_phone: optional(indianMobile),
   email: optional(email),
   floors: integer("Number of floors", 1, 100),
 });
 
-/** Settings page: both steps together. */
-export const hostelSchema = hostelBasicsSchema.extend(hostelAddressSchema.shape);
+/** GST registration number, e.g. 29ABCDE1234F1Z5. Stored upper-cased. */
+export const gstin = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, {
+    error: "Enter a valid 15-character GSTIN",
+  });
+
+/** Settings page: both steps together, plus details only settings collects. */
+export const hostelSchema = hostelBasicsSchema
+  .extend(hostelAddressSchema.shape)
+  .extend({ gstin: optional(gstin) });
 
 export type HostelBasicsInput = z.input<typeof hostelBasicsSchema>;
 export type HostelInput = z.output<typeof hostelSchema>;

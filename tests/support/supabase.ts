@@ -90,15 +90,64 @@ export function createUserFactory() {
     return { id: data.user.id, email, client };
   }
 
+  /**
+   * Creates a hostel for `ownerId` with the service role, as fixture data.
+   * Active by default so tests start from a fully onboarded hostel.
+   */
+  async function createHostel(
+    ownerId: string,
+    overrides: Partial<Database["public"]["Tables"]["hostels"]["Insert"]> = {},
+  ) {
+    const { data, error } = await admin
+      .from("hostels")
+      .insert({
+        owner_id: ownerId,
+        name: `Test Hostel ${randomUUID().slice(0, 8)}`,
+        type: "co_ed",
+        phone: "9876543210",
+        address: "12 MG Road",
+        city: "Bengaluru",
+        state: "Karnataka",
+        pincode: "560001",
+        floors: 3,
+        status: "active",
+        ...overrides,
+      })
+      .select()
+      .single();
+    if (error || !data) throw error ?? new Error("createHostel returned no row");
+    return data;
+  }
+
   /** Registers a user created outside the factory (e.g. by signUp) for cleanup. */
   function track(id: string) {
     created.push(id);
   }
 
+  /**
+   * Deletes everything the test file created. Order matters because history
+   * is protected by restrictive foreign keys: staff first (they reference a
+   * hostel), then the hostels, then the owners.
+   */
   async function cleanup() {
-    await Promise.all(created.map((id) => admin.auth.admin.deleteUser(id)));
+    if (created.length === 0) return;
+    const deleteUsers = (ids: string[]) =>
+      Promise.all(ids.map((id) => admin.auth.admin.deleteUser(id)));
+
+    const { data: staff } = await admin
+      .from("profiles")
+      .select("id")
+      .in("id", created)
+      .eq("role", "staff");
+    const staffIds = (staff ?? []).map((row) => row.id);
+    await deleteUsers(staffIds);
+
+    const { error } = await admin.from("hostels").delete().in("owner_id", created);
+    if (error) throw error;
+
+    await deleteUsers(created.filter((id) => !staffIds.includes(id)));
     created.length = 0;
   }
 
-  return { admin, createUser, track, cleanup };
+  return { admin, createUser, createHostel, track, cleanup };
 }

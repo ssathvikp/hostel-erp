@@ -12,7 +12,7 @@ export function LoginForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState(signIn, initialFormState);
 
   return (
-    <form action={action} noValidate className="space-y-4">
+    <form key={state.id} action={action} noValidate className="space-y-4">
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {next && <input type="hidden" name="next" value={next} />}
 
