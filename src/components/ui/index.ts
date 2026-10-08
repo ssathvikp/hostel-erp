@@ -8,4 +8,5 @@ export { Modal, type ModalProps } from "./Modal";
 export { Select, type SelectOption, type SelectProps } from "./Select";
 export { Spinner } from "./Spinner";
 export { Table, TBody, Td, Th, THead, Tr } from "./Table";
+export { Textarea, type TextareaProps } from "./Textarea";
 export { focusRing } from "./styles";
