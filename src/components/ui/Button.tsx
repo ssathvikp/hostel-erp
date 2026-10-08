@@ -18,6 +18,21 @@ const sizes = {
   md: "h-10 px-4 text-sm gap-2",
 } as const;
 
+/** Button styling for elements that are not buttons, such as a navigation link. */
+export function buttonClass({
+  variant = "primary",
+  size = "md",
+  className,
+}: { variant?: keyof typeof variants; size?: keyof typeof sizes; className?: string } = {}) {
+  return cn(
+    "inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed",
+    focusRing,
+    variants[variant],
+    sizes[size],
+    className,
+  );
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
@@ -40,13 +55,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={cn(
-        "inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed",
-        focusRing,
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={buttonClass({ variant, size, className })}
       {...props}
     >
       {loading && <Spinner className="size-4" />}
