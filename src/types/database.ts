@@ -7,6 +7,7 @@ export type Database = {
         Row: {
           action: string;
           actor_id: string | null;
+          actor_name: string | null;
           allocation_id: string;
           bed_id: string;
           created_at: string;
@@ -22,6 +23,7 @@ export type Database = {
         Insert: {
           action: string;
           actor_id?: string | null;
+          actor_name?: string | null;
           allocation_id: string;
           bed_id: string;
           created_at?: string;
@@ -36,6 +38,7 @@ export type Database = {
         Update: {
           action?: string;
           actor_id?: string | null;
+          actor_name?: string | null;
           allocation_id?: string;
           bed_id?: string;
           created_at?: string;
@@ -63,11 +66,53 @@ export type Database = {
             referencedColumns: ["hostel_id", "id"];
           },
           {
+            foreignKeyName: "allocation_events_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
             foreignKeyName: "allocation_events_hostel_id_fkey";
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_events_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
           },
         ];
       };

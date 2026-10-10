@@ -331,12 +331,21 @@ create table public.allocation_events (
   previous_state jsonb,
   new_state jsonb not null,
   actor_id uuid references public.profiles (id) on delete set null,
+  -- Snapshot of who recorded it, readable by every member and kept even if
+  -- the profile is later renamed or removed.
+  actor_name text,
   created_at timestamptz not null default now(),
 
   -- Allocations are never deleted except with their whole hostel, so this
   -- cascade only ever runs as part of a hostel deletion.
   constraint allocation_events_allocation_fkey foreign key (hostel_id, allocation_id)
     references public.allocations (hostel_id, id) on delete cascade,
+  constraint allocation_events_resident_fkey foreign key (hostel_id, resident_id)
+    references public.residents (hostel_id, id),
+  constraint allocation_events_bed_fkey foreign key (hostel_id, bed_id)
+    references public.beds (hostel_id, id),
+  constraint allocation_events_room_fkey foreign key (hostel_id, room_id)
+    references public.rooms (hostel_id, id),
   constraint allocation_events_action_valid
     check (action in ('allocated', 'vacated', 'transferred_out', 'transferred_in'))
 );
@@ -374,11 +383,12 @@ set search_path = ''
 as $$
 declare
   transfer_from text := nullif(current_setting('hostel_erp.transfer_from', true), '');
+  actor_name text := (select p.full_name from public.profiles p where p.id = auth.uid());
 begin
   if tg_op = 'INSERT' then
     insert into public.allocation_events
       (hostel_id, allocation_id, resident_id, bed_id, room_id, action, effective_date,
-       previous_state, new_state, actor_id)
+       previous_state, new_state, actor_id, actor_name)
     values
       (new.hostel_id, new.id, new.resident_id, new.bed_id, new.room_id,
        case when transfer_from is null then 'allocated' else 'transferred_in' end,
@@ -386,16 +396,16 @@ begin
        private.allocation_state(new)
          || case when transfer_from is null then '{}'::jsonb
                  else jsonb_build_object('transferred_from', transfer_from) end,
-       auth.uid());
+       auth.uid(), actor_name);
   elsif old.end_date is null and new.end_date is not null then
     insert into public.allocation_events
       (hostel_id, allocation_id, resident_id, bed_id, room_id, action, effective_date,
-       previous_state, new_state, actor_id)
+       previous_state, new_state, actor_id, actor_name)
     values
       (new.hostel_id, new.id, new.resident_id, new.bed_id, new.room_id,
        case when new.vacate_reason = 'transferred' then 'transferred_out' else 'vacated' end,
        new.end_date + 1, private.allocation_state(old), private.allocation_state(new),
-       auth.uid());
+       auth.uid(), actor_name);
   end if;
   return null;
 end;

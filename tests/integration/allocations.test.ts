@@ -471,7 +471,9 @@ describe("audit trail (E6-T7)", () => {
 
     const { data: events } = await staff.client
       .from("allocation_events")
-      .select("allocation_id, action, effective_date, actor_id, previous_state, new_state")
+      .select(
+        "allocation_id, action, effective_date, actor_id, actor_name, previous_state, new_state",
+      )
       .eq("resident_id", r.id)
       .order("id");
     expect(events).toMatchObject([
@@ -480,6 +482,7 @@ describe("audit trail (E6-T7)", () => {
         action: "allocated",
         effective_date: daysFromToday(-9),
         actor_id: owner.id,
+        actor_name: "Test User",
         previous_state: null,
         new_state: { bed_id: from.beds[0].id, end_date: null },
       },

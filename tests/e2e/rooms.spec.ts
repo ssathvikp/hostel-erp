@@ -150,9 +150,9 @@ test("an owner edits capacity, blocks a bed and archives a room", async ({ page 
   await dialog.getByRole("button", { name: "Save status" }).click();
   await expect(dialog).toBeHidden();
   const row = inMain(page).getByRole("row", { name: /301-B/ });
-  // Cells: bed, status, reason, last changed (the closed dialog also lives in the row).
+  // Cells: bed, status, resident, reason, last changed (the closed dialog also lives in the row).
   await expect(row.getByRole("cell").nth(1)).toHaveText("Blocked");
-  await expect(row.getByRole("cell").nth(2)).toHaveText("Broken frame");
+  await expect(row.getByRole("cell").nth(3)).toHaveText("Broken frame");
 
   await page.goto("/rooms");
   await expect(inMain(page).getByText("1 out of service")).toBeVisible();

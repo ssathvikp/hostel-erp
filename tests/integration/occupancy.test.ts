@@ -192,9 +192,8 @@ describe("occupancy fixture", () => {
       vacant_beds: 4,
       out_of_service_beds: 2,
     });
-    expect(data!.occupied_beds + data!.vacant_beds + data!.out_of_service_beds).toBe(
-      data!.total_beds,
-    );
+    const { occupied_beds, vacant_beds, out_of_service_beds, total_beds } = data!;
+    expect(occupied_beds! + vacant_beds! + out_of_service_beds!).toBe(total_beds);
   });
 
   it("matches the residents the directory shows in a bed", async () => {

@@ -5,6 +5,11 @@ import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { AllocateDialog } from "@/features/allocations/components/AllocateDialog";
+import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
+import { StayActions } from "@/features/allocations/components/StayActions";
+import { VACATE_REASON_LABELS } from "@/features/allocations/options";
+import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
 import {
@@ -19,13 +24,6 @@ import { todayIst, uuid } from "@/lib/validation";
 import type { Gender, IdProofType, ResidentStatus, VacateReason } from "@/types";
 
 export const metadata: Metadata = { title: "Resident" };
-
-const VACATE_REASON_LABELS: Record<VacateReason, string> = {
-  moved_out: "Moved out",
-  transferred: "Transferred",
-  evicted: "Evicted",
-  other: "Other",
-};
 
 // Calendar dates are stored as YYYY-MM-DD; format them without shifting days.
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
@@ -80,18 +78,24 @@ export default async function ResidentPage({
   if (!uuid("Resident").safeParse(id).success) notFound();
 
   const supabase = await createClient();
-  const [{ data: resident, error }, { data: allocations, error: allocationsError }] =
-    await Promise.all([
-      supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
-      supabase
-        .from("allocations")
-        .select(
-          "id, start_date, end_date, vacate_reason, rooms(room_number), beds!allocations_bed_fkey(bed_label)",
-        )
-        .eq("resident_id", id)
-        .eq("hostel_id", hostel.id)
-        .order("start_date", { ascending: false }),
-    ]);
+  const [
+    { data: resident, error },
+    { data: allocations, error: allocationsError },
+    vacantBeds,
+    events,
+  ] = await Promise.all([
+    supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
+    supabase
+      .from("allocations")
+      .select(
+        "id, start_date, end_date, vacate_reason, rooms(room_number), beds!allocations_bed_fkey(bed_label)",
+      )
+      .eq("resident_id", id)
+      .eq("hostel_id", hostel.id)
+      .order("start_date", { ascending: false }),
+    getVacantBeds(supabase, hostel.id),
+    getAllocationEvents(supabase, hostel.id, { residentId: id }),
+  ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
   if (!resident) notFound();
@@ -104,6 +108,8 @@ export default async function ResidentPage({
       (allocation.end_date === null || allocation.end_date >= today),
   );
   const status = resident.status as ResidentStatus;
+  const bedOptions = vacantBeds.map((bed) => ({ value: bed.id, label: bed.label }));
+  const allocatable = status === "active" || status === "notice";
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -136,9 +142,56 @@ export default async function ResidentPage({
         {updated && <Alert tone="success">Resident details saved.</Alert>}
       </div>
 
-      {/* Actions area. EP-06 adds allocate and vacate; EP-07 adds record payment. */}
+      {/* Actions area. EP-07 adds record payment. */}
       <Card title="Actions" id="actions-heading">
-        <ResidentStatusControl resident={{ id: resident.id, name: resident.full_name, status }} />
+        <div className="space-y-5">
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-slate-700">Bed</h3>
+            {current ? (
+              <StayActions
+                stay={{
+                  allocationId: current.id,
+                  residentId: resident.id,
+                  residentName: resident.full_name,
+                  bedLabel: current.beds?.bed_label ?? "",
+                  startDate: current.start_date,
+                }}
+                bedOptions={bedOptions}
+                feeSummary={
+                  // EP-07 (E7-T5) replaces this with the outstanding balance.
+                  <p>
+                    Billing is not set up yet, so there is no outstanding balance to settle. Rent
+                    for the new bed follows its sharing type unless you set an override.
+                  </p>
+                }
+              />
+            ) : allocatable ? (
+              <AllocateDialog
+                title={`Allocate a bed to ${resident.full_name}`}
+                fixed={{ name: "resident_id", value: resident.id }}
+                choice={{
+                  name: "bed_id",
+                  label: "Bed",
+                  placeholder: "Choose a vacant bed",
+                  options: bedOptions,
+                  emptyMessage:
+                    "There are no vacant beds. Free a bed, or add rooms, before allocating.",
+                }}
+              />
+            ) : (
+              <p className="text-sm text-slate-600">
+                {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the resident
+                active first.
+              </p>
+            )}
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
+            <ResidentStatusControl
+              resident={{ id: resident.id, name: resident.full_name, status }}
+            />
+          </div>
+        </div>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -229,6 +282,9 @@ export default async function ResidentPage({
             </TBody>
           </Table>
         )}
+
+        <h3 className="mt-6 mb-3 text-sm font-semibold text-slate-900">Activity log</h3>
+        <AllocationHistory events={events} show="bed" caption="Allocation activity log" />
       </Card>
 
       {/* EP-07 (E7-T5) replaces this with fee history and the outstanding balance. */}

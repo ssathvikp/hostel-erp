@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { AllocateDialog } from "@/features/allocations/components/AllocateDialog";
+import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
+import { getAllocationEvents, getUnallocatedResidents } from "@/features/allocations/queries";
 import { BedStatusControl } from "@/features/rooms/components/BedStatusControl";
 import { RoomDangerZone } from "@/features/rooms/components/RoomDangerZone";
 import {
@@ -33,7 +36,10 @@ const changedAt = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
 });
 
-/** A room and its beds, with bed status controls (E4-T7, E4-T8). */
+/**
+ * A room and its beds: who sleeps in each, bed status controls, allocation
+ * from a vacant bed and the room's allocation log (E4-T7, E4-T8, E6-T2, E6-T7).
+ */
 export default async function RoomPage({
   params,
   searchParams,
@@ -47,7 +53,13 @@ export default async function RoomPage({
   if (!uuid("Room").safeParse(id).success) notFound();
 
   const supabase = await createClient();
-  const [{ data: room, error }, { data: beds, error: bedsError }] = await Promise.all([
+  const [
+    { data: room, error },
+    { data: beds, error: bedsError },
+    { data: occupants, error: occupantsError },
+    residents,
+    events,
+  ] = await Promise.all([
     supabase
       .from("rooms")
       .select("id, room_number, floor, sharing_type, capacity, status")
@@ -60,14 +72,24 @@ export default async function RoomPage({
       .eq("room_id", id)
       .eq("hostel_id", hostel.id)
       .order("bed_label"),
+    supabase
+      .from("resident_directory")
+      .select("id, full_name, bed_label")
+      .eq("room_id", id)
+      .eq("hostel_id", hostel.id),
+    getUnallocatedResidents(supabase, hostel.id),
+    getAllocationEvents(supabase, hostel.id, { roomId: id }),
   ]);
   if (error) throw error;
   if (bedsError) throw bedsError;
+  if (occupantsError) throw occupantsError;
   if (!room) notFound();
 
   const isOwner = user.role === "owner";
   const archived = room.status === "archived";
   const rows = (beds ?? []) as BedRow[];
+  const occupantByBed = new Map((occupants ?? []).map((o) => [o.bed_label, o]));
+  const residentOptions = residents.map((r) => ({ value: r.id, label: r.label }));
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -115,6 +137,7 @@ export default async function RoomPage({
               <tr>
                 <Th>Bed</Th>
                 <Th>Status</Th>
+                <Th>Resident</Th>
                 <Th>Reason</Th>
                 <Th>Last changed</Th>
                 <Th>
@@ -123,38 +146,81 @@ export default async function RoomPage({
               </tr>
             </THead>
             <TBody>
-              {rows.map((bed) => (
-                <Tr key={bed.id}>
-                  <Td className="font-medium">{bed.bed_label}</Td>
-                  <Td>
-                    <Badge tone={BED_STATUS_TONES[bed.status as BedStatus]}>
-                      {BED_STATUS_LABELS[bed.status as BedStatus]}
-                    </Badge>
-                  </Td>
-                  <Td className="whitespace-normal text-slate-600">{bed.status_reason ?? "—"}</Td>
-                  <Td className="text-slate-600">
-                    {bed.status_changed_at
-                      ? changedAt.format(new Date(bed.status_changed_at))
-                      : "—"}
-                  </Td>
-                  <Td className="text-right">
-                    {bed.status !== "occupied" && (
-                      <BedStatusControl
-                        bed={{
-                          id: bed.id,
-                          label: bed.bed_label,
-                          status: bed.manual_status as ManualBedStatus,
-                          reason: bed.status_reason ?? null,
-                        }}
-                      />
-                    )}
-                  </Td>
-                </Tr>
-              ))}
+              {rows.map((bed) => {
+                const occupant = occupantByBed.get(bed.bed_label);
+                return (
+                  <Tr key={bed.id}>
+                    <Td className="font-medium">{bed.bed_label}</Td>
+                    <Td>
+                      <Badge tone={BED_STATUS_TONES[bed.status as BedStatus]}>
+                        {BED_STATUS_LABELS[bed.status as BedStatus]}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      {occupant ? (
+                        <Link
+                          href={`/residents/${occupant.id}`}
+                          className="font-medium text-brand-700 hover:underline"
+                        >
+                          {occupant.full_name}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-500">—</span>
+                      )}
+                    </Td>
+                    <Td className="whitespace-normal text-slate-600">{bed.status_reason ?? "—"}</Td>
+                    <Td className="text-slate-600">
+                      {bed.status_changed_at
+                        ? changedAt.format(new Date(bed.status_changed_at))
+                        : "—"}
+                    </Td>
+                    <Td className="space-x-2 text-right">
+                      {bed.status === "available" && (
+                        <AllocateDialog
+                          title={`Allocate bed ${bed.bed_label}`}
+                          fixed={{ name: "bed_id", value: bed.id }}
+                          choice={{
+                            name: "resident_id",
+                            label: "Resident",
+                            placeholder: "Choose a resident without a bed",
+                            options: residentOptions,
+                            emptyMessage:
+                              "Every active resident already has a bed. Register a resident first.",
+                          }}
+                          triggerLabel="Allocate"
+                          triggerAriaLabel={`Allocate bed ${bed.bed_label}`}
+                          size="sm"
+                        />
+                      )}
+                      {bed.status !== "occupied" && (
+                        <BedStatusControl
+                          bed={{
+                            id: bed.id,
+                            label: bed.bed_label,
+                            status: bed.manual_status as ManualBedStatus,
+                            reason: bed.status_reason ?? null,
+                          }}
+                        />
+                      )}
+                    </Td>
+                  </Tr>
+                );
+              })}
             </TBody>
           </Table>
         </section>
       )}
+
+      <section aria-labelledby="history-heading" className="space-y-3">
+        <h2 id="history-heading" className="text-base font-semibold text-slate-900">
+          Allocation history
+        </h2>
+        <AllocationHistory
+          events={events}
+          show="resident"
+          caption={`Allocation history of room ${room.room_number}`}
+        />
+      </section>
 
       {isOwner && !archived && <RoomDangerZone room={{ id: room.id, number: room.room_number }} />}
     </div>
