@@ -183,3 +183,19 @@ in short:
   collectors cannot overpay between them.
 - **Roles.** Owners set rates, generate and void. Owners and staff read fees
   and record payments.
+
+## Dashboard (EP-08)
+
+`supabase/migrations/20261011120000_dashboard.sql`. Both functions are
+security invoker and derive everything at read time.
+
+- `occupancy_trend(hostel, from, to, 'day' | 'month')`: occupied beds per day
+  from allocation dates, so backdated changes rewrite history correctly. The
+  bed count for a day is every bed not yet retired (or in a room not yet
+  archived); bed creation dates are ignored because owners enter rooms on
+  the day they start using the app. Months average bed-nights. Days after
+  today are never returned; ranges are limited to two years.
+- `dashboard_money(hostel, from, to)`: collected (live payments received in
+  the range), billed (issued invoices for months starting in the range), and
+  outstanding and overdue as of today across all months, so it matches the
+  fee list.

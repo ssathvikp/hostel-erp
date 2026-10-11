@@ -1053,6 +1053,18 @@ export type Database = {
           rooms_created: number;
         }[];
       };
+      dashboard_money: {
+        Args: { p_from: string; p_hostel_id: string; p_to: string };
+        Returns: {
+          billed: number;
+          collected: number;
+          invoices: number;
+          outstanding: number;
+          overdue: number;
+          overdue_residents: number;
+          payments: number;
+        }[];
+      };
       fee_status_totals: {
         Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
         Returns: {
@@ -1066,6 +1078,16 @@ export type Database = {
       generate_invoices: {
         Args: { p_due_day?: number; p_hostel_id: string; p_period_month: string };
         Returns: Json;
+      };
+      occupancy_trend: {
+        Args: { p_from: string; p_granularity?: string; p_hostel_id: string; p_to: string };
+        Returns: {
+          bucket: string;
+          days: number;
+          occupancy_percent: number;
+          occupied_beds: number;
+          total_beds: number;
+        }[];
       };
       set_fee_structure: {
         Args: {
