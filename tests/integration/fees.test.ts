@@ -581,6 +581,41 @@ describe("payments", () => {
     expect(spoof.error).not.toBeNull();
   });
 
+  it("keep who recorded them readable by every member, without trusting the client", async () => {
+    // Staff cannot read the owner's profile, so the name is snapshotted.
+    const namedOwner = await createUser({ fullName: "Priya Owner" });
+    const hostelId = (await createHostel(namedOwner.id)).id;
+    const warden = await createUser({
+      fullName: "Ravi Warden",
+      profile: { role: "staff", hostel_id: hostelId },
+    });
+    const invoiceId = await notYetDueInvoice(hostelId, await resident(hostelId), 2000);
+    expect((await pay(hostelId, invoiceId, 1000, namedOwner)).error).toBeNull();
+    expect((await pay(hostelId, invoiceId, 1000, warden)).error).toBeNull();
+
+    const names = async (user: TestUser) =>
+      (
+        await user.client
+          .from("payments")
+          .select("recorded_by_name")
+          .eq("invoice_id", invoiceId)
+          .order("created_at")
+      ).data;
+    const expected = [{ recorded_by_name: "Priya Owner" }, { recorded_by_name: "Ravi Warden" }];
+    expect(await names(warden)).toEqual(expected);
+    expect(await names(namedOwner)).toEqual(expected);
+
+    const forged = await warden.client.from("payments").insert({
+      hostel_id: hostelId,
+      invoice_id: invoiceId,
+      amount: 1,
+      paid_at: todayIst(),
+      mode: "cash",
+      recorded_by_name: "Someone else",
+    });
+    expect(forged.error?.code).toBe(PERMISSION_DENIED);
+  });
+
   it("block overpayment, naming what is still due", async () => {
     const hostelId = await hostel();
     const invoiceId = await notYetDueInvoice(hostelId, await resident(hostelId), 500000);
@@ -672,6 +707,39 @@ describe("payments", () => {
 // ---------------------------------------------------------------------------
 // Balances (E7-T5)
 // ---------------------------------------------------------------------------
+
+describe("billed months", () => {
+  it("lists every billed month once, beyond the API's 1000-row cap", async () => {
+    const hostelId = await hostel();
+    const { data: residents, error } = await admin
+      .from("residents")
+      .insert(Array.from({ length: 92 }, () => residentRow(hostelId)))
+      .select("id");
+    if (error) throw error;
+    const months = Array.from({ length: 12 }, (_, index) => monthStart(-index));
+    const rows = months.flatMap((month) =>
+      residents.map((row) => ({
+        hostel_id: hostelId,
+        resident_id: row.id,
+        period_month: month,
+        amount: 100,
+        due_date: dayOf(month, 5),
+      })),
+    );
+    expect(rows.length).toBeGreaterThan(1000);
+    const inserted = await admin.from("invoices").insert(rows);
+    expect(inserted.error).toBeNull();
+
+    const listed = await owner.client.rpc("billed_months", { p_hostel_id: hostelId });
+    expect(listed.error).toBeNull();
+    expect(listed.data).toEqual(months);
+
+    const outsider = await createUser();
+    expect((await outsider.client.rpc("billed_months", { p_hostel_id: hostelId })).data).toEqual(
+      [],
+    );
+  });
+});
 
 describe("outstanding balances", () => {
   it("reconcile exactly with seeded invoices and payments across several months", async () => {
