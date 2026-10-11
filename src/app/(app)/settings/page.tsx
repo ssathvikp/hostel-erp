@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Settings has one section in the MVP. */
+/** Hostel details are the first settings section. */
 export default function SettingsPage() {
   redirect("/settings/hostel");
 }

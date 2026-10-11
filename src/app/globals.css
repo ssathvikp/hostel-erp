@@ -21,3 +21,16 @@
 body {
   @apply bg-slate-50 font-sans text-slate-900;
 }
+
+/* Printed invoices and receipts (E7-T7): A4, white, no browser-added colour loss. */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+@media print {
+  body {
+    @apply bg-white;
+    print-color-adjust: exact;
+  }
+}

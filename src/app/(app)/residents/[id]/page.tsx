@@ -10,6 +10,9 @@ import { AllocationHistory } from "@/features/allocations/components/AllocationH
 import { StayActions } from "@/features/allocations/components/StayActions";
 import { VACATE_REASON_LABELS } from "@/features/allocations/options";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
+import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
+import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
+import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
 import {
@@ -19,6 +22,7 @@ import {
   RESIDENT_STATUS_TONES,
 } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { formatMonth } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst, uuid } from "@/lib/validation";
 import type { Gender, IdProofType, ResidentStatus, VacateReason } from "@/types";
@@ -83,6 +87,8 @@ export default async function ResidentPage({
     { data: allocations, error: allocationsError },
     vacantBeds,
     events,
+    balance,
+    invoices,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -95,6 +101,8 @@ export default async function ResidentPage({
       .order("start_date", { ascending: false }),
     getVacantBeds(supabase, hostel.id),
     getAllocationEvents(supabase, hostel.id, { residentId: id }),
+    getResidentBalance(supabase, hostel.id, id),
+    getResidentInvoices(supabase, hostel.id, id),
   ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
@@ -110,6 +118,15 @@ export default async function ResidentPage({
   const status = resident.status as ResidentStatus;
   const bedOptions = vacantBeds.map((bed) => ({ value: bed.id, label: bed.label }));
   const allocatable = status === "active" || status === "notice";
+  // Oldest first, so the payment dialog preselects the longest-owed month.
+  const payable = invoices
+    .filter((invoice) => invoice.balance > 0)
+    .reverse()
+    .map((invoice) => ({
+      id: invoice.id,
+      label: formatMonth(invoice.periodMonth),
+      balance: invoice.balance,
+    }));
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -142,7 +159,6 @@ export default async function ResidentPage({
         {updated && <Alert tone="success">Resident details saved.</Alert>}
       </div>
 
-      {/* Actions area. EP-07 adds record payment. */}
       <Card title="Actions" id="actions-heading">
         <div className="space-y-5">
           <div>
@@ -158,11 +174,14 @@ export default async function ResidentPage({
                 }}
                 bedOptions={bedOptions}
                 feeSummary={
-                  // EP-07 (E7-T5) replaces this with the outstanding balance.
-                  <p>
-                    Billing is not set up yet, so there is no outstanding balance to settle. Rent
-                    for the new bed follows its sharing type unless you set an override.
-                  </p>
+                  <>
+                    <BalanceSentence balance={balance} />
+                    <p className="mt-1">
+                      Rent for the new bed follows its sharing type unless you set an override. This
+                      month&apos;s invoice, if already issued, is not changed; void and generate it
+                      again to charge each bed for its nights.
+                    </p>
+                  </>
                 }
               />
             ) : allocatable ? (
@@ -183,6 +202,14 @@ export default async function ResidentPage({
                 {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the resident
                 active first.
               </p>
+            )}
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-slate-700">Fees</h3>
+            {payable.length > 0 ? (
+              <PaymentDialog residentName={resident.full_name} invoices={payable} />
+            ) : (
+              <p className="text-sm text-slate-600">Nothing is due.</p>
             )}
           </div>
           <div>
@@ -287,11 +314,8 @@ export default async function ResidentPage({
         <AllocationHistory events={events} show="bed" caption="Allocation activity log" />
       </Card>
 
-      {/* EP-07 (E7-T5) replaces this with fee history and the outstanding balance. */}
       <Card title="Fees" id="fees-heading">
-        <p className="text-sm text-slate-600">
-          Fee history and the outstanding balance appear here once billing is set up.
-        </p>
+        <ResidentFees balance={balance} invoices={invoices} />
       </Card>
     </div>
   );
