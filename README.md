@@ -45,13 +45,14 @@ to run again). It prints the demo owner and staff logins.
 
 `.env.example` lists every variable. Names only; values never go in git.
 
-| Variable                        | Exposure      | Purpose                                         |
-| ------------------------------- | ------------- | ----------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | browser       | Supabase API URL                                |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser       | Publishable (anon) key; every query runs as RLS |
-| `SUPABASE_SERVICE_ROLE_KEY`     | server only   | Secret key; bypasses RLS. Trusted jobs only     |
-| `SUPABASE_DB_URL`               | local tests   | Direct Postgres connection for schema tests     |
-| `CLICKUP_API_TOKEN`             | local scripts | Only for `scripts/clickup/sync-plan.ps1`        |
+| Variable                        | Exposure      | Purpose                                          |
+| ------------------------------- | ------------- | ------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`      | browser       | Supabase API URL                                 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser       | Publishable (anon) key; every query runs as RLS  |
+| `SUPABASE_SERVICE_ROLE_KEY`     | server only   | Secret key; bypasses RLS. Trusted jobs only      |
+| `SUPABASE_DB_URL`               | local tests   | Direct Postgres connection for schema tests      |
+| `CLICKUP_API_TOKEN`             | local scripts | Only for `scripts/clickup/sync-plan.ps1`         |
+| `ENABLE_DIAGNOSTICS`            | tests only    | `1` turns on `/diagnostics/error`; never in prod |
 
 The app refuses to build or start when a required variable is missing.
 
@@ -67,6 +68,7 @@ The app refuses to build or start when a required variable is missing.
 | `npm test`                  | Every test suite                                              |
 | `npm run test:unit`         | Unit tests; no database needed                                |
 | `npm run test:db`           | Schema, RLS and integration tests against local Supabase      |
+| `npm run test:integrity`    | The bed and money integrity rules on their own (about 2 s)    |
 | `npm run test:e2e`          | Browser tests (desktop and mobile) against a production build |
 | `npm run db:start` / `stop` | Start or stop the local Supabase stack                        |
 | `npm run db:new -- <name>`  | Create a migration in `supabase/migrations/`                  |
@@ -105,6 +107,23 @@ changed) lands in the mail catcher at <http://localhost:54324>.
   away from app routes. Pages and server actions check again on their own:
   `requireUser()` for pages and layouts, `requireRole([...])` first thing in
   every server action (`src/lib/auth/session.ts`).
+
+## Errors and logging
+
+- Unhandled errors show a friendly page with a reference code (the error
+  digest), never a message or stack: `src/app/(app)/error.tsx` inside the app
+  shell, `src/app/error.tsx` elsewhere, `src/app/global-error.tsx` if the root
+  layout itself fails.
+- Every request gets an `x-request-id` (minted by the middleware, returned to
+  the browser). `src/instrumentation.ts` logs each unhandled server error as
+  one JSON line with that id, the route and the digest, so a reference a user
+  reports can be found. Server actions log failures they cannot explain to
+  the user (`unexpectedFailure` in `src/lib/request-context.ts`).
+- Logs never carry personal data or secrets (`src/lib/logger.ts`): personal
+  and secret keys are redacted, phone numbers, emails, ID numbers, tokens and
+  keys are scrubbed from every string (including Next.js's own console
+  output), database errors are logged by code and hint only, and query
+  strings are dropped from paths.
 
 ## Quality gates
 

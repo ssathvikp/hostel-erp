@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
+import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   bedStatusSchema,
@@ -24,7 +25,6 @@ import type { SharingType } from "@/types";
 
 import { planBulkRooms } from "./plan";
 
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 const NO_HOSTEL = "Finish setting up your hostel first.";
 
 const ROOM_FIELDS = ["room_number", "floor", "sharing_type", "capacity"] as const;
@@ -48,6 +48,12 @@ const RULE_MESSAGES: Record<string, string> = {
 
 function ruleMessage(error: PostgrestError): string | null {
   return error.code === "P0001" && error.hint ? (RULE_MESSAGES[error.hint] ?? null) : null;
+}
+
+/** A rule the user can act on, or a logged failure with the generic message. */
+async function failure(action: string, error: PostgrestError, values?: Record<string, string>) {
+  const message = ruleMessage(error);
+  return message ? formFailure(message, values) : unexpectedFailure(action, error, values);
 }
 
 function isDuplicateRoom(error: PostgrestError) {
@@ -99,7 +105,7 @@ export async function createRoom(_previous: FormState, formData: FormData): Prom
         room_number: [`Room ${parsed.data.room_number} already exists in this hostel.`],
       });
     }
-    return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+    return failure("createRoom", error, values);
   }
 
   revalidatePath("/rooms");
@@ -172,7 +178,7 @@ export async function generateRooms(
           values,
         );
       }
-      return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+      return failure("generateRooms", error, values);
     }
 
     revalidatePath("/rooms");
@@ -189,7 +195,7 @@ export async function generateRooms(
     .select("room_number")
     .eq("hostel_id", hostelId)
     .in("room_number", plan.roomNumbers);
-  if (error) return formFailure(UNEXPECTED, values);
+  if (error) return unexpectedFailure("generateRooms", error, values);
 
   const taken = new Set((existing ?? []).map((row) => row.room_number));
   return {
@@ -243,7 +249,7 @@ export async function updateRoom(_previous: FormState, formData: FormData): Prom
     .select("id")
     .maybeSingle();
 
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("updateRoom", error, values);
   if (!data) return formFailure("This room could not be found.", values);
 
   revalidatePath("/rooms");
@@ -270,7 +276,7 @@ export async function archiveRoom(_previous: FormState, formData: FormData): Pro
     .select("room_number")
     .maybeSingle();
 
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED);
+  if (error) return failure("archiveRoom", error);
   if (!data) return formFailure("This room could not be found.");
 
   revalidatePath("/rooms");
@@ -304,7 +310,7 @@ export async function deleteRoom(_previous: FormState, formData: FormData): Prom
         "This room has resident history, so it cannot be deleted. Archive it instead to keep that history.",
       );
     }
-    return formFailure(UNEXPECTED);
+    return unexpectedFailure("deleteRoom", error);
   }
   if (!data) return formFailure("This room could not be found.");
 
@@ -341,7 +347,7 @@ export async function setBedStatus(_previous: FormState, formData: FormData): Pr
     .select("bed_label, room_id")
     .maybeSingle();
 
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("setBedStatus", error, values);
   if (!data) return formFailure("This bed could not be found.", values);
 
   revalidatePath(`/rooms/${data.room_id}`);

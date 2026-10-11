@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
 import { detectIdProofType } from "@/lib/residents/file-type";
 import { protectIdProof } from "@/lib/residents/id-proof";
+import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   formFailure,
@@ -25,7 +26,6 @@ import type { ResidentStatus } from "@/types";
 
 import { ID_PROOF_MAX_BYTES, RESIDENT_STATUS_LABELS } from "./options";
 
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 const NO_HOSTEL = "Finish setting up your hostel first.";
 const NOT_FOUND = "This resident could not be found.";
 const BUCKET = "id-proofs";
@@ -78,6 +78,12 @@ async function activeHostelId(): Promise<string | null> {
 
 function ruleMessage(error: PostgrestError): string | null {
   return error.code === "P0001" && error.hint ? (RULE_MESSAGES[error.hint] ?? null) : null;
+}
+
+/** A rule the user can act on, or a logged failure with the generic message. */
+async function failure(action: string, error: PostgrestError, values?: Record<string, string>) {
+  const message = ruleMessage(error);
+  return message ? formFailure(message, values) : unexpectedFailure(action, error, values);
 }
 
 /** Which unique key a duplicate insert or update hit, if any. */
@@ -143,7 +149,7 @@ export async function registerResident(
         existing: existing ? { id: existing.id, name: existing.full_name, match: kind } : undefined,
       };
     }
-    return formFailure(UNEXPECTED, values);
+    return unexpectedFailure("registerResident", error, values);
   }
 
   revalidatePath("/residents");
@@ -205,7 +211,7 @@ export async function updateResident(
           : undefined,
       };
     }
-    return formFailure(UNEXPECTED, values);
+    return unexpectedFailure("updateResident", error, values);
   }
   if (!data) return formFailure(NOT_FOUND, values);
 
@@ -242,7 +248,7 @@ export async function changeResidentStatus(
     .select("full_name, status")
     .maybeSingle();
 
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED);
+  if (error) return failure("changeResidentStatus", error);
   if (!data) return formFailure(NOT_FOUND);
 
   revalidatePath("/residents");
@@ -287,7 +293,7 @@ export async function uploadIdProof(_previous: FormState, formData: FormData): P
     .eq("id", residentId)
     .eq("hostel_id", hostelId)
     .maybeSingle();
-  if (readError) return formFailure(UNEXPECTED);
+  if (readError) return unexpectedFailure("uploadIdProof", readError);
   if (!resident) return formFailure(NOT_FOUND);
 
   // Storage policies only accept <hostel>/<resident>/... for a resident of a
@@ -296,7 +302,10 @@ export async function uploadIdProof(_previous: FormState, formData: FormData): P
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(path, bytes, { contentType: type.mime, upsert: false });
-  if (uploadError) return formFailure("The file could not be uploaded. Try again.");
+  if (uploadError) {
+    await logUnexpected("uploadIdProof", uploadError);
+    return formFailure("The file could not be uploaded. Try again.");
+  }
 
   const { error: updateError } = await supabase
     .from("residents")
@@ -305,7 +314,7 @@ export async function uploadIdProof(_previous: FormState, formData: FormData): P
     .eq("hostel_id", hostelId);
   if (updateError) {
     await supabase.storage.from(BUCKET).remove([path]);
-    return formFailure(UNEXPECTED);
+    return unexpectedFailure("uploadIdProof", updateError);
   }
 
   // The previous copy is replaced, not kept: one current document per resident.

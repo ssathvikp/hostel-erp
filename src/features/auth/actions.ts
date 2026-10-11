@@ -4,6 +4,7 @@ import type { AuthError } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import { safeNextPath } from "@/lib/auth/redirect";
+import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -18,7 +19,6 @@ import {
 } from "@/lib/validation";
 
 const RATE_LIMITED = "Too many attempts. Wait a minute and try again.";
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 
 function isRateLimited(error: AuthError) {
   return error.status === 429 || error.code === "over_request_rate_limit";
@@ -46,7 +46,7 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
     if (error.code === "weak_password") {
       return formFailure(undefined, values, { password: ["Choose a stronger password"] });
     }
-    return formFailure(UNEXPECTED, values);
+    return unexpectedFailure("signUp", error, values);
   }
 
   // Only reachable if email confirmation is switched off.
@@ -134,7 +134,7 @@ export async function resetPassword(_previous: FormState, formData: FormData): P
     if (error.code === "weak_password") {
       return formFailure(undefined, undefined, { password: ["Choose a stronger password"] });
     }
-    return formFailure(UNEXPECTED);
+    return unexpectedFailure("resetPassword", error);
   }
 
   // A reset usually means the old password may be known to someone else:

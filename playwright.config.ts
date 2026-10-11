@@ -31,6 +31,8 @@ export default defineConfig({
     command: process.env.CI ? "npm run start" : "npm run build && npm run start",
     url: "http://localhost:3000/login",
     reuseExistingServer: !process.env.CI,
+    // Turns on /diagnostics/error, which throws on purpose (E9-T5).
+    env: { ENABLE_DIAGNOSTICS: "1" },
     timeout: 180_000,
   },
 });
