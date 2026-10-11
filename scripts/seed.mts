@@ -36,12 +36,19 @@ const HOSTEL_NAME = "Sunrise Residency";
 const options = { auth: { autoRefreshToken: false, persistSession: false } } as const;
 const admin = createClient(url, serviceKey, options);
 
-function check<T>(result: { data: T; error: unknown }, what: string): T {
+/**
+ * Stops the seed on the first error. Writes without `.select()` return no
+ * data; only reads use the return value, and those always return rows.
+ */
+function check<R extends { data: unknown; error: unknown }>(
+  result: R,
+  what: string,
+): NonNullable<R["data"]> {
   if (result.error) {
     console.error(`Seeding failed while ${what}:`, result.error);
     process.exit(1);
   }
-  return result.data;
+  return result.data as NonNullable<R["data"]>;
 }
 
 // ---------------------------------------------------------------------------
