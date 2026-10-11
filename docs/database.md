@@ -150,3 +150,36 @@ avoid now and expensive to fix once real data exists.
 - Files are only ever served through 60-second signed URLs, created with the
   user's own session (`/residents/[id]/id-proof`). The upload action checks
   the real file type from its first bytes, not the name or declared type.
+
+## Fees (EP-07)
+
+Full rules are in the header of `supabase/migrations/20261011090000_fees.sql`;
+in short:
+
+- **Money is integer paise**, never a mutable balance. `fee_structures` (rates),
+  `invoices` (a snapshot of what a month cost) and `payments` (append-only).
+- **Rates.** At most one rate per sharing type covers any day (exclusion
+  constraint). `set_fee_structure` closes the rate in force the day before a
+  new one starts; re-entering a rate with the same start date corrects it; a
+  rate cannot be set before a later one. Issued invoices never change.
+- **Rent precedence.** The allocation's `rent_override`, otherwise the rate for
+  the room's sharing type in force on the 1st of the billing month. A resident
+  with neither is reported as unpriced, never under-billed.
+- **Monthly billing** (`generate_invoices`, one statement). Each resident who
+  held a bed on at least one night of the month gets exactly one invoice
+  (partial unique index on `(resident_id, period_month)` for issued
+  invoices). A full month costs the rate; otherwise
+  `sum(rate × nights held) ÷ days in month`, rounded to the rupee, which also
+  covers mid-month arrivals, departures and transfers on one invoice.
+  Open-ended stays count to month end (rent is billed in advance). Future
+  months cannot be billed; months and due dates follow Asia/Kolkata.
+- **Corrections.** An invoice is voided with a reason (only when no live
+  payment sits on it) and the month can be generated again for that
+  resident. A payment is voided with a reason. Nothing is edited or deleted.
+- **Derived status.** `invoice_balances` (security invoker) computes paid,
+  balance and `due_status`: paid, overdue (past due with money owed, India
+  date), partial or unpaid. `resident_balances` sums them per resident.
+  Overpayment is rejected per invoice, under an advisory lock so concurrent
+  collectors cannot overpay between them.
+- **Roles.** Owners set rates, generate and void. Owners and staff read fees
+  and record payments.

@@ -336,14 +336,31 @@ export interface FeeStructure {
   sharing_type: SharingType;
   monthly_amount: Paise;
   effective_from: IsoDate;
-  /** Null means open-ended. */
+  /** Last day the rate applies. Null while it is the current rate. */
   effective_to: IsoDate | null;
+  created_by: Uuid | null;
   created_at: IsoTimestamp;
   updated_at: IsoTimestamp;
 }
 
-export type FeeStructureInsert = Omit<FeeStructure, Generated>;
-export type FeeStructureUpdate = Partial<Pick<FeeStructure, "effective_to">>;
+/** Rates are set through `set_fee_structure`, which closes the previous rate. */
+export type FeeStructureInsert = Pick<
+  FeeStructure,
+  "hostel_id" | "sharing_type" | "monthly_amount" | "effective_from"
+>;
+
+/** One stay's share of an invoice: its nights in the month at its rate. */
+export interface InvoiceLine {
+  allocation_id: Uuid;
+  room_number: string;
+  bed_label: string;
+  sharing_type: SharingType;
+  from: IsoDate;
+  to: IsoDate;
+  nights: number;
+  monthly_rate: Paise;
+  rate_source: "override" | "structure";
+}
 
 export interface Invoice {
   id: Uuid;
@@ -355,12 +372,20 @@ export interface Invoice {
   due_date: IsoDate;
   status: InvoiceStatus;
   void_reason: string | null;
+  voided_at: IsoTimestamp | null;
+  voided_by: Uuid | null;
+  /** How the amount was reached; see `InvoiceLine`. */
+  breakdown: InvoiceLine[];
+  created_by: Uuid | null;
   created_at: IsoTimestamp;
   updated_at: IsoTimestamp;
 }
 
 /** Invoices are generated, never hand-edited; due status derives from payments. */
-export type InvoiceInsert = Omit<Invoice, Generated | "status" | "void_reason">;
+export type InvoiceInsert = Omit<
+  Invoice,
+  Generated | "status" | "void_reason" | "voided_at" | "voided_by" | "created_by"
+>;
 
 export interface Payment {
   id: Uuid;
@@ -374,11 +399,15 @@ export interface Payment {
   /** A mistaken payment is reversed by voiding it, never by editing or deleting. */
   voided_at: IsoTimestamp | null;
   void_reason: string | null;
+  voided_by: Uuid | null;
   created_at: IsoTimestamp;
 }
 
 /** Payments are append-only: there is no update variant beyond voiding. */
-export type PaymentInsert = Omit<Payment, "id" | "created_at" | "voided_at" | "void_reason">;
+export type PaymentInsert = Omit<
+  Payment,
+  "id" | "created_at" | "voided_at" | "void_reason" | "voided_by" | "recorded_by"
+>;
 
 // ---------------------------------------------------------------------------
 // Read models (security_invoker views)
