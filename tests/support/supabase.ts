@@ -126,13 +126,22 @@ export function createUserFactory() {
 
   /**
    * Deletes everything the test file created. Order matters because history
-   * is protected by restrictive foreign keys: staff first (they reference a
-   * hostel), then the hostels, then the owners.
+   * is protected by restrictive foreign keys: allocations first, then staff
+   * (they reference a hostel), then the hostels, then the owners.
    */
   async function cleanup() {
     if (created.length === 0) return;
     const deleteUsers = (ids: string[]) =>
       Promise.all(ids.map((id) => admin.auth.admin.deleteUser(id)));
+
+    // Allocations name the user who made them and protect that history, so
+    // they go first; then nothing stops a staff account from being removed.
+    const { data: hostels } = await admin.from("hostels").select("id").in("owner_id", created);
+    const hostelIds = (hostels ?? []).map((row) => row.id);
+    if (hostelIds.length > 0) {
+      const { error } = await admin.from("allocations").delete().in("hostel_id", hostelIds);
+      if (error) throw error;
+    }
 
     const { data: staff } = await admin
       .from("profiles")

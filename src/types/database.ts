@@ -3,6 +3,123 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      allocations: {
+        Row: {
+          bed_id: string;
+          created_at: string;
+          created_by: string;
+          end_date: string | null;
+          hostel_id: string;
+          id: string;
+          rent_override: number | null;
+          resident_id: string;
+          room_id: string;
+          start_date: string;
+          updated_at: string;
+          vacate_reason: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          bed_id: string;
+          created_at?: string;
+          created_by?: string;
+          end_date?: string | null;
+          hostel_id: string;
+          id?: string;
+          rent_override?: number | null;
+          resident_id: string;
+          room_id: string;
+          start_date: string;
+          updated_at?: string;
+          vacate_reason?: string | null;
+        };
+        Update: {
+          bed_id?: string;
+          created_at?: string;
+          created_by?: string;
+          end_date?: string | null;
+          hostel_id?: string;
+          id?: string;
+          rent_override?: number | null;
+          resident_id?: string;
+          room_id?: string;
+          start_date?: string;
+          updated_at?: string;
+          vacate_reason?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "allocations_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_bed_in_room_fkey";
+            columns: ["room_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["room_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_bed_in_room_fkey";
+            columns: ["room_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["room_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocations_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocations_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocations_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       beds: {
         Row: {
           archived_at: string | null;
@@ -176,6 +293,107 @@ export type Database = {
           },
         ];
       };
+      residents: {
+        Row: {
+          alt_phone: string | null;
+          created_at: string;
+          created_by: string | null;
+          dob: string;
+          email: string | null;
+          full_name: string;
+          gender: string;
+          guardian_name: string | null;
+          guardian_phone: string | null;
+          hostel_id: string;
+          id: string;
+          id_proof_hash: string;
+          id_proof_last4: string;
+          id_proof_path: string | null;
+          id_proof_type: string;
+          joining_date: string;
+          notes: string | null;
+          permanent_address: string;
+          phone: string;
+          status: string;
+          status_changed_at: string | null;
+          status_changed_by: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          alt_phone?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          dob: string;
+          email?: string | null;
+          full_name: string;
+          gender: string;
+          guardian_name?: string | null;
+          guardian_phone?: string | null;
+          hostel_id: string;
+          id?: string;
+          id_proof_hash: string;
+          id_proof_last4: string;
+          id_proof_path?: string | null;
+          id_proof_type: string;
+          joining_date: string;
+          notes?: string | null;
+          permanent_address: string;
+          phone: string;
+          status?: string;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          alt_phone?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          dob?: string;
+          email?: string | null;
+          full_name?: string;
+          gender?: string;
+          guardian_name?: string | null;
+          guardian_phone?: string | null;
+          hostel_id?: string;
+          id?: string;
+          id_proof_hash?: string;
+          id_proof_last4?: string;
+          id_proof_path?: string | null;
+          id_proof_type?: string;
+          joining_date?: string;
+          notes?: string | null;
+          permanent_address?: string;
+          phone?: string;
+          status?: string;
+          status_changed_at?: string | null;
+          status_changed_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "residents_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "residents_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "residents_status_changed_by_fkey";
+            columns: ["status_changed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       rooms: {
         Row: {
           capacity: number;
@@ -278,6 +496,30 @@ export type Database = {
             columns: ["status_changed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      resident_directory: {
+        Row: {
+          bed_label: string | null;
+          created_at: string | null;
+          full_name: string | null;
+          hostel_id: string | null;
+          id: string | null;
+          joining_date: string | null;
+          phone: string | null;
+          room_id: string | null;
+          room_number: string | null;
+          status: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "residents_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
             referencedColumns: ["id"];
           },
         ];

@@ -7,8 +7,10 @@ import {
   INDIAN_STATES,
   MANUAL_BED_STATUSES,
   PAYMENT_MODES,
+  RESIDENT_STATUSES,
   SHARING_TYPES,
   VACATE_REASONS,
+  type IdProofType,
   type SharingType,
 } from "@/types";
 
@@ -247,9 +249,51 @@ export const residentSchema = z
       error: `Resident must be between ${MIN_RESIDENT_AGE} and ${MAX_RESIDENT_AGE} years old`,
       path: ["dob"],
     },
-  );
+  )
+  .refine(
+    (resident) => ID_PROOF_FORMATS[resident.id_proof_type].pattern.test(resident.id_proof_number),
+    {
+      error: "ID proof number does not match the chosen document",
+      path: ["id_proof_number"],
+    },
+  )
+  .refine((resident) => resident.joining_date >= resident.dob, {
+    error: "Joining date cannot be before the date of birth",
+    path: ["joining_date"],
+  });
+
+/**
+ * Shape of each document's number after normalisation. Strict enough to
+ * catch a number typed against the wrong document type, loose enough for
+ * older formats (driving licences and voter IDs vary by state).
+ */
+export const ID_PROOF_FORMATS: Record<IdProofType, { pattern: RegExp; example: string }> = {
+  aadhaar: { pattern: /^[2-9][0-9]{11}$/, example: "12 digits" },
+  pan: { pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, example: "ABCDE1234F" },
+  passport: { pattern: /^[A-Z][0-9]{7}$/, example: "A1234567" },
+  driving_licence: { pattern: /^[A-Z]{2}[0-9A-Z]{8,14}$/, example: "KA0120190001234" },
+  voter_id: { pattern: /^[A-Z]{3}[0-9]{7}$/, example: "ABC1234567" },
+};
+
+/** Editing a resident: contact, address, guardian and notes (E5-T2). */
+export const residentUpdateSchema = z.object({
+  phone: indianMobile,
+  alt_phone: optional(indianMobile),
+  email: optional(email),
+  guardian_name: optional(requiredText("Guardian name", 120)),
+  guardian_phone: optional(indianMobile),
+  permanent_address: requiredText("Permanent address", 500),
+  notes: optional(requiredText("Notes", 1000)),
+});
+
+/** A status change (E5-T6). Allowed transitions are enforced by the database. */
+export const residentStatusSchema = z.object({
+  resident_id: uuid("Resident"),
+  status: z.enum(RESIDENT_STATUSES, { error: "Choose a status" }),
+});
 
 export type ResidentInput = z.output<typeof residentSchema>;
+export type ResidentUpdateInput = z.output<typeof residentUpdateSchema>;
 
 // ---------------------------------------------------------------------------
 // Allocation (EP-06)
