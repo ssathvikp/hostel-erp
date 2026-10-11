@@ -67,7 +67,7 @@ schema_paths = []
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
 # Disabled: demo data needs real auth users, so it is created by
-# `npm run db:seed` (scripts/seed.ts, E9-T6) through the Auth admin API.
+# `npm run db:seed` (scripts/seed.mts, E9-T6) through the Auth admin API.
 enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
