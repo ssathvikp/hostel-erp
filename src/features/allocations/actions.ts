@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
+import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   allocationSchema,
@@ -19,7 +20,6 @@ import {
   type FormState,
 } from "@/lib/validation";
 
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 const NO_HOSTEL = "Finish setting up your hostel first.";
 
 const ALLOCATE_FIELDS = ["resident_id", "bed_id", "start_date", "rent_override"] as const;
@@ -58,6 +58,12 @@ function ruleMessage(error: PostgrestError): string | null {
   if (error.code !== "P0001" || !error.hint) return null;
   if (OVERLAP_HINTS.has(error.hint)) return `${error.message}. Choose another bed or date.`;
   return RULE_MESSAGES[error.hint] ?? null;
+}
+
+/** A rule the user can act on, or a logged failure with the generic message. */
+async function failure(action: string, error: PostgrestError, values?: Record<string, string>) {
+  const message = ruleMessage(error);
+  return message ? formFailure(message, values) : unexpectedFailure(action, error, values);
 }
 
 function authorizationFailure(error: unknown, values?: Record<string, string>): FormState {
@@ -102,7 +108,7 @@ export async function allocateBed(_previous: FormState, formData: FormData): Pro
     p_start_date: parsed.data.start_date,
     p_rent_override: parsed.data.rent_override ?? undefined,
   });
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("allocateBed", error, values);
 
   revalidateOccupancy(parsed.data.resident_id);
   return formSuccess("Bed allocated.");
@@ -131,7 +137,7 @@ export async function vacateBed(_previous: FormState, formData: FormData): Promi
     p_reason: parsed.data.vacate_reason,
     p_mark_vacated: parsed.data.mark_vacated,
   });
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("vacateBed", error, values);
 
   revalidateOccupancy(formData.get("resident_id"));
   return formSuccess(
@@ -162,7 +168,7 @@ export async function transferBed(_previous: FormState, formData: FormData): Pro
     p_move_date: parsed.data.move_date,
     p_rent_override: parsed.data.rent_override ?? undefined,
   });
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("transferBed", error, values);
 
   revalidateOccupancy(formData.get("resident_id"));
   return formSuccess("Resident moved to the new bed.");

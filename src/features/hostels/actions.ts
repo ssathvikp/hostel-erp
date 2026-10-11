@@ -9,6 +9,7 @@ import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
 import { ACTIVE_HOSTEL_COOKIE, ACTIVE_HOSTEL_COOKIE_OPTIONS } from "@/lib/hostels/cookie";
+import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   formFailure,
@@ -21,8 +22,6 @@ import {
   validateFormData,
   type FormState,
 } from "@/lib/validation";
-
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 
 const BASICS_FIELDS = ["name", "type", "phone"] as const;
 const ADDRESS_FIELDS = ["address", "city", "state", "pincode", "alt_phone", "email", "floors"];
@@ -89,7 +88,10 @@ export async function saveHostelBasics(
   }
 
   if (error)
-    return nameConflict(error, parsed.data.name, values) ?? formFailure(UNEXPECTED, values);
+    return (
+      nameConflict(error, parsed.data.name, values) ??
+      (await unexpectedFailure("saveHostelBasics", error, values))
+    );
 
   revalidatePath("/onboarding");
   redirect("/onboarding?step=2");
@@ -124,7 +126,7 @@ export async function completeHostelOnboarding(
     .select("id")
     .maybeSingle();
 
-  if (error) return formFailure(UNEXPECTED, values);
+  if (error) return unexpectedFailure("completeHostelOnboarding", error, values);
   if (data) await setActiveHostelCookie(data.id);
 
   revalidatePath("/", "layout");
@@ -190,7 +192,10 @@ export async function updateHostelSettings(
     .maybeSingle();
 
   if (error)
-    return nameConflict(error, parsed.data.name, values) ?? formFailure(UNEXPECTED, values);
+    return (
+      nameConflict(error, parsed.data.name, values) ??
+      (await unexpectedFailure("updateHostelSettings", error, values))
+    );
   if (!data) return formFailure("Only the hostel owner can change these details.", values);
 
   revalidatePath("/", "layout");

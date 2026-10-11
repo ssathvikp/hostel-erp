@@ -7,6 +7,7 @@ import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
 import { formatMonth, formatPaise } from "@/lib/money";
+import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   feeStructureSchema,
@@ -20,7 +21,6 @@ import {
   type FormState,
 } from "@/lib/validation";
 
-const UNEXPECTED = "Something went wrong on our side. Try again in a moment.";
 const NO_HOSTEL = "Finish setting up your hostel first.";
 const FOREIGN_KEY_VIOLATION = "23503";
 
@@ -56,6 +56,12 @@ function ruleMessage(error: PostgrestError): string | null {
   if (error.code !== "P0001" || !error.hint) return null;
   if (SELF_EXPLAINING_HINTS.has(error.hint)) return `${error.message}.`;
   return RULE_MESSAGES[error.hint] ?? null;
+}
+
+/** A rule the user can act on, or a logged failure with the generic message. */
+async function failure(action: string, error: PostgrestError, values?: Record<string, string>) {
+  const message = ruleMessage(error);
+  return message ? formFailure(message, values) : unexpectedFailure(action, error, values);
 }
 
 function authorizationFailure(error: unknown, values?: Record<string, string>): FormState {
@@ -101,7 +107,7 @@ export async function setFeeStructure(
     p_monthly_amount: parsed.data.monthly_amount,
     p_effective_from: parsed.data.effective_from,
   });
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("setFeeStructure", error, values);
 
   revalidatePath("/settings/fees");
   revalidatePath("/fees");
@@ -145,7 +151,7 @@ export async function generateInvoices(
     p_period_month: parsed.data.period_month,
     p_due_day: parsed.data.due_day,
   });
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("generateInvoices", error, values);
 
   const summary = data as unknown as GenerationSummary;
   const month = formatMonth(parsed.data.period_month);
@@ -190,7 +196,7 @@ export async function voidInvoice(_previous: FormState, formData: FormData): Pro
     .eq("id", parsed.data.id)
     .eq("hostel_id", hostelId)
     .select("id");
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("voidInvoice", error, values);
   if (!data?.length) return formFailure(RULE_MESSAGES.invoice_not_found, values);
 
   revalidateFees();
@@ -237,7 +243,7 @@ export async function recordPayment(_previous: FormState, formData: FormData): P
         });
       }
     }
-    return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+    return failure("recordPayment", error, values);
   }
 
   revalidateFees();
@@ -264,7 +270,7 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
     .eq("id", parsed.data.id)
     .eq("hostel_id", hostelId)
     .select("id");
-  if (error) return formFailure(ruleMessage(error) ?? UNEXPECTED, values);
+  if (error) return failure("voidPayment", error, values);
   if (!data?.length)
     return formFailure("This payment could not be found. Refresh the page.", values);
 
