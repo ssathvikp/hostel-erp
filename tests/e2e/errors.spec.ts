@@ -58,3 +58,12 @@ test("a page number past the end of a list goes back to the first page, not an e
     await expect(inMain(page).getByText("Something went wrong")).toHaveCount(0);
   }
 });
+
+test("every response carries the security headers", async ({ request }) => {
+  const headers = (await request.get("/login")).headers();
+  expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  expect(headers["x-powered-by"]).toBeUndefined();
+});

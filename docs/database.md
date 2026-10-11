@@ -183,6 +183,20 @@ in short:
   collectors cannot overpay between them.
 - **Roles.** Owners set rates, generate and void. Owners and staff read fees
   and record payments.
+- **Who recorded a payment** is snapshotted in `payments.recorded_by_name` by
+  the insert trigger (clients cannot write it), because staff cannot read the
+  owner's profile. `billed_months(hostel)` lists the distinct billed months
+  for the fee filter; reading invoice rows would stop at the API's 1000-row
+  cap.
+
+### Reading lists through the API
+
+PostgREST returns at most 1000 rows per request (`max_rows` in
+`supabase/config.toml`, the same on hosted projects), silently. Anything
+that can grow past that is paged (`.range()`), aggregated in the database,
+or returned by a function, never read whole and reduced in the app. A page
+that starts past the last row answers HTTP 416 (`PGRST103`); list pages
+treat that as "go to the first page" (`src/lib/pagination.ts`).
 
 ## Dashboard (EP-08)
 
