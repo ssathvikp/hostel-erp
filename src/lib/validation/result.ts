@@ -65,6 +65,8 @@ export interface FormState {
   formError?: string;
   fieldErrors: FieldErrors;
   message?: string;
+  /** Something the user should act on even though the action succeeded. */
+  warning?: string;
   values?: Record<string, string>;
 }
 
@@ -78,8 +80,8 @@ export function formFailure(
   return { id: crypto.randomUUID(), status: "error", formError, fieldErrors, values };
 }
 
-export function formSuccess(message?: string): FormState {
-  return { id: crypto.randomUUID(), status: "success", fieldErrors: {}, message };
+export function formSuccess(message?: string, warning?: string): FormState {
+  return { id: crypto.randomUUID(), status: "success", fieldErrors: {}, message, warning };
 }
 
 /** Reads the named text fields from a submission, for echoing back. */

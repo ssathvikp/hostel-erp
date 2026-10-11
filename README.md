@@ -31,6 +31,9 @@ npm run dev          # http://localhost:3000
 
 The first `db:start` downloads the Supabase images and takes a few minutes.
 
+For realistic data to click through, run `npm run db:seed` (local only; safe
+to run again). It prints the demo owner and staff logins.
+
 | Local service             | URL                      |
 | ------------------------- | ------------------------ |
 | App                       | <http://localhost:3000>  |
@@ -69,6 +72,7 @@ The app refuses to build or start when a required variable is missing.
 | `npm run db:new -- <name>`  | Create a migration in `supabase/migrations/`                  |
 | `npm run db:reset`          | Rebuild the local database from empty with every migration    |
 | `npm run db:types`          | Regenerate `src/types/database.ts` from the local schema      |
+| `npm run db:seed`           | Add a demo hostel with residents, invoices and payments       |
 | `npm run db:lint`           | Lint the database schema                                      |
 | `npm run env:local`         | Write local Supabase values into `.env.local`                 |
 

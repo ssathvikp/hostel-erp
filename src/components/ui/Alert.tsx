@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 const tones = {
   error: "border-red-200 bg-red-50 text-red-800",
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
   info: "border-brand-100 bg-brand-50 text-slate-800",
 } as const;
 

@@ -5,6 +5,7 @@ import {
   allocationSchema,
   bulkRoomSchema,
   feeStructureSchema,
+  generateInvoicesSchema,
   hostelAddressSchema,
   hostelBasicsSchema,
   hostelSchema,
@@ -14,6 +15,7 @@ import {
   roomSchema,
   todayIst,
   toFieldErrors,
+  voidSchema,
   validate,
   validateFormData,
   transferSchema,
@@ -262,10 +264,12 @@ describe("fee schemas", () => {
       sharing_type: "triple",
       monthly_amount: "5000",
       effective_from: "2026-10-01",
-      effective_to: "",
     });
-    expect(parsed.monthly_amount).toBe(500000);
-    expect(parsed.effective_to).toBeNull();
+    expect(parsed).toEqual({
+      sharing_type: "triple",
+      monthly_amount: 500000,
+      effective_from: "2026-10-01",
+    });
   });
 
   it("rejects an amount with more than 2 decimal places", () => {
@@ -280,17 +284,36 @@ describe("fee schemas", () => {
     ).toHaveProperty("monthly_amount");
   });
 
-  it("rejects an effective range that ends before it starts", () => {
+  it("turns a billing month into its first day and refuses future months", () => {
+    const thisMonth = todayIst().slice(0, 7);
+    expect(generateInvoicesSchema.parse({ period_month: thisMonth, due_day: "5" })).toEqual({
+      period_month: `${thisMonth}-01`,
+      due_day: 5,
+    });
+    const nextYear = `${Number(thisMonth.slice(0, 4)) + 1}-01`;
     expect(
-      errorsOf(
-        validate(feeStructureSchema, {
-          sharing_type: "triple",
-          monthly_amount: "5000",
-          effective_from: "2026-10-01",
-          effective_to: "2026-09-30",
-        }),
-      ),
-    ).toHaveProperty("effective_to");
+      errorsOf(validate(generateInvoicesSchema, { period_month: nextYear, due_day: "5" })),
+    ).toHaveProperty("period_month");
+    expect(
+      errorsOf(validate(generateInvoicesSchema, { period_month: "2026-13", due_day: "5" })),
+    ).toHaveProperty("period_month");
+  });
+
+  it("keeps due days between 1 and 28 so every month has one", () => {
+    for (const due_day of ["0", "29", "", "2.5"]) {
+      expect(
+        errorsOf(validate(generateInvoicesSchema, { period_month: "2026-01", due_day })),
+      ).toHaveProperty("due_day");
+    }
+  });
+
+  it("requires a reason to void", () => {
+    expect(errorsOf(validate(voidSchema, { id: UUID_A, void_reason: "  " }))).toHaveProperty(
+      "void_reason",
+    );
+    expect(voidSchema.parse({ id: UUID_A, void_reason: " Duplicate " }).void_reason).toBe(
+      "Duplicate",
+    );
   });
 
   const payment = {

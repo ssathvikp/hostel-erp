@@ -126,7 +126,7 @@ export function createUserFactory() {
 
   /**
    * Deletes everything the test file created. Order matters because history
-   * is protected by restrictive foreign keys: allocations first, then staff
+   * is protected by restrictive foreign keys: payments, invoices and allocations first, then staff
    * (they reference a hostel), then the hostels, then the owners.
    */
   async function cleanup() {
@@ -139,8 +139,11 @@ export function createUserFactory() {
     const { data: hostels } = await admin.from("hostels").select("id").in("owner_id", created);
     const hostelIds = (hostels ?? []).map((row) => row.id);
     if (hostelIds.length > 0) {
-      const { error } = await admin.from("allocations").delete().in("hostel_id", hostelIds);
-      if (error) throw error;
+      // Money rows protect the stays and people they name, so they go first.
+      for (const table of ["payments", "invoices", "allocations"] as const) {
+        const { error } = await admin.from(table).delete().in("hostel_id", hostelIds);
+        if (error) throw error;
+      }
     }
 
     const { data: staff } = await admin

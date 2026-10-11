@@ -298,6 +298,58 @@ export type Database = {
           },
         ];
       };
+      fee_structures: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          effective_from: string;
+          effective_to: string | null;
+          hostel_id: string;
+          id: string;
+          monthly_amount: number;
+          sharing_type: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          effective_from: string;
+          effective_to?: string | null;
+          hostel_id: string;
+          id?: string;
+          monthly_amount: number;
+          sharing_type: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          effective_from?: string;
+          effective_to?: string | null;
+          hostel_id?: string;
+          id?: string;
+          monthly_amount?: number;
+          sharing_type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fee_structures_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fee_structures_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       hostels: {
         Row: {
           address: string | null;
@@ -361,6 +413,186 @@ export type Database = {
           {
             foreignKeyName: "hostels_owner_id_fkey";
             columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoices: {
+        Row: {
+          allocation_id: string | null;
+          amount: number;
+          breakdown: NonNullable<Json>;
+          created_at: string;
+          created_by: string | null;
+          due_date: string;
+          hostel_id: string;
+          id: string;
+          period_month: string;
+          resident_id: string;
+          status: string;
+          updated_at: string;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          allocation_id?: string | null;
+          amount: number;
+          breakdown?: NonNullable<Json>;
+          created_at?: string;
+          created_by?: string | null;
+          due_date: string;
+          hostel_id: string;
+          id?: string;
+          period_month: string;
+          resident_id: string;
+          status?: string;
+          updated_at?: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          allocation_id?: string | null;
+          amount?: number;
+          breakdown?: NonNullable<Json>;
+          created_at?: string;
+          created_by?: string | null;
+          due_date?: string;
+          hostel_id?: string;
+          id?: string;
+          period_month?: string;
+          resident_id?: string;
+          status?: string;
+          updated_at?: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoices_allocation_fkey";
+            columns: ["hostel_id", "allocation_id"];
+            isOneToOne: false;
+            referencedRelation: "allocations";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payments: {
+        Row: {
+          amount: number;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          invoice_id: string;
+          mode: string;
+          paid_at: string;
+          recorded_by: string;
+          reference: string | null;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          invoice_id: string;
+          mode: string;
+          paid_at: string;
+          recorded_by?: string;
+          reference?: string | null;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          invoice_id?: string;
+          mode?: string;
+          paid_at?: string;
+          recorded_by?: string;
+          reference?: string | null;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payments_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "payments_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "payments_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_voided_by_fkey";
+            columns: ["voided_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -654,6 +886,97 @@ export type Database = {
           },
         ];
       };
+      invoice_balances: {
+        Row: {
+          allocation_id: string | null;
+          amount: number | null;
+          balance: number | null;
+          bed_label: string | null;
+          created_at: string | null;
+          due_date: string | null;
+          due_status: string | null;
+          hostel_id: string | null;
+          id: string | null;
+          paid: number | null;
+          period_month: string | null;
+          resident_email: string | null;
+          resident_id: string | null;
+          resident_name: string | null;
+          resident_phone: string | null;
+          room_id: string | null;
+          room_number: string | null;
+          room_sort: string | null;
+          status: string | null;
+          void_reason: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "invoices_allocation_fkey";
+            columns: ["hostel_id", "allocation_id"];
+            isOneToOne: false;
+            referencedRelation: "allocations";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
+      resident_balances: {
+        Row: {
+          hostel_id: string | null;
+          invoiced: number | null;
+          oldest_overdue_due_date: string | null;
+          open_invoices: number | null;
+          outstanding: number | null;
+          overdue: number | null;
+          paid: number | null;
+          resident_id: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "invoices_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       resident_directory: {
         Row: {
           bed_label: string | null;
@@ -729,6 +1052,29 @@ export type Database = {
           beds_created: number;
           rooms_created: number;
         }[];
+      };
+      fee_status_totals: {
+        Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
+        Returns: {
+          amount: number;
+          balance: number;
+          due_status: string;
+          invoices: number;
+          paid: number;
+        }[];
+      };
+      generate_invoices: {
+        Args: { p_due_day?: number; p_hostel_id: string; p_period_month: string };
+        Returns: Json;
+      };
+      set_fee_structure: {
+        Args: {
+          p_effective_from: string;
+          p_hostel_id: string;
+          p_monthly_amount: number;
+          p_sharing_type: string;
+        };
+        Returns: string;
       };
       transfer_allocation: {
         Args: {

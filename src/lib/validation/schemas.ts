@@ -344,17 +344,36 @@ export type TransferInput = z.output<typeof transferSchema>;
 // Fees and payments (EP-07)
 // ---------------------------------------------------------------------------
 
-export const feeStructureSchema = z
-  .object({
-    sharing_type: z.enum(SHARING_TYPES, { error: "Choose a sharing type" }),
-    monthly_amount: rupees("Monthly amount"),
-    effective_from: isoDate("Effective from"),
-    effective_to: optional(isoDate("Effective to")),
+/**
+ * A rate for a sharing type from a date (E7-T2). It has no end date: the
+ * next rate set for the same type closes it the day before it starts.
+ */
+export const feeStructureSchema = z.object({
+  sharing_type: z.enum(SHARING_TYPES, { error: "Choose a sharing type" }),
+  monthly_amount: rupees("Monthly amount"),
+  effective_from: isoDate("Effective from"),
+});
+
+/** A billing month typed into `<input type="month">` (`YYYY-MM`), output as `YYYY-MM-01`. */
+export const billingMonth = z
+  .string({ error: "Choose a month" })
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, { error: "Choose a month" })
+  .refine((value) => value <= todayIst().slice(0, 7), {
+    error: "A future month cannot be billed yet",
   })
-  .refine((fee) => fee.effective_to === null || fee.effective_to >= fee.effective_from, {
-    error: "Effective to must not be before effective from",
-    path: ["effective_to"],
-  });
+  .transform((value) => `${value}-01`);
+
+/** Monthly invoice generation (E7-T3). Due days stop at 28 so every month has one. */
+export const generateInvoicesSchema = z.object({
+  period_month: billingMonth,
+  due_day: integer("Due day", 1, 28),
+});
+
+/** Voiding an invoice or payment always records why (E7-T3, E7-T4). */
+export const voidSchema = z.object({
+  id: uuid("Record"),
+  void_reason: requiredText("Reason", 500),
+});
 
 export const paymentSchema = z
   .object({
@@ -370,4 +389,5 @@ export const paymentSchema = z
   });
 
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
+export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;
 export type PaymentInput = z.output<typeof paymentSchema>;
