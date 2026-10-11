@@ -16,6 +16,7 @@ import {
   toFieldErrors,
   validate,
   validateFormData,
+  transferSchema,
   vacateSchema,
 } from "@/lib/validation";
 
@@ -211,16 +212,47 @@ describe("allocation schemas", () => {
     ).toHaveProperty("bed_id");
   });
 
-  it("validates vacate input", () => {
+  it("refuses a start date in the future (no advance bookings)", () => {
+    const tomorrow = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    expect(
+      errorsOf(
+        validate(allocationSchema, { resident_id: UUID_A, bed_id: UUID_B, start_date: tomorrow }),
+      ),
+    ).toEqual({ start_date: ["Start date cannot be in the future"] });
+  });
+
+  it("validates vacate input, with transferred reserved for transfers", () => {
     const vacate = {
       allocation_id: UUID_A,
-      end_date: "2026-10-31",
+      move_out_date: "2026-10-01",
       vacate_reason: "moved_out",
     };
-    expect(vacateSchema.safeParse(vacate).success).toBe(true);
-    expect(errorsOf(validate(vacateSchema, { ...vacate, vacate_reason: "bored" }))).toHaveProperty(
-      "vacate_reason",
-    );
+    expect(vacateSchema.parse(vacate)).toEqual({ ...vacate, mark_vacated: false });
+    expect(vacateSchema.parse({ ...vacate, mark_vacated: "on" }).mark_vacated).toBe(true);
+    for (const reason of ["bored", "transferred"]) {
+      expect(errorsOf(validate(vacateSchema, { ...vacate, vacate_reason: reason }))).toHaveProperty(
+        "vacate_reason",
+      );
+    }
+  });
+
+  it("validates transfer input and converts the rent override to paise", () => {
+    expect(
+      transferSchema.parse({
+        allocation_id: UUID_A,
+        bed_id: UUID_B,
+        move_date: "2026-10-01",
+        rent_override: "6500.50",
+      }),
+    ).toEqual({
+      allocation_id: UUID_A,
+      bed_id: UUID_B,
+      move_date: "2026-10-01",
+      rent_override: 650050,
+    });
+    expect(
+      errorsOf(validate(transferSchema, { allocation_id: UUID_A, move_date: "2026-10-01" })),
+    ).toHaveProperty("bed_id");
   });
 });
 

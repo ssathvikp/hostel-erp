@@ -9,7 +9,6 @@ import {
   PAYMENT_MODES,
   RESIDENT_STATUSES,
   SHARING_TYPES,
-  VACATE_REASONS,
   type IdProofType,
   type SharingType,
 } from "@/types";
@@ -299,21 +298,47 @@ export type ResidentUpdateInput = z.output<typeof residentUpdateSchema>;
 // Allocation (EP-06)
 // ---------------------------------------------------------------------------
 
+/** Allocations record moves that have happened: no advance bookings (E6-T2). */
+const notFuture = (label: string) =>
+  isoDate(label).refine((value) => value <= todayIst(), {
+    error: `${label} cannot be in the future`,
+  });
+
 export const allocationSchema = z.object({
   resident_id: uuid("Resident"),
   bed_id: uuid("Bed"),
-  start_date: isoDate("Start date"),
+  start_date: notFuture("Start date"),
   rent_override: optional(rupees("Rent override")),
 });
 
+/** Reasons a user can give for vacating; "transferred" is set by transfers only. */
+export const VACATE_FORM_REASONS = ["moved_out", "evicted", "other"] as const;
+
+/**
+ * Vacating (E6-T4). The move-out date is the day the resident leaves; the
+ * allocation's last night (end_date) is the day before.
+ */
 export const vacateSchema = z.object({
   allocation_id: uuid("Allocation"),
-  end_date: isoDate("End date"),
-  vacate_reason: z.enum(VACATE_REASONS, { error: "Choose a reason" }),
+  move_out_date: notFuture("Move-out date"),
+  vacate_reason: z.enum(VACATE_FORM_REASONS, { error: "Choose a reason" }),
+  mark_vacated: z
+    .literal("on")
+    .optional()
+    .transform((value) => value === "on"),
+});
+
+/** Transferring to another bed (E6-T4). The first night in the new bed is move_date. */
+export const transferSchema = z.object({
+  allocation_id: uuid("Allocation"),
+  bed_id: uuid("New bed"),
+  move_date: notFuture("Move date"),
+  rent_override: optional(rupees("Rent override")),
 });
 
 export type AllocationInput = z.output<typeof allocationSchema>;
 export type VacateInput = z.output<typeof vacateSchema>;
+export type TransferInput = z.output<typeof transferSchema>;
 
 // ---------------------------------------------------------------------------
 // Fees and payments (EP-07)

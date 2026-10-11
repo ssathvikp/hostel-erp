@@ -13,7 +13,9 @@ interface TableProps extends HTMLAttributes<HTMLTableElement> {
  */
 export function Table({ caption, className, children, ...props }: TableProps) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    // relative: absolutely positioned content (sr-only labels) stays inside the
+    // scroll area instead of widening the page.
+    <div className="relative overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className={cn("min-w-full divide-y divide-slate-200 text-sm", className)} {...props}>
         {caption && <caption className="sr-only">{caption}</caption>}
         {children}

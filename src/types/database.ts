@@ -3,6 +3,119 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      allocation_events: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          actor_name: string | null;
+          allocation_id: string;
+          bed_id: string;
+          created_at: string;
+          effective_date: string;
+          hostel_id: string;
+          id: number;
+          new_state: NonNullable<Json>;
+          previous_state: Json | null;
+          resident_id: string;
+          room_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          allocation_id: string;
+          bed_id: string;
+          created_at?: string;
+          effective_date: string;
+          hostel_id: string;
+          id?: never;
+          new_state: NonNullable<Json>;
+          previous_state?: Json | null;
+          resident_id: string;
+          room_id: string;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          actor_name?: string | null;
+          allocation_id?: string;
+          bed_id?: string;
+          created_at?: string;
+          effective_date?: string;
+          hostel_id?: string;
+          id?: never;
+          new_state?: NonNullable<Json>;
+          previous_state?: Json | null;
+          resident_id?: string;
+          room_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "allocation_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_events_allocation_fkey";
+            columns: ["hostel_id", "allocation_id"];
+            isOneToOne: false;
+            referencedRelation: "allocations";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_bed_fkey";
+            columns: ["hostel_id", "bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_events_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "allocation_events_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       allocations: {
         Row: {
           bed_id: string;
@@ -500,6 +613,47 @@ export type Database = {
           },
         ];
       };
+      floor_occupancy: {
+        Row: {
+          floor: number | null;
+          hostel_id: string | null;
+          occupied_beds: number | null;
+          out_of_service_beds: number | null;
+          rooms: number | null;
+          total_beds: number | null;
+          vacant_beds: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      hostel_occupancy: {
+        Row: {
+          hostel_id: string | null;
+          occupied_beds: number | null;
+          out_of_service_beds: number | null;
+          rooms: number | null;
+          total_beds: number | null;
+          vacant_beds: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       resident_directory: {
         Row: {
           bed_label: string | null;
@@ -532,6 +686,7 @@ export type Database = {
           floor: number | null;
           hostel_id: string | null;
           id: string | null;
+          occupied_beds: number | null;
           out_of_service_beds: number | null;
           room_number: string | null;
           room_sort: string | null;
@@ -552,6 +707,15 @@ export type Database = {
       };
     };
     Functions: {
+      allocate_bed: {
+        Args: {
+          p_bed_id: string;
+          p_rent_override?: number;
+          p_resident_id: string;
+          p_start_date: string;
+        };
+        Returns: string;
+      };
       create_rooms_bulk: {
         Args: {
           p_capacity: number;
@@ -565,6 +729,24 @@ export type Database = {
           beds_created: number;
           rooms_created: number;
         }[];
+      };
+      transfer_allocation: {
+        Args: {
+          p_allocation_id: string;
+          p_move_date: string;
+          p_new_bed_id: string;
+          p_rent_override?: number;
+        };
+        Returns: string;
+      };
+      vacate_allocation: {
+        Args: {
+          p_allocation_id: string;
+          p_mark_vacated?: boolean;
+          p_move_out_date: string;
+          p_reason: string;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

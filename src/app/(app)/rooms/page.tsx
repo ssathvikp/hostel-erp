@@ -61,9 +61,12 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient();
   let query = supabase
     .from("room_inventory")
-    .select("id, room_number, floor, sharing_type, total_beds, out_of_service_beds, capacity", {
-      count: "exact",
-    })
+    .select(
+      "id, room_number, floor, sharing_type, total_beds, occupied_beds, available_beds, out_of_service_beds, capacity",
+      {
+        count: "exact",
+      },
+    )
     .eq("hostel_id", hostel.id)
     .eq("status", filters.archived ? "archived" : "active");
   if (filters.q) query = query.ilike("room_number", `%${filters.q.replace(/[\\%_]/g, "\\$&")}%`);
@@ -194,6 +197,12 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
                     <Th>Floor</Th>
                     <Th>Sharing</Th>
                     <Th className="text-right">Beds</Th>
+                    {!filters.archived && (
+                      <>
+                        <Th className="text-right">Occupied</Th>
+                        <Th className="text-right">Vacant</Th>
+                      </>
+                    )}
                   </tr>
                 </THead>
                 <TBody>
@@ -217,6 +226,12 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
                           </Badge>
                         )}
                       </Td>
+                      {!filters.archived && (
+                        <>
+                          <Td className="text-right">{room.occupied_beds}</Td>
+                          <Td className="text-right">{room.available_beds}</Td>
+                        </>
+                      )}
                     </Tr>
                   ))}
                 </TBody>
