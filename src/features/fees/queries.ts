@@ -130,6 +130,8 @@ export async function getResidentBalance(
 
 export interface InvoiceRow {
   id: string;
+  /** Sequential per hostel and financial year, e.g. INV/26-27/00042. */
+  number: string;
   residentId: string;
   residentName: string;
   residentPhone: string;
@@ -149,7 +151,7 @@ export interface InvoiceRow {
 }
 
 const INVOICE_COLUMNS =
-  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason";
+  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, number";
 
 type InvoiceBalanceRow = {
   id: string | null;
@@ -168,11 +170,13 @@ type InvoiceBalanceRow = {
   status: string | null;
   due_status: string | null;
   void_reason: string | null;
+  number: string | null;
 };
 
 function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
   return {
     id: row.id!,
+    number: row.number!,
     residentId: row.resident_id!,
     residentName: row.resident_name ?? "",
     residentPhone: row.resident_phone ?? "",
@@ -310,6 +314,8 @@ export async function getBilledMonths(supabase: Supabase, hostelId: string): Pro
 
 export interface PaymentRow {
   id: string;
+  /** The receipt number, e.g. RCT/26-27/00042. */
+  number: string;
   amount: number;
   paidAt: string;
   mode: PaymentMode;
@@ -360,7 +366,7 @@ async function getInvoicePayments(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name",
+      "id, number, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name",
     )
     .eq("hostel_id", hostelId)
     .eq("invoice_id", invoiceId)
@@ -369,6 +375,7 @@ async function getInvoicePayments(
   if (error) throw error;
   return (data ?? []).map((row) => ({
     id: row.id,
+    number: row.number,
     amount: row.amount,
     paidAt: row.paid_at,
     mode: row.mode as PaymentMode,

@@ -19,11 +19,6 @@ interface Letterhead {
   gstin: string | null;
 }
 
-/** A short, stable document number derived from the record id. */
-export function documentNumber(prefix: string, id: string): string {
-  return `${prefix}-${id.slice(0, 8).toUpperCase()}`;
-}
-
 function Header({ hostel, title, number }: { hostel: Letterhead; title: string; number: string }) {
   const address = [hostel.address, hostel.city, hostel.state, hostel.pincode]
     .filter(Boolean)
@@ -113,7 +108,7 @@ export function InvoiceDocument({
       <Header
         hostel={hostel}
         title={invoice.status === "void" ? "Invoice (void)" : "Invoice"}
-        number={documentNumber("INV", invoice.id)}
+        number={invoice.number}
       />
       {invoice.status === "void" && (
         <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-800">
@@ -223,7 +218,7 @@ export function ReceiptDocument({
       <Header
         hostel={hostel}
         title={payment.voidedAt ? "Receipt (void)" : "Payment receipt"}
-        number={documentNumber("RCT", payment.id)}
+        number={payment.number}
       />
       {payment.voidedAt && (
         <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-800">
@@ -235,8 +230,7 @@ export function ReceiptDocument({
         <span className="font-semibold">{formatPaise(payment.amount)}</span> by{" "}
         {PAYMENT_MODE_LABELS[payment.mode]} on {formatDay(payment.paidAt)}
         {payment.reference && <> (reference {payment.reference})</>}, towards invoice{" "}
-        <span className="font-mono">{documentNumber("INV", invoice.id)}</span> for{" "}
-        {formatMonth(invoice.periodMonth)}.
+        <span className="font-mono">{invoice.number}</span> for {formatMonth(invoice.periodMonth)}.
       </p>
       <Party invoice={invoice} />
       <div className="flex justify-end">

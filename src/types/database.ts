@@ -429,6 +429,7 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id: string;
+          number: string;
           period_month: string;
           resident_id: string;
           status: string;
@@ -447,6 +448,7 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id?: string;
+          number?: string;
           period_month: string;
           resident_id: string;
           status?: string;
@@ -464,6 +466,7 @@ export type Database = {
           due_date?: string;
           hostel_id?: string;
           id?: string;
+          number?: string;
           period_month?: string;
           resident_id?: string;
           status?: string;
@@ -525,6 +528,7 @@ export type Database = {
           id: string;
           invoice_id: string;
           mode: string;
+          number: string;
           paid_at: string;
           recorded_by: string;
           recorded_by_name: string | null;
@@ -541,6 +545,7 @@ export type Database = {
           id?: string;
           invoice_id: string;
           mode: string;
+          number?: string;
           paid_at: string;
           recorded_by?: string;
           recorded_by_name?: string | null;
@@ -556,6 +561,7 @@ export type Database = {
           id?: string;
           invoice_id?: string;
           mode?: string;
+          number?: string;
           paid_at?: string;
           recorded_by?: string;
           recorded_by_name?: string | null;
@@ -900,6 +906,7 @@ export type Database = {
           due_status: string | null;
           hostel_id: string | null;
           id: string | null;
+          number: string | null;
           paid: number | null;
           period_month: string | null;
           resident_email: string | null;

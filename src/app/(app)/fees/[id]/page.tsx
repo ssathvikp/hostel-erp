@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
-import { documentNumber } from "@/features/fees/components/InvoiceDocument";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
@@ -44,7 +43,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             title={`${invoice.residentName}, ${month}`}
             description={
               <span className="inline-flex items-center gap-2">
-                <span className="font-mono">{documentNumber("INV", invoice.id)}</span>
+                <span className="font-mono">{invoice.number}</span>
                 {invoice.dueStatus ? (
                   <Badge tone={DUE_STATUS_TONES[invoice.dueStatus]}>
                     {DUE_STATUS_LABELS[invoice.dueStatus]}
