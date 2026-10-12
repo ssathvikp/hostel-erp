@@ -18,7 +18,7 @@ import {
 import { RoomFilters } from "@/features/rooms/components/RoomFilters";
 import { floorLabel, SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { isPastLastPage } from "@/lib/pagination";
+import { fetchAllPages, isPastLastPage } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { SHARING_TYPES, type SharingType, type ViewRow } from "@/types";
 import type { Database } from "@/types/database";
@@ -78,21 +78,25 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
   if (filters.availability === "full") query = query.eq("available_beds", 0);
 
   const from = (filters.page - 1) * PAGE_SIZE;
-  const [{ data: rooms, count, error }, { data: floorRows, error: floorError }] = await Promise.all(
-    [
-      query
-        .order("floor")
-        .order("room_sort")
-        .range(from, from + PAGE_SIZE - 1),
-      supabase.from("rooms").select("floor").eq("hostel_id", hostel.id),
-    ],
-  );
+  const [{ data: rooms, count, error }, floorRows] = await Promise.all([
+    query
+      .order("floor")
+      .order("room_sort")
+      .range(from, from + PAGE_SIZE - 1),
+    fetchAllPages((first, last) =>
+      supabase
+        .from("rooms")
+        .select("floor")
+        .eq("hostel_id", hostel.id)
+        .order("id")
+        .range(first, last),
+    ),
+  ]);
   if (error && !isPastLastPage(error)) throw error;
-  if (floorError) throw floorError;
 
   const rows = (rooms ?? []) as InventoryRow[];
   const total = count ?? 0;
-  const floors = [...new Set((floorRows ?? []).map((row) => row.floor))].sort((a, b) => a - b);
+  const floors = [...new Set(floorRows.map((row) => row.floor))].sort((a, b) => a - b);
   const hasAnyRoom = floors.length > 0;
   const filtered =
     Boolean(filters.q) ||

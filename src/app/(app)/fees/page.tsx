@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/cn";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatMonth, formatPaise } from "@/lib/money";
+import { fetchAllPages } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst, uuid } from "@/lib/validation";
 
@@ -64,18 +65,21 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [list, totals, months, { data: rooms, error: roomsError }] = await Promise.all([
+  const [list, totals, months, rooms] = await Promise.all([
     getFeeList(supabase, hostel.id, filters),
     getFeeTotals(supabase, hostel.id, filters),
     getBilledMonths(supabase, hostel.id),
-    supabase
-      .from("room_inventory")
-      .select("id, room_number")
-      .eq("hostel_id", hostel.id)
-      .order("floor")
-      .order("room_sort"),
+    fetchAllPages((first, last) =>
+      supabase
+        .from("room_inventory")
+        .select("id, room_number")
+        .eq("hostel_id", hostel.id)
+        .order("floor")
+        .order("room_sort")
+        .order("id")
+        .range(first, last),
+    ),
   ]);
-  if (roomsError) throw roomsError;
 
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
@@ -168,7 +172,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </section>
 
           <FeeFilters
-            rooms={(rooms ?? []).map((room) => ({
+            rooms={rooms.map((room) => ({
               value: room.id ?? "",
               label: `Room ${room.room_number}`,
             }))}

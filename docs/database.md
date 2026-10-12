@@ -197,7 +197,9 @@ PostgREST returns at most 1000 rows per request (`max_rows` in
 that can grow past that is paged (`.range()`), aggregated in the database,
 or returned by a function, never read whole and reduced in the app. A page
 that starts past the last row answers HTTP 416 (`PGRST103`); list pages
-treat that as "go to the first page" (`src/lib/pagination.ts`).
+treat that as "go to the first page" (`src/lib/pagination.ts`). A screen
+that genuinely needs every row (the occupancy grid, the vacant-bed picker,
+room filters) reads it with `fetchAllPages`, page by page in a total order.
 
 ## Dashboard (EP-08)
 
