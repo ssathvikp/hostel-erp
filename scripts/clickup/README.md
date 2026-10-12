@@ -33,8 +33,8 @@ Workspace : Sai Sathvik P s Workspace
 Space     : HOSTEL ERP
 Folder    : Hostel/PG ERP
   List    : MVP - v0.1            -> 9 epic parent tasks + 63 subtasks
-  List    : Backlog - Post-MVP    -> 5 epic parent tasks: EP-10, EP-13 and EP-14 with 12 subtasks
-                                     each; EP-11 and EP-12 not yet detailed
+  List    : Backlog - Post-MVP    -> 6 epic parent tasks: EP-10, EP-13 and EP-14 with 12 subtasks
+                                     each, EP-15 with 14; EP-11 and EP-12 not yet detailed
 ```
 
 ## Known ClickUp API limitations
@@ -52,6 +52,7 @@ Folder    : Hostel/PG ERP
 | 2026-09-21 | EP-10, EP-11 and EP-12 remain container epics with zero subtasks | Detail is written only when an epic is scheduled; no invented requirements |
 | 2026-09-21 | The gaps listed below stay out of the MVP by choice | Owner decision, taken with the retrofit cost understood |
 | 2026-10-12 | EP-10 detailed into 12 tasks; EP-13 (resident fee structure and online collection) and EP-14 (SaaS subscription billing) added with 12 tasks each, all still backlog | Owner asked for the payment structure in detail and a complete super-admin epic; EP-12's online payments and deposit ledger moved to EP-13 |
+| 2026-10-12 | EP-15 Complaints and Maintenance Requests added with 14 tasks: residents report from a room QR code, owners and staff in the app, routed to on-site workers or the hostel's own vendors | Owner request; EP-12's complaints item moved here. A platform-supplied worker network is a discovery task (E15-T13), not a build |
 
 ### Gaps knowingly deferred out of the MVP
 
@@ -66,6 +67,8 @@ Folder    : Hostel/PG ERP
 Revisit when scheduling EP-10 to EP-12. Reconsider data import and DPDP specifically before the first paying hostel, because both are expensive to retrofit.
 
 ## Open actions
+
+- [ ] Create E15-T6 to E15-T14 in ClickUp: the MCP daily limit ran out on 2026-10-12 after E15-T5. Their specs are in `plan-15.ndjson`; record the new ids in `created-tasks.json`
 
 - [ ] Rotate the ClickUp API token, because it was shared in a chat message, then update `.env.local`
 - [ ] Add statuses in the HOSTEL ERP space: Backlog, In Progress, Blocked, In Review. The ClickUp API cannot set statuses, so this is a manual step
