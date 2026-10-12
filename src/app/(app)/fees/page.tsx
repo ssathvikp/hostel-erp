@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
@@ -63,7 +64,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [{ rows, total }, totals, months, { data: rooms, error: roomsError }] = await Promise.all([
+  const [list, totals, months, { data: rooms, error: roomsError }] = await Promise.all([
     getFeeList(supabase, hostel.id, filters),
     getFeeTotals(supabase, hostel.id, filters),
     getBilledMonths(supabase, hostel.id),
@@ -75,11 +76,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       .order("room_sort"),
   ]);
   if (roomsError) throw roomsError;
-
-  const isOwner = user.role === "owner";
-  const lastPage = Math.max(1, Math.ceil(total / FEE_PAGE_SIZE));
-  const anyInvoices = months.length > 0;
-  const filtered = Boolean(filters.status || filters.roomId || filters.month);
 
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
@@ -93,6 +89,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
     }
     return next.size ? `/fees?${next}` : "/fees";
   };
+
+  if (!list) redirect(href({ page: null }));
+  const { rows, total } = list;
+
+  const isOwner = user.role === "owner";
+  const lastPage = Math.max(1, Math.ceil(total / FEE_PAGE_SIZE));
+  const anyInvoices = months.length > 0;
+  const filtered = Boolean(filters.status || filters.roomId || filters.month);
 
   return (
     <>

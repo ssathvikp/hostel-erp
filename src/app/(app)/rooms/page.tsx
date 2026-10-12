@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import {
@@ -17,6 +18,7 @@ import {
 import { RoomFilters } from "@/features/rooms/components/RoomFilters";
 import { floorLabel, SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { isPastLastPage } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { SHARING_TYPES, type SharingType, type ViewRow } from "@/types";
 import type { Database } from "@/types/database";
@@ -85,7 +87,7 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
       supabase.from("rooms").select("floor").eq("hostel_id", hostel.id),
     ],
   );
-  if (error) throw error;
+  if (error && !isPastLastPage(error)) throw error;
   if (floorError) throw floorError;
 
   const rows = (rooms ?? []) as InventoryRow[];
@@ -109,6 +111,8 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
     if (page > 1) next.set("page", String(page));
     return next.size ? `/rooms?${next}` : "/rooms";
   };
+
+  if (isPastLastPage(error)) redirect(pageHref(1));
 
   const created = single(params.created);
   const archived = single(params.archived);

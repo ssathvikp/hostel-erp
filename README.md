@@ -45,14 +45,15 @@ to run again). It prints the demo owner and staff logins.
 
 `.env.example` lists every variable. Names only; values never go in git.
 
-| Variable                        | Exposure      | Purpose                                          |
-| ------------------------------- | ------------- | ------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | browser       | Supabase API URL                                 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser       | Publishable (anon) key; every query runs as RLS  |
-| `SUPABASE_SERVICE_ROLE_KEY`     | server only   | Secret key; bypasses RLS. Trusted jobs only      |
-| `SUPABASE_DB_URL`               | local tests   | Direct Postgres connection for schema tests      |
-| `CLICKUP_API_TOKEN`             | local scripts | Only for `scripts/clickup/sync-plan.ps1`         |
-| `ENABLE_DIAGNOSTICS`            | tests only    | `1` turns on `/diagnostics/error`; never in prod |
+| Variable                        | Exposure      | Purpose                                                        |
+| ------------------------------- | ------------- | -------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | browser       | Supabase API URL                                               |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser       | Publishable (anon) key; every query runs as RLS                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | server only   | Secret key; bypasses RLS. Trusted jobs only                    |
+| `ID_PROOF_HMAC_KEY`             | server only   | Keys the hash of resident ID numbers; never change it once set |
+| `SUPABASE_DB_URL`               | local tests   | Direct Postgres connection for schema tests                    |
+| `CLICKUP_API_TOKEN`             | local scripts | Only for `scripts/clickup/sync-plan.ps1`                       |
+| `ENABLE_DIAGNOSTICS`            | tests only    | `1` turns on `/diagnostics/error`; never in prod               |
 
 The app refuses to build or start when a required variable is missing.
 
@@ -77,6 +78,8 @@ The app refuses to build or start when a required variable is missing.
 | `npm run db:seed`           | Add a demo hostel with residents, invoices and payments       |
 | `npm run db:lint`           | Lint the database schema                                      |
 | `npm run env:local`         | Write local Supabase values into `.env.local`                 |
+| `npm run staging:auth`      | Apply auth settings and email templates to staging            |
+| `npm run test:staging`      | The smoke journey against the deployed staging site           |
 
 ## Database
 
@@ -91,6 +94,14 @@ After a schema change:
 ```bash
 npm run db:reset && npm run db:types && npm run test:db
 ```
+
+## Staging
+
+The app deploys to Vercel and uses its own hosted Supabase project.
+[docs/staging.md](docs/staging.md) is the runbook: first-time setup, the
+values each service needs, applying migrations with `supabase db push`, and
+the smoke test. Free-tier Supabase projects pause after about a week without
+activity and must be restored from the dashboard.
 
 ## Authentication
 

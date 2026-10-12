@@ -8,14 +8,20 @@ import { todayIst } from "@/lib/validation";
 import { confirmLink, waitForEmail } from "../support/mail";
 import { randomMobile } from "../support/residents";
 import { adminClient } from "../support/supabase";
-import { inMain } from "./helpers";
+import { inMain, signIn } from "./helpers";
 
 /**
  * The end-to-end smoke journey (E9-T4): everything a new owner does in
  * their first session, through the UI only, starting from signup. It runs
- * in CI against the local stack, and is the check to run against staging
- * once that exists.
+ * in CI against the local stack, and against a deployed site with
+ * `npm run test:staging` (playwright.staging.config.ts).
+ *
+ * On staging the account is created already confirmed and signed in
+ * through the login form: a real SMTP provider would otherwise send the
+ * confirmation to a made-up address and count the bounce against the
+ * sender. The emailed link is covered locally and by the staging runbook.
  */
+const ON_STAGING = process.env.SMOKE_TARGET === "staging";
 const PASSWORD = "Smoke-passw0rd";
 const email = `smoke-${randomUUID()}@example.com`;
 
@@ -40,14 +46,25 @@ test("signup → hostel → room → resident → bed → invoice → payment", 
   const month = formatMonth(todayIst());
 
   // 1. Sign up and confirm by email.
-  await page.goto("/signup");
-  await page.getByLabel("Your name").fill("Smoke Owner");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(inMain(page).getByRole("status")).toContainText("Check your email");
-  const link = confirmLink((await waitForEmail(email, "Confirm your Hostel ERP account")).html);
-  await page.goto(link.url.toString());
+  if (ON_STAGING) {
+    const { error } = await adminClient().auth.admin.createUser({
+      email,
+      password: PASSWORD,
+      email_confirm: true,
+      user_metadata: { full_name: "Smoke Owner" },
+    });
+    if (error) throw error;
+    await signIn(page, email, PASSWORD);
+  } else {
+    await page.goto("/signup");
+    await page.getByLabel("Your name").fill("Smoke Owner");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(inMain(page).getByRole("status")).toContainText("Check your email");
+    const link = confirmLink((await waitForEmail(email, "Confirm your Hostel ERP account")).html);
+    await page.goto(link.url.toString());
+  }
 
   // 2. Create the hostel.
   await expect(page).toHaveURL(/\/onboarding$/);

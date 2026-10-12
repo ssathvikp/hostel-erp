@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { ResidentFilters } from "@/features/residents/components/ResidentFilters";
 import { RESIDENT_STATUS_LABELS, RESIDENT_STATUS_TONES } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { isPastLastPage } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 import { RESIDENT_STATUSES, type ResidentStatus } from "@/types";
@@ -102,6 +104,17 @@ export default async function ResidentsPage({
       .select("id", { count: "exact", head: true })
       .eq("hostel_id", hostel.id),
   ]);
+  const pageHref = (page: number) => {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      const text = single(value);
+      if (text && key !== "page") next.set(key, text);
+    }
+    if (page > 1) next.set("page", String(page));
+    return next.size ? `/residents?${next}` : "/residents";
+  };
+
+  if (isPastLastPage(error)) redirect(pageHref(1));
   if (error) throw error;
   if (roomsError) throw roomsError;
 
@@ -112,16 +125,6 @@ export default async function ResidentsPage({
     value: room.id ?? "",
     label: `Room ${room.room_number}`,
   }));
-
-  const pageHref = (page: number) => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      const text = single(value);
-      if (text && key !== "page") next.set(key, text);
-    }
-    if (page > 1) next.set("page", String(page));
-    return next.size ? `/residents?${next}` : "/residents";
-  };
 
   return (
     <>

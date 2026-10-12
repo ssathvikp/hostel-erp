@@ -17,6 +17,7 @@
     "test:db": "vitest run --project db",
     "test:integrity": "vitest run --project db tests/integration/integrity.test.ts",
     "test:e2e": "playwright test",
+    "test:staging": "playwright test --config playwright.staging.config.ts",
     "test:watch": "vitest",
     "prepare": "husky",
     "format": "prettier --write .",
@@ -28,7 +29,8 @@
     "db:lint": "supabase db lint --level warning --fail-on warning",
     "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "db:seed": "node scripts/seed.mts",
-    "env:local": "node scripts/env-local.mjs"
+    "env:local": "node scripts/env-local.mjs",
+    "staging:auth": "node scripts/staging/configure-auth.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

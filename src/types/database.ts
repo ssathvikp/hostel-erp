@@ -527,6 +527,7 @@ export type Database = {
           mode: string;
           paid_at: string;
           recorded_by: string;
+          recorded_by_name: string | null;
           reference: string | null;
           void_reason: string | null;
           voided_at: string | null;
@@ -542,6 +543,7 @@ export type Database = {
           mode: string;
           paid_at: string;
           recorded_by?: string;
+          recorded_by_name?: string | null;
           reference?: string | null;
           void_reason?: string | null;
           voided_at?: string | null;
@@ -556,6 +558,7 @@ export type Database = {
           mode?: string;
           paid_at?: string;
           recorded_by?: string;
+          recorded_by_name?: string | null;
           reference?: string | null;
           void_reason?: string | null;
           voided_at?: string | null;
@@ -1039,6 +1042,7 @@ export type Database = {
         };
         Returns: string;
       };
+      billed_months: { Args: { p_hostel_id: string }; Returns: string[] };
       create_rooms_bulk: {
         Args: {
           p_capacity: number;

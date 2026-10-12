@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isPastLastPage } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
 import {
@@ -221,6 +222,7 @@ export const FEE_PAGE_SIZE = 50;
 /**
  * One page of issued invoices. Filters and sort run in the database over
  * indexed columns, so the page stays fast with thousands of invoices.
+ * Null when the page starts after the last invoice.
  */
 export async function getFeeList(supabase: Supabase, hostelId: string, filters: FeeListFilters) {
   let query = supabase
@@ -251,6 +253,7 @@ export async function getFeeList(supabase: Supabase, hostelId: string, filters: 
 
   const from = (filters.page - 1) * FEE_PAGE_SIZE;
   const { data, count, error } = await query.order("id").range(from, from + FEE_PAGE_SIZE - 1);
+  if (isPastLastPage(error)) return null;
   if (error) throw error;
   return { rows: (data ?? []).map(toInvoiceRow), total: count ?? 0 };
 }
@@ -289,14 +292,9 @@ export async function getFeeTotals(
 
 /** Months that have invoices, newest first, for the month filter. */
 export async function getBilledMonths(supabase: Supabase, hostelId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("period_month")
-    .eq("hostel_id", hostelId)
-    .order("period_month", { ascending: false })
-    .limit(1000);
+  const { data, error } = await supabase.rpc("billed_months", { p_hostel_id: hostelId });
   if (error) throw error;
-  return [...new Set((data ?? []).map((row) => row.period_month))];
+  return data ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +353,7 @@ async function getInvoicePayments(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorder:profiles!payments_recorded_by_fkey(full_name)",
+      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name",
     )
     .eq("hostel_id", hostelId)
     .eq("invoice_id", invoiceId)
@@ -368,7 +366,7 @@ async function getInvoicePayments(
     paidAt: row.paid_at,
     mode: row.mode as PaymentMode,
     reference: row.reference,
-    recordedBy: row.recorder?.full_name ?? null,
+    recordedBy: row.recorded_by_name,
     recordedAt: row.created_at,
     voidedAt: row.voided_at,
     voidReason: row.void_reason,

@@ -1,0 +1,73 @@
+name: Staging
+
+# Run by hand from the Actions tab once staging exists (docs/staging.md).
+# Vercel deploys the app itself on every push to main; this applies the
+# database migrations to the staging project and then runs the smoke
+# journey against the deployed site.
+on:
+  workflow_dispatch:
+    inputs:
+      migrate:
+        description: Apply pending migrations to the staging database first
+        type: boolean
+        default: true
+
+concurrency:
+  group: staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    name: Migrate and smoke test staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+      STAGING_PROJECT_REF: ${{ vars.STAGING_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply migrations to the staging database
+        if: inputs.migrate
+        run: |
+          npx supabase link --project-ref "$STAGING_PROJECT_REF"
+          npx supabase db push
+
+      - name: Write .env.staging
+        env:
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SERVICE_ROLE_KEY }}
+        run: |
+          {
+            echo "STAGING_SITE_URL=$STAGING_SITE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+          } > .env.staging
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test (signup to payment) against the deployed site
+        run: npm run test:staging
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-playwright-report
+          path: test-results/
+          retention-days: 7
