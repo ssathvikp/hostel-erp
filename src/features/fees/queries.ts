@@ -486,3 +486,108 @@ export async function getLetterhead(supabase: Supabase, hostelId: string) {
   if (error) throw error;
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Charges, discounts and late fees (E13-T2, E13-T5, E13-T6)
+// ---------------------------------------------------------------------------
+
+export interface ResidentCharge {
+  id: string;
+  kind: "charge" | "late_fee";
+  description: string;
+  amount: number;
+  chargeDate: string;
+  status: "pending" | "invoiced" | "void";
+  invoiceId: string | null;
+  voidReason: string | null;
+}
+
+/** A resident's charges outside the monthly cycle, newest first. */
+export async function getResidentCharges(
+  supabase: Supabase,
+  hostelId: string,
+  residentId: string,
+): Promise<ResidentCharge[]> {
+  const { data, error } = await supabase
+    .from("resident_charges")
+    .select("id, kind, description, amount, charge_date, status, invoice_id, void_reason")
+    .eq("hostel_id", hostelId)
+    .eq("resident_id", residentId)
+    .order("charge_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    kind: row.kind as ResidentCharge["kind"],
+    description: row.description,
+    amount: row.amount,
+    chargeDate: row.charge_date,
+    status: row.status as ResidentCharge["status"],
+    invoiceId: row.invoice_id,
+    voidReason: row.void_reason,
+  }));
+}
+
+export interface Discount {
+  id: string;
+  /** "Rent", or the fee head's name. */
+  target: string;
+  percent: number | null;
+  amount: number | null;
+  fromMonth: string;
+  toMonth: string | null;
+  reason: string;
+}
+
+export async function getResidentDiscounts(
+  supabase: Supabase,
+  hostelId: string,
+  residentId: string,
+): Promise<Discount[]> {
+  const { data, error } = await supabase
+    .from("discounts")
+    .select("id, percent, amount, from_month, to_month, reason, fee_heads(name)")
+    .eq("hostel_id", hostelId)
+    .eq("resident_id", residentId)
+    .order("from_month", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    target: row.fee_heads?.name ?? "Rent",
+    percent: row.percent,
+    amount: row.amount,
+    fromMonth: row.from_month,
+    toMonth: row.to_month,
+    reason: row.reason,
+  }));
+}
+
+export interface LateFeeRule {
+  graceDays: number;
+  kind: "fixed" | "per_day";
+  amount: number;
+  cap: number | null;
+  active: boolean;
+}
+
+export async function getLateFeeRule(
+  supabase: Supabase,
+  hostelId: string,
+): Promise<LateFeeRule | null> {
+  const { data, error } = await supabase
+    .from("late_fee_rules")
+    .select("grace_days, kind, amount, cap, active")
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+  if (error) throw error;
+  return data
+    ? {
+        graceDays: data.grace_days,
+        kind: data.kind as LateFeeRule["kind"],
+        amount: data.amount,
+        cap: data.cap,
+        active: data.active,
+      }
+    : null;
+}

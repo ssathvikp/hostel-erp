@@ -9,10 +9,11 @@ import {
 } from "@/features/fees/components/FeeHeadForms";
 import { RateForm } from "@/features/fees/components/RateForm";
 import { FEE_HEAD_BILLING_LABELS } from "@/features/fees/options";
-import { getFeeHeads, getRates, type FeeHead } from "@/features/fees/queries";
+import { LateFeeRuleForm } from "@/features/fees/components/ChargeForms";
+import { getFeeHeads, getLateFeeRule, getRates, type FeeHead } from "@/features/fees/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { formatPaise, shiftMonth } from "@/lib/money";
+import { formatPaise, paiseToInput, shiftMonth } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
 
@@ -40,9 +41,10 @@ function currentPrice(head: FeeHead): string {
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const [{ history, summaries }, heads] = await Promise.all([
+  const [{ history, summaries }, heads, lateFees] = await Promise.all([
     getRates(supabase, hostel.id),
     getFeeHeads(supabase, hostel.id),
+    getLateFeeRule(supabase, hostel.id),
   ]);
   const isOwner = user.role === "owner";
 
@@ -200,6 +202,33 @@ export default async function FeeSettingsPage() {
               />
             )}
           </div>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="late-fees"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="late-fees" className="text-base font-semibold text-slate-900">
+          Late fees
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          {lateFees?.active
+            ? `${lateFees.kind === "fixed" ? formatPaise(lateFees.amount) : `${formatPaise(lateFees.amount)} a day, up to ${formatPaise(lateFees.cap ?? 0)},`} once an invoice is ${lateFees.graceDays} ${lateFees.graceDays === 1 ? "day" : "days"} past its due date.`
+            : "No late fees are charged."}
+        </p>
+        {isOwner && (
+          <LateFeeRuleForm
+            rule={
+              lateFees && {
+                graceDays: lateFees.graceDays,
+                kind: lateFees.kind,
+                amount: paiseToInput(lateFees.amount),
+                cap: lateFees.cap === null ? "" : paiseToInput(lateFees.cap),
+                active: lateFees.active,
+              }
+            }
+          />
         )}
       </section>
 

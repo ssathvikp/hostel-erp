@@ -140,7 +140,14 @@ export function createUserFactory() {
     const hostelIds = (hostels ?? []).map((row) => row.id);
     if (hostelIds.length > 0) {
       // Money rows protect the stays and people they name, so they go first.
-      for (const table of ["payments", "invoices", "allocations"] as const) {
+      for (const table of [
+        "payments",
+        "invoice_lines",
+        "resident_charges",
+        "discounts",
+        "invoices",
+        "allocations",
+      ] as const) {
         const { error } = await admin.from(table).delete().in("hostel_id", hostelIds);
         if (error) throw error;
       }

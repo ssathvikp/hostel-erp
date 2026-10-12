@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-import { Alert, Button, Input, Select } from "@/components/ui";
+import { Alert, Button, Checkbox, Input, Select } from "@/components/ui";
 import { SHARING_TYPE_OPTIONS } from "@/features/rooms/options";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -46,6 +46,14 @@ export function NewFeeHeadForm() {
           error={state.fieldErrors.pricing?.[0]}
         />
       </div>
+      <Checkbox
+        id="head-first-stay"
+        name="charge_on_first_stay"
+        label="Charge automatically when a resident first gets a bed"
+        hint="For one-time charges such as an admission fee."
+        defaultChecked={state.values?.charge_on_first_stay === "on"}
+        error={state.fieldErrors.charge_on_first_stay?.[0]}
+      />
       <Button type="submit" variant="secondary" loading={pending}>
         Add charge
       </Button>

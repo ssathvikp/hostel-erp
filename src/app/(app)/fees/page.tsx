@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { ApplyLateFeesButton } from "@/features/fees/components/ChargeForms";
 import { FeeFilters } from "@/features/fees/components/FeeFilters";
 import { GenerateInvoicesForm } from "@/features/fees/components/GenerateInvoicesForm";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
@@ -19,6 +20,7 @@ import {
   getBilledMonths,
   getFeeList,
   getFeeTotals,
+  getLateFeeRule,
   type FeeListFilters,
   type FeeSort,
 } from "@/features/fees/queries";
@@ -65,7 +67,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [list, totals, months, rooms] = await Promise.all([
+  const [list, totals, months, rooms, lateFees] = await Promise.all([
     getFeeList(supabase, hostel.id, filters),
     getFeeTotals(supabase, hostel.id, filters),
     getBilledMonths(supabase, hostel.id),
@@ -79,6 +81,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         .order("id")
         .range(first, last),
     ),
+    getLateFeeRule(supabase, hostel.id),
   ]);
 
   const href = (changes: Record<string, string | null>) => {
@@ -123,6 +126,15 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             Generate monthly invoices
           </h2>
           <GenerateInvoicesForm currentMonth={todayIst().slice(0, 7)} />
+          {lateFees?.active && (
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <p className="mb-3 text-sm text-slate-600">
+                Late fees are applied every night. Apply them now to see today&apos;s on the
+                residents who owe them.
+              </p>
+              <ApplyLateFeesButton />
+            </div>
+          )}
         </section>
       )}
 

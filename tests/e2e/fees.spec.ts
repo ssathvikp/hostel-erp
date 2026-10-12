@@ -332,3 +332,66 @@ test("an owner adds a monthly charge, bills it on the invoice and excuses one re
   // Arun is billed first (by name), so Sita's is the hostel's second invoice.
   await expect(inMain(page).getByText(/^INV\/\d\d-\d\d\/00002$/)).toBeVisible();
 });
+
+test("an owner charges, discounts and fines a resident, then waives the fine", async ({ page }) => {
+  const { owner, hostel, beds } = await setup("Extras PG");
+  const sitaId = await residentInBed(hostel.id, owner.id, "Sita Iyer", beds["101"]);
+  await owner.client.rpc("set_fee_structure", {
+    p_hostel_id: hostel.id,
+    p_sharing_type: "double",
+    p_monthly_amount: 800000,
+    p_effective_from: shiftMonth(todayIst(), -6),
+  });
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // A one-off charge, dated last month so it lands on last month's invoice.
+  await page.goto(`/residents/${sitaId}`);
+  await inMain(page).getByRole("button", { name: "Add charge" }).click();
+  const chargeDialog = page.getByRole("dialog", { name: "Charge Sita Iyer" });
+  await chargeDialog.getByLabel(/^Description/).fill("Key replacement");
+  await chargeDialog.getByLabel(/^Amount/).fill("200");
+  await chargeDialog.getByLabel(/^Date/).fill(`${lastMonth.slice(0, 8)}15`);
+  await chargeDialog.getByRole("button", { name: "Add charge" }).click();
+  const charges = inMain(page).getByRole("table", { name: "Charges and late fees" });
+  await expect(
+    charges.getByRole("row", { name: /Key replacement.*₹200.*Next invoice/ }),
+  ).toBeVisible();
+
+  // Ten percent off rent from last month.
+  await inMain(page).getByRole("button", { name: "Give discount" }).click();
+  const discountDialog = page.getByRole("dialog", { name: "Discount for Sita Iyer" });
+  await discountDialog.getByLabel(/^Percentage or amount/).fill("10");
+  await discountDialog.getByLabel(/^From/).fill(lastMonth.slice(0, 7));
+  await discountDialog.getByLabel(/^Reason/).fill("Sibling also staying");
+  await discountDialog.getByRole("button", { name: "Save discount" }).click();
+  await expect(inMain(page).getByText(/10% off rent from/)).toBeVisible();
+
+  // A fixed late fee with no grace days.
+  await page.goto("/settings/fees");
+  const lateFees = inMain(page).getByRole("region", { name: "Late fees" });
+  await lateFees.getByLabel(/^Grace days/).fill("0");
+  await lateFees.getByLabel(/^Amount/).fill("100");
+  await lateFees.getByRole("button", { name: "Save late fee rule" }).click();
+  await expect(lateFees.getByText("Late fee rule saved.", { exact: false })).toBeVisible();
+
+  // Rent 8,000 less 800, plus the 200 charge.
+  await page.goto("/fees");
+  await billMonth(page);
+  await expect(
+    inMain(page).getByText(`Created 1 invoice for ${lastMonthLabel} worth ₹7,400.`),
+  ).toBeVisible();
+
+  // Last month's invoice is already past due: the fine applies.
+  await inMain(page).getByRole("button", { name: "Apply late fees now" }).click();
+  await expect(inMain(page).getByText("Late fees updated on 1 invoice.")).toBeVisible();
+
+  await page.goto(`/residents/${sitaId}`);
+  await expect(charges.getByRole("row", { name: /Key replacement.*Billed/ })).toBeVisible();
+  const fine = charges.getByRole("row", { name: /Late fee on INV.*₹100.*Next invoice/ });
+  await expect(fine).toBeVisible();
+  await fine.getByRole("button", { name: "Void late fee of ₹100" }).click();
+  const voidDialog = page.getByRole("dialog", { name: "Void this charge" });
+  await voidDialog.getByLabel(/^Reason/).fill("First delay, waived");
+  await voidDialog.getByRole("button", { name: "Void charge" }).click();
+  await expect(charges.getByRole("row", { name: /Late fee on INV.*Void/ })).toBeVisible();
+});

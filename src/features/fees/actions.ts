@@ -10,6 +10,9 @@ import { formatMonth, formatPaise } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
+  chargeSchema,
+  discountEndSchema,
+  discountSchema,
   feeExemptionSchema,
   feeHeadRateSchema,
   feeHeadSchema,
@@ -19,7 +22,9 @@ import {
   formSuccess,
   formValues,
   generateInvoicesSchema,
+  lateFeeRuleSchema,
   paymentSchema,
+  uuid,
   voidSchema,
   validateFormData,
   type FormState,
@@ -54,6 +59,8 @@ const RULE_MESSAGES: Record<string, string> = {
   payment_immutable: "Payments cannot be edited. Void it and record it again.",
   fee_head_not_found: "This charge could not be found. Refresh the page.",
   fee_head_sharing_required: "This charge is priced per sharing type. Choose one.",
+  charge_not_pending: "This charge has already been billed or voided. Refresh the page.",
+  discount_end_only: "A discount can only be ended earlier, not extended. Add a new one instead.",
 };
 
 const SELF_EXPLAINING_HINTS = new Set([
@@ -128,7 +135,7 @@ export async function setFeeStructure(
 // Fee heads (E13-T1)
 // ---------------------------------------------------------------------------
 
-const FEE_HEAD_FIELDS = ["name", "billing", "pricing"] as const;
+const FEE_HEAD_FIELDS = ["name", "billing", "pricing", "charge_on_first_stay"] as const;
 const FEE_HEAD_RATE_FIELDS = ["fee_head_id", "sharing_type", "amount", "effective_from"] as const;
 
 export async function createFeeHead(_previous: FormState, formData: FormData): Promise<FormState> {
@@ -414,4 +421,222 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   revalidateFees();
   return formSuccess("Payment voided. It no longer counts towards any total.");
+}
+
+// ---------------------------------------------------------------------------
+// Charges, discounts and late fees (E13-T2, E13-T5, E13-T6)
+// ---------------------------------------------------------------------------
+
+const CHARGE_FIELDS = ["fee_head_id", "description", "amount", "charge_date"] as const;
+const DISCOUNT_FIELDS = ["target", "measure", "value", "from_month", "to_month", "reason"] as const;
+const LATE_FEE_FIELDS = ["grace_days", "kind", "amount", "cap", "active"] as const;
+
+function revalidateResident(residentId: string) {
+  revalidatePath(`/residents/${residentId}`);
+  revalidateFees();
+}
+
+/** Owners and staff record a charge; it is billed on the next invoice. */
+export async function addCharge(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, CHARGE_FIELDS);
+  try {
+    await requireRole(["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(chargeSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  let description = parsed.data.description;
+  if (!description && parsed.data.fee_head_id) {
+    const { data: head } = await supabase
+      .from("fee_heads")
+      .select("name")
+      .eq("id", parsed.data.fee_head_id)
+      .eq("hostel_id", hostelId)
+      .maybeSingle();
+    if (!head) return formFailure(RULE_MESSAGES.fee_head_not_found, values);
+    description = head.name;
+  }
+
+  const { error } = await supabase.from("resident_charges").insert({
+    hostel_id: hostelId,
+    resident_id: parsed.data.resident_id,
+    fee_head_id: parsed.data.fee_head_id,
+    description: description!,
+    amount: parsed.data.amount,
+    charge_date: parsed.data.charge_date,
+  });
+  if (error) {
+    if (error.code === FOREIGN_KEY_VIOLATION) {
+      return formFailure("This resident could not be found.", values);
+    }
+    return failure("addCharge", error, values);
+  }
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess(
+    `Charge of ${formatPaise(parsed.data.amount)} added. It is billed on the next invoice.`,
+  );
+}
+
+/** Voids a charge that has not been billed yet; waiving a late fee is the same. */
+export async function voidCharge(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, VOID_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(voidSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("resident_charges")
+    .update({ status: "void", void_reason: parsed.data.void_reason })
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostelId)
+    .select("resident_id");
+  if (error) return failure("voidCharge", error, values);
+  if (!data?.length) {
+    return formFailure("This charge could not be found. Refresh the page.", values);
+  }
+
+  revalidateResident(data[0].resident_id);
+  return formSuccess("Charge voided. It will not be billed.");
+}
+
+/** Bills a resident's pending charges now, on an invoice of their own. */
+export async function billChargesNow(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const resident = uuid("Resident").safeParse(formData.get("resident_id"));
+  if (!resident.success) return formFailure("This resident could not be found.");
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bill_pending_charges", {
+    p_resident_id: resident.data,
+  });
+  if (error) return failure("billChargesNow", error);
+
+  revalidateResident(resident.data);
+  return formSuccess(data ? "Invoice issued for the pending charges." : "Nothing is pending.");
+}
+
+export async function addDiscount(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, DISCOUNT_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(discountSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("discounts")
+    .insert({ ...parsed.data, hostel_id: hostelId });
+  if (error) return failure("addDiscount", error, values);
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess("Discount saved. It applies to invoices generated from now on.");
+}
+
+export async function endDiscount(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const parsed = validateFormData(discountEndSchema, formData);
+  if (!parsed.ok) return formFailure("Choose the last month the discount applies to.");
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("discounts")
+    .update({ to_month: parsed.data.to_month })
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostelId);
+  if (error) {
+    if (error.code === "23514") return formFailure("A discount cannot end before it starts.");
+    return failure("endDiscount", error);
+  }
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess(`Discount ends after ${formatMonth(parsed.data.to_month)}.`);
+}
+
+export async function saveLateFeeRule(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, LATE_FEE_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(lateFeeRuleSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  // Update the rule in place, or create it: an upsert would also rewrite
+  // hostel_id, which owners may not change.
+  const supabase = await createClient();
+  const { data: updated, error: updateError } = await supabase
+    .from("late_fee_rules")
+    .update(parsed.data)
+    .eq("hostel_id", hostelId)
+    .select("hostel_id");
+  if (updateError) return failure("saveLateFeeRule", updateError, values);
+  if (!updated?.length) {
+    const { error } = await supabase
+      .from("late_fee_rules")
+      .insert({ ...parsed.data, hostel_id: hostelId });
+    if (error) return failure("saveLateFeeRule", error, values);
+  }
+
+  revalidatePath("/settings/fees");
+  return formSuccess(
+    parsed.data.active
+      ? "Late fee rule saved. It is applied every night."
+      : "Late fees are switched off.",
+  );
+}
+
+export async function applyLateFeesNow(): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("apply_late_fees", { p_hostel_id: hostelId });
+  if (error) return failure("applyLateFeesNow", error);
+
+  revalidateFees();
+  return formSuccess(
+    data
+      ? `Late fees updated on ${data} ${data === 1 ? "invoice" : "invoices"}.`
+      : "No late fees are due.",
+  );
 }

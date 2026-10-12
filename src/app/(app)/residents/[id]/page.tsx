@@ -13,9 +13,12 @@ import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queri
 import { FeeExemptionToggle } from "@/features/fees/components/FeeHeadForms";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
+import { ResidentCharges } from "@/features/fees/components/ResidentCharges";
 import {
   getFeeHeads,
   getResidentBalance,
+  getResidentCharges,
+  getResidentDiscounts,
   getResidentExemptions,
   getResidentInvoices,
 } from "@/features/fees/queries";
@@ -97,6 +100,8 @@ export default async function ResidentPage({
     invoices,
     heads,
     exemptions,
+    charges,
+    discounts,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -113,6 +118,8 @@ export default async function ResidentPage({
     getResidentInvoices(supabase, hostel.id, id),
     getFeeHeads(supabase, hostel.id),
     getResidentExemptions(supabase, hostel.id, id),
+    getResidentCharges(supabase, hostel.id, id),
+    getResidentDiscounts(supabase, hostel.id, id),
   ]);
   const monthlyHeads = heads.filter((head) => head.billing === "monthly" && head.active);
   if (error) throw error;
@@ -350,6 +357,15 @@ export default async function ResidentPage({
             </ul>
           </div>
         )}
+        <div className="mt-6 border-t border-slate-200 pt-5">
+          <ResidentCharges
+            resident={{ id: resident.id, name: resident.full_name }}
+            charges={charges}
+            discounts={discounts}
+            heads={heads}
+            isOwner={user.role === "owner"}
+          />
+        </div>
       </Card>
     </div>
   );

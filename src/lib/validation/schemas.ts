@@ -391,13 +391,23 @@ export const paymentSchema = z
   });
 
 /** A charge other than rent (E13-T1). Rent is built in and cannot be a head. */
-export const feeHeadSchema = z.object({
-  name: requiredText("Name", 60).refine((name) => name.toLowerCase() !== "rent", {
-    error: "Rent is set in the rates above",
-  }),
-  billing: z.enum(FEE_HEAD_BILLINGS, { error: "Choose how often it is billed" }),
-  pricing: z.enum(FEE_HEAD_PRICINGS, { error: "Choose how it is priced" }),
-});
+export const feeHeadSchema = z
+  .object({
+    name: requiredText("Name", 60).refine((name) => name.toLowerCase() !== "rent", {
+      error: "Rent is set in the rates above",
+    }),
+    billing: z.enum(FEE_HEAD_BILLINGS, { error: "Choose how often it is billed" }),
+    pricing: z.enum(FEE_HEAD_PRICINGS, { error: "Choose how it is priced" }),
+    /** One-time heads only: added as a charge when a resident first gets a bed. */
+    charge_on_first_stay: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+  })
+  .refine((head) => !head.charge_on_first_stay || head.billing === "one_time", {
+    error: "Only a one-time charge can be added on a resident's first stay",
+    path: ["charge_on_first_stay"],
+  });
 
 /** A head's rate from a date; per-sharing heads also name the sharing type. */
 export const feeHeadRateSchema = z.object({
@@ -418,6 +428,96 @@ export const feeExemptionSchema = z.object({
   fee_head_id: uuid("Charge"),
   exempt: z.enum(["true", "false"]).transform((value) => value === "true"),
 });
+
+/**
+ * A charge outside the monthly cycle (E13-T2): from a one-time head, or
+ * described by hand. It is billed on the next invoice, or now.
+ */
+export const chargeSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    fee_head_id: optional(uuid("Charge")),
+    description: optional(requiredText("Description", 200)),
+    amount: rupees("Amount"),
+    charge_date: notFuture("Date"),
+  })
+  .refine((charge) => charge.fee_head_id || charge.description, {
+    error: "Describe the charge or choose one from the list",
+    path: ["description"],
+  });
+
+/** `YYYY-MM` from `<input type="month">`, as `YYYY-MM-01`. */
+const monthInput = (label: string) =>
+  z
+    .string({ error: `Choose ${label}` })
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, { error: `Choose ${label}` })
+    .transform((value) => `${value}-01`);
+
+/** A discount off rent or one charge, for a range of months (E13-T5). */
+export const discountSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    /** "rent", or the fee head it comes off. */
+    target: z.union([z.literal("rent"), uuid("Charge")], { error: "Choose what it comes off" }),
+    measure: z.enum(["percent", "fixed"], { error: "Choose a percentage or an amount" }),
+    value: z.coerce.number({ error: "Enter a number" }).positive({ error: "Enter more than zero" }),
+    from_month: monthInput("the first month"),
+    to_month: optional(monthInput("the last month")),
+    reason: requiredText("Reason", 200),
+  })
+  .refine((d) => d.measure !== "percent" || (Number.isInteger(d.value) && d.value <= 100), {
+    error: "A percentage is a whole number up to 100",
+    path: ["value"],
+  })
+  .refine(
+    (d) => d.measure !== "fixed" || Math.abs(d.value * 100 - Math.round(d.value * 100)) < 1e-6,
+    {
+      error: "Amount can have at most 2 decimal places",
+      path: ["value"],
+    },
+  )
+  .refine((d) => !d.to_month || d.to_month >= d.from_month, {
+    error: "The last month must not be before the first",
+    path: ["to_month"],
+  })
+  .transform((d) => ({
+    resident_id: d.resident_id,
+    fee_head_id: d.target === "rent" ? null : d.target,
+    percent: d.measure === "percent" ? d.value : null,
+    amount: d.measure === "fixed" ? Math.round(d.value * 100) : null,
+    from_month: d.from_month,
+    to_month: d.to_month,
+    reason: d.reason,
+  }));
+
+/** Ends a discount after a month. */
+export const discountEndSchema = z.object({
+  id: uuid("Discount"),
+  resident_id: uuid("Resident"),
+  to_month: monthInput("the last month"),
+});
+
+/** The hostel's late fee rule (E13-T6). */
+export const lateFeeRuleSchema = z
+  .object({
+    grace_days: integer("Grace days", 0, 60),
+    kind: z.enum(["fixed", "per_day"], { error: "Choose a fixed fee or a fee per day" }),
+    amount: rupees("Fee", { max: 1_00_000 }),
+    cap: optional(rupees("Most it can reach", { max: 1_00_000 })),
+    active: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+  })
+  .refine((rule) => rule.kind === "fixed" || rule.cap !== null, {
+    error: "Set the most a per-day fee can reach",
+    path: ["cap"],
+  })
+  .refine((rule) => rule.cap === null || rule.cap >= rule.amount, {
+    error: "The most it can reach must be at least the daily fee",
+    path: ["cap"],
+  })
+  .transform((rule) => ({ ...rule, cap: rule.kind === "fixed" ? null : rule.cap }));
 
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;

@@ -5,9 +5,16 @@ import { useActionState, useEffect, useState } from "react";
 import { Alert, Button, Modal, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
-import { voidInvoice, voidPayment } from "../actions";
+import { voidCharge, voidInvoice, voidPayment } from "../actions";
 
 const COPY = {
+  charge: {
+    action: voidCharge,
+    title: "Void this charge",
+    description:
+      "For a charge added by mistake, or a late fee you are waiving. It stays on record, marked void, and is never billed.",
+    confirm: "Void charge",
+  },
   invoice: {
     action: voidInvoice,
     title: "Void this invoice",
