@@ -5,8 +5,11 @@ import type { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
 import {
   SHARING_TYPES,
+  type FeeHeadBilling,
+  type FeeHeadPricing,
   type InvoiceDueStatus,
   type InvoiceLine,
+  type StayBreakdown,
   type PaymentMode,
   type SharingType,
 } from "@/types";
@@ -80,6 +83,88 @@ export async function getRates(supabase: Supabase, hostelId: string) {
   });
 
   return { history, summaries };
+}
+
+// ---------------------------------------------------------------------------
+// Fee heads (E13-T1)
+// ---------------------------------------------------------------------------
+
+export interface FeeHeadRate {
+  id: string;
+  /** Null for a flat head. */
+  sharingType: SharingType | null;
+  amount: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface FeeHead {
+  id: string;
+  name: string;
+  billing: FeeHeadBilling;
+  pricing: FeeHeadPricing;
+  active: boolean;
+  /** Rates in force today: one for a flat head, one per priced sharing type otherwise. */
+  current: FeeHeadRate[];
+  /** Every rate, newest first. */
+  history: FeeHeadRate[];
+}
+
+/** The hostel's charges other than rent, with what each costs today. */
+export async function getFeeHeads(supabase: Supabase, hostelId: string): Promise<FeeHead[]> {
+  const { data, error } = await supabase
+    .from("fee_heads")
+    .select(
+      "id, name, billing, pricing, active, fee_head_rates(id, sharing_type, amount, effective_from, effective_to)",
+    )
+    .eq("hostel_id", hostelId)
+    .order("name")
+    .order("effective_from", { referencedTable: "fee_head_rates", ascending: false });
+  if (error) throw error;
+
+  const today = todayIst();
+  return (data ?? []).map((head) => {
+    const history: FeeHeadRate[] = head.fee_head_rates.map((rate) => ({
+      id: rate.id,
+      sharingType: rate.sharing_type as SharingType | null,
+      amount: rate.amount,
+      effectiveFrom: rate.effective_from,
+      effectiveTo: rate.effective_to,
+    }));
+    return {
+      id: head.id,
+      name: head.name,
+      billing: head.billing as FeeHeadBilling,
+      pricing: head.pricing as FeeHeadPricing,
+      active: head.active,
+      history,
+      current: history
+        .filter(
+          (rate) =>
+            rate.effectiveFrom <= today && (rate.effectiveTo === null || rate.effectiveTo >= today),
+        )
+        .sort(
+          (a, b) =>
+            SHARING_TYPES.indexOf(a.sharingType ?? "single") -
+            SHARING_TYPES.indexOf(b.sharingType ?? "single"),
+        ),
+    };
+  });
+}
+
+/** Monthly heads a resident is excused from. */
+export async function getResidentExemptions(
+  supabase: Supabase,
+  hostelId: string,
+  residentId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("resident_fee_exemptions")
+    .select("fee_head_id")
+    .eq("hostel_id", hostelId)
+    .eq("resident_id", residentId);
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.fee_head_id));
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +422,10 @@ export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId
         .maybeSingle(),
       supabase
         .from("invoices")
-        .select("breakdown, created_at, voided_at")
+        .select(
+          "breakdown, created_at, voided_at, invoice_lines(position, kind, description, amount, detail)",
+        )
+        .order("position", { referencedTable: "invoice_lines" })
         .eq("hostel_id", hostelId)
         .eq("id", invoiceId)
         .maybeSingle(),
@@ -349,7 +437,8 @@ export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId
 
   return {
     ...toInvoiceRow(invoice),
-    breakdown: detail.breakdown as unknown as InvoiceLine[],
+    breakdown: detail.breakdown as unknown as StayBreakdown[],
+    lines: (detail.invoice_lines ?? []) as unknown as InvoiceLine[],
     issuedAt: detail.created_at,
     voidedAt: detail.voided_at,
     payments,

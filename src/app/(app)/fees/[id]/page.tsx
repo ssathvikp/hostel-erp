@@ -113,6 +113,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {invoice.bedLabel && ` · Bed ${invoice.bedLabel}`}
       </section>
 
+      <section aria-labelledby="lines-heading">
+        <h2 id="lines-heading" className="mb-3 text-base font-semibold text-slate-900">
+          What it is for
+        </h2>
+        <dl className="max-w-md divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+          {invoice.lines.map((line) => (
+            <div key={line.position} className="flex justify-between gap-4 px-4 py-2">
+              <dt className="text-slate-700">{line.description}</dt>
+              <dd className="text-slate-900 tabular-nums">{formatPaise(line.amount)}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       <section aria-labelledby="payments-heading">
         <h2 id="payments-heading" className="mb-3 text-base font-semibold text-slate-900">
           Payments

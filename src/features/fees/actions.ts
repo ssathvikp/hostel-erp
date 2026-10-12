@@ -10,6 +10,10 @@ import { formatMonth, formatPaise } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
+  feeExemptionSchema,
+  feeHeadRateSchema,
+  feeHeadSchema,
+  feeHeadToggleSchema,
   feeStructureSchema,
   formFailure,
   formSuccess,
@@ -48,9 +52,15 @@ const RULE_MESSAGES: Record<string, string> = {
   payment_future: "The payment date cannot be in the future.",
   payment_void: "This payment is already void. Refresh the page.",
   payment_immutable: "Payments cannot be edited. Void it and record it again.",
+  fee_head_not_found: "This charge could not be found. Refresh the page.",
+  fee_head_sharing_required: "This charge is priced per sharing type. Choose one.",
 };
 
-const SELF_EXPLAINING_HINTS = new Set(["overpayment", "fee_structure_later_exists"]);
+const SELF_EXPLAINING_HINTS = new Set([
+  "overpayment",
+  "fee_structure_later_exists",
+  "fee_head_later_exists",
+]);
 
 function ruleMessage(error: PostgrestError): string | null {
   if (error.code !== "P0001" || !error.hint) return null;
@@ -112,6 +122,134 @@ export async function setFeeStructure(
   revalidatePath("/settings/fees");
   revalidatePath("/fees");
   return formSuccess("Rate saved.");
+}
+
+// ---------------------------------------------------------------------------
+// Fee heads (E13-T1)
+// ---------------------------------------------------------------------------
+
+const FEE_HEAD_FIELDS = ["name", "billing", "pricing"] as const;
+const FEE_HEAD_RATE_FIELDS = ["fee_head_id", "sharing_type", "amount", "effective_from"] as const;
+
+export async function createFeeHead(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, FEE_HEAD_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+
+  const parsed = validateFormData(feeHeadSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("fee_heads")
+    .insert({ ...parsed.data, hostel_id: hostelId });
+  if (error) {
+    if (error.code === "23505") {
+      return formFailure(undefined, values, {
+        name: [`There is already a charge called "${parsed.data.name}".`],
+      });
+    }
+    return failure("createFeeHead", error, values);
+  }
+
+  revalidatePath("/settings/fees");
+  return formSuccess(`${parsed.data.name} added. Set its rate below.`);
+}
+
+export async function setFeeHeadRate(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, FEE_HEAD_RATE_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+
+  const parsed = validateFormData(feeHeadRateSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_fee_head_rate", {
+    p_fee_head_id: parsed.data.fee_head_id,
+    p_amount: parsed.data.amount,
+    p_effective_from: parsed.data.effective_from,
+    p_sharing_type: parsed.data.sharing_type ?? undefined,
+  });
+  if (error) return failure("setFeeHeadRate", error, values);
+
+  revalidatePath("/settings/fees");
+  return formSuccess("Charge rate saved.");
+}
+
+/** Stops (or resumes) billing a head; its history stays. */
+export async function toggleFeeHead(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const parsed = validateFormData(feeHeadToggleSchema, formData);
+  if (!parsed.ok) return formFailure(RULE_MESSAGES.fee_head_not_found);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("fee_heads")
+    .update({ active: parsed.data.active })
+    .eq("id", parsed.data.fee_head_id)
+    .eq("hostel_id", hostelId)
+    .select("name");
+  if (error) return failure("toggleFeeHead", error);
+  if (!data?.length) return formFailure(RULE_MESSAGES.fee_head_not_found);
+
+  revalidatePath("/settings/fees");
+  return formSuccess(
+    parsed.data.active
+      ? `${data[0].name} is billed again.`
+      : `${data[0].name} is no longer billed.`,
+  );
+}
+
+/** Excuses a resident from a monthly charge, or bills them for it again. */
+export async function setFeeExemption(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const parsed = validateFormData(feeExemptionSchema, formData);
+  if (!parsed.ok) return formFailure(RULE_MESSAGES.fee_head_not_found);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL);
+
+  const { resident_id, fee_head_id, exempt } = parsed.data;
+  const supabase = await createClient();
+  const { error } = exempt
+    ? await supabase
+        .from("resident_fee_exemptions")
+        .upsert(
+          { hostel_id: hostelId, resident_id, fee_head_id },
+          { onConflict: "resident_id,fee_head_id", ignoreDuplicates: true },
+        )
+    : await supabase
+        .from("resident_fee_exemptions")
+        .delete()
+        .eq("hostel_id", hostelId)
+        .eq("resident_id", resident_id)
+        .eq("fee_head_id", fee_head_id);
+  if (error) return failure("setFeeExemption", error);
+
+  revalidatePath(`/residents/${resident_id}`);
+  return formSuccess(exempt ? "Excused from this charge." : "Billed for this charge again.");
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  FEE_HEAD_BILLINGS,
+  FEE_HEAD_PRICINGS,
   GENDERS,
   HOSTEL_TYPES,
   ID_PROOF_TYPES,
@@ -387,6 +389,35 @@ export const paymentSchema = z
     error: "Payment date cannot be in the future",
     path: ["paid_at"],
   });
+
+/** A charge other than rent (E13-T1). Rent is built in and cannot be a head. */
+export const feeHeadSchema = z.object({
+  name: requiredText("Name", 60).refine((name) => name.toLowerCase() !== "rent", {
+    error: "Rent is set in the rates above",
+  }),
+  billing: z.enum(FEE_HEAD_BILLINGS, { error: "Choose how often it is billed" }),
+  pricing: z.enum(FEE_HEAD_PRICINGS, { error: "Choose how it is priced" }),
+});
+
+/** A head's rate from a date; per-sharing heads also name the sharing type. */
+export const feeHeadRateSchema = z.object({
+  fee_head_id: uuid("Charge"),
+  sharing_type: optional(z.enum(SHARING_TYPES, { error: "Choose a sharing type" })),
+  amount: rupees("Amount"),
+  effective_from: isoDate("Effective from"),
+});
+
+export const feeHeadToggleSchema = z.object({
+  fee_head_id: uuid("Charge"),
+  active: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
+
+/** Excusing a resident from a monthly charge, or billing them again. */
+export const feeExemptionSchema = z.object({
+  resident_id: uuid("Resident"),
+  fee_head_id: uuid("Charge"),
+  exempt: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
 
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;

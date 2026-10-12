@@ -88,6 +88,55 @@ function Money({
   );
 }
 
+/** The rent line, with one row per stay showing how it was reached. */
+function RentRows({
+  amount,
+  stays,
+  periodMonth,
+  daysInMonth,
+}: {
+  amount: number;
+  stays: InvoiceDetail["breakdown"];
+  periodMonth: string;
+  daysInMonth: number;
+}) {
+  if (stays.length === 0) {
+    return (
+      <tr className="border-b border-slate-200">
+        <td className="py-2">Rent for {formatMonth(periodMonth)}</td>
+        <td className="py-2">—</td>
+        <td className="py-2 text-right">—</td>
+        <td className="py-2 text-right tabular-nums">{formatPaise(amount)}</td>
+      </tr>
+    );
+  }
+  return (
+    <>
+      {stays.map((stay, index) => (
+        <tr
+          key={stay.allocation_id}
+          className={index === stays.length - 1 ? "border-b border-slate-200" : undefined}
+        >
+          <td className="py-2">
+            Rent: bed {stay.bed_label} ({SHARING_TYPE_LABELS[stay.sharing_type]}),{" "}
+            {formatDay(stay.from)} to {formatDay(stay.to)}
+            {stay.rate_source === "override" && (
+              <span className="text-slate-500"> · agreed rent</span>
+            )}
+          </td>
+          <td className="py-2">
+            {stay.nights} of {daysInMonth}
+          </td>
+          <td className="py-2 text-right tabular-nums">{formatPaise(stay.monthly_rate)}</td>
+          <td className="py-2 text-right tabular-nums">
+            {index === stays.length - 1 ? formatPaise(amount) : ""}
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 /**
  * The printable invoice (E7-T7): letterhead, resident, the month's charges
  * with how they were reached, payments received and the balance.
@@ -122,38 +171,42 @@ export function InvoiceDocument({
           <tr className="border-b border-slate-300 text-left text-slate-600">
             <th className="py-2 font-medium">Description</th>
             <th className="py-2 font-medium">Nights</th>
-            <th className="py-2 text-right font-medium">Monthly rent</th>
+            <th className="py-2 text-right font-medium">Monthly rate</th>
+            <th className="py-2 text-right font-medium">Amount</th>
           </tr>
         </thead>
         <tbody>
-          {invoice.breakdown.length === 0 ? (
-            <tr className="border-b border-slate-200">
-              <td className="py-2">Rent for {formatMonth(invoice.periodMonth)}</td>
-              <td className="py-2">—</td>
-              <td className="py-2 text-right tabular-nums">{formatPaise(invoice.amount)}</td>
-            </tr>
-          ) : (
-            invoice.breakdown.map((line) => (
-              <tr key={line.allocation_id} className="border-b border-slate-200">
+          {invoice.lines.map((line) =>
+            line.kind === "rent" ? (
+              <RentRows
+                key={line.position}
+                amount={line.amount}
+                stays={invoice.breakdown}
+                periodMonth={invoice.periodMonth}
+                daysInMonth={daysInMonth}
+              />
+            ) : (
+              <tr key={line.position} className="border-b border-slate-200">
+                <td className="py-2">{line.description}</td>
                 <td className="py-2">
-                  Bed {line.bed_label} ({SHARING_TYPE_LABELS[line.sharing_type]}),{" "}
-                  {formatDay(line.from)} to {formatDay(line.to)}
-                  {line.rate_source === "override" && (
-                    <span className="text-slate-500"> · agreed rent</span>
-                  )}
+                  {line.detail.nights !== undefined
+                    ? `${line.detail.nights} of ${daysInMonth}`
+                    : "—"}
                 </td>
-                <td className="py-2">
-                  {line.nights} of {daysInMonth}
+                <td className="py-2 text-right tabular-nums">
+                  {line.detail.monthly_rate !== undefined
+                    ? formatPaise(line.detail.monthly_rate)
+                    : "—"}
                 </td>
-                <td className="py-2 text-right tabular-nums">{formatPaise(line.monthly_rate)}</td>
+                <td className="py-2 text-right tabular-nums">{formatPaise(line.amount)}</td>
               </tr>
-            ))
+            ),
           )}
         </tbody>
       </table>
       {invoice.breakdown.some((line) => line.nights < daysInMonth) && (
         <p className="text-xs text-slate-500">
-          Part months are charged for the nights held: monthly rent × nights ÷ {daysInMonth}.
+          Part months are charged for the nights held: monthly rate × nights ÷ {daysInMonth}.
         </p>
       )}
 

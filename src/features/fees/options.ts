@@ -1,6 +1,10 @@
 import type { BadgeTone, SelectOption } from "@/components/ui";
 import {
+  FEE_HEAD_BILLINGS,
+  FEE_HEAD_PRICINGS,
   INVOICE_DUE_STATUSES,
+  type FeeHeadBilling,
+  type FeeHeadPricing,
   PAYMENT_MODES,
   type InvoiceDueStatus,
   type PaymentMode,
@@ -49,3 +53,21 @@ export const PAYMENT_MODE_OPTIONS: readonly SelectOption[] = PAYMENT_MODES.map((
   value: mode,
   label: PAYMENT_MODE_LABELS[mode],
 }));
+
+export const FEE_HEAD_BILLING_LABELS: Record<FeeHeadBilling, string> = {
+  monthly: "Every month",
+  one_time: "Once, when charged",
+};
+
+export const FEE_HEAD_PRICING_LABELS: Record<FeeHeadPricing, string> = {
+  flat: "Same for every resident",
+  per_sharing: "By sharing type",
+};
+
+export const FEE_HEAD_BILLING_OPTIONS: readonly SelectOption[] = FEE_HEAD_BILLINGS.map(
+  (billing) => ({ value: billing, label: FEE_HEAD_BILLING_LABELS[billing] }),
+);
+
+export const FEE_HEAD_PRICING_OPTIONS: readonly SelectOption[] = FEE_HEAD_PRICINGS.map(
+  (pricing) => ({ value: pricing, label: FEE_HEAD_PRICING_LABELS[pricing] }),
+);

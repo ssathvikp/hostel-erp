@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import {
+  FeeHeadRateForm,
+  FeeHeadToggle,
+  NewFeeHeadForm,
+} from "@/features/fees/components/FeeHeadForms";
 import { RateForm } from "@/features/fees/components/RateForm";
-import { getRates } from "@/features/fees/queries";
+import { FEE_HEAD_BILLING_LABELS } from "@/features/fees/options";
+import { getFeeHeads, getRates, type FeeHead } from "@/features/fees/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatPaise, shiftMonth } from "@/lib/money";
@@ -15,11 +21,29 @@ export const metadata: Metadata = { title: "Fee settings" };
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
 const formatDay = (value: string) => day.format(new Date(value));
 
-/** Monthly rent per sharing type, with effective dates (E7-T2). */
+/** What a charge costs today: one amount, or one per sharing type. */
+function currentPrice(head: FeeHead): string {
+  if (head.current.length === 0) return "No rate set";
+  return head.current
+    .map((rate) =>
+      rate.sharingType
+        ? `${SHARING_TYPE_LABELS[rate.sharingType]} ${formatPaise(rate.amount)}`
+        : formatPaise(rate.amount),
+    )
+    .join(" · ");
+}
+
+/**
+ * Monthly rent per sharing type, with effective dates (E7-T2), and every
+ * other charge the hostel makes (E13-T1).
+ */
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const { history, summaries } = await getRates(supabase, hostel.id);
+  const [{ history, summaries }, heads] = await Promise.all([
+    getRates(supabase, hostel.id),
+    getFeeHeads(supabase, hostel.id),
+  ]);
   const isOwner = user.role === "owner";
 
   // Sharing types with rooms but no rate today would go unbilled.
@@ -110,6 +134,74 @@ export default async function FeeSettingsPage() {
       ) : (
         <Alert tone="info">Only the hostel owner can change rates.</Alert>
       )}
+
+      <section
+        aria-labelledby="other-charges"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="other-charges" className="text-base font-semibold text-slate-900">
+          Other charges
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          Mess, maintenance, Wi-Fi and anything else besides rent. Monthly charges are added to
+          every invoice, for the nights held, unless a resident is excused on their profile.
+        </p>
+        {heads.length === 0 ? (
+          <p className="text-sm text-slate-600">No other charges yet.</p>
+        ) : (
+          <Table caption="Charges">
+            <THead>
+              <tr>
+                <Th>Charge</Th>
+                <Th>Billed</Th>
+                <Th>Today</Th>
+                <Th>Status</Th>
+                {isOwner && (
+                  <Th>
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                )}
+              </tr>
+            </THead>
+            <TBody>
+              {heads.map((head) => (
+                <Tr key={head.id}>
+                  <Td className="font-medium">{head.name}</Td>
+                  <Td>{FEE_HEAD_BILLING_LABELS[head.billing]}</Td>
+                  <Td className="whitespace-normal">
+                    {head.current.length === 0 ? (
+                      <Badge tone="warning">No rate set</Badge>
+                    ) : (
+                      currentPrice(head)
+                    )}
+                  </Td>
+                  <Td>
+                    <Badge tone={head.active ? "success" : "neutral"}>
+                      {head.active ? "Billed" : "Stopped"}
+                    </Badge>
+                  </Td>
+                  {isOwner && (
+                    <Td className="text-right">
+                      <FeeHeadToggle head={head} />
+                    </Td>
+                  )}
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        )}
+        {isOwner && (
+          <div className="mt-6 space-y-6 border-t border-slate-200 pt-6">
+            <NewFeeHeadForm />
+            {heads.length > 0 && (
+              <FeeHeadRateForm
+                heads={heads.map(({ id, name }) => ({ id, name }))}
+                defaultFrom={shiftMonth(todayIst(), 0)}
+              />
+            )}
+          </div>
+        )}
+      </section>
 
       {history.length > 0 && (
         <section aria-labelledby="rate-history">

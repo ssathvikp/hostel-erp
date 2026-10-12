@@ -269,3 +269,66 @@ test("staff record payments but cannot generate, set rates or void", async ({ pa
   await page.goto("/settings/fees");
   await expect(inMain(page).getByText("Only the hostel owner can change rates.")).toBeVisible();
 });
+
+test("an owner adds a monthly charge, bills it on the invoice and excuses one resident", async ({
+  page,
+}) => {
+  const { owner, hostel, beds } = await setup("Mess Hall PG");
+  const sitaId = await residentInBed(hostel.id, owner.id, "Sita Rao", beds["101"]);
+  const arunId = await residentInBed(hostel.id, owner.id, "Arun Pal", beds["201"]);
+  await owner.client.rpc("set_fee_structure", {
+    p_hostel_id: hostel.id,
+    p_sharing_type: "double",
+    p_monthly_amount: 800000,
+    p_effective_from: shiftMonth(todayIst(), -6),
+  });
+  await owner.client.rpc("set_fee_structure", {
+    p_hostel_id: hostel.id,
+    p_sharing_type: "single",
+    p_monthly_amount: 1000000,
+    p_effective_from: shiftMonth(todayIst(), -6),
+  });
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // Add the charge, then its rate from six months ago.
+  await page.goto("/settings/fees");
+  const charges = inMain(page).getByRole("region", { name: "Other charges" });
+  await charges.getByLabel(/^Name/).fill("Mess");
+  await charges.getByRole("button", { name: "Add charge" }).click();
+  await expect(charges.getByText("Mess added. Set its rate below.")).toBeVisible();
+  await charges.getByRole("combobox", { name: "Charge" }).selectOption({ label: "Mess" });
+  await charges.getByLabel(/^Amount/).fill("3000");
+  await charges.getByLabel(/^Applies from/).fill(shiftMonth(todayIst(), -6));
+  await charges.getByRole("button", { name: "Save charge rate" }).click();
+  await expect(charges.getByText("Charge rate saved.")).toBeVisible();
+  await expect(
+    charges.getByRole("table", { name: "Charges" }).getByRole("row", { name: /Mess.*₹3,000/ }),
+  ).toBeVisible();
+
+  // Arun eats elsewhere.
+  await page.goto(`/residents/${arunId}`);
+  await inMain(page).getByRole("button", { name: "Excuse this resident from Mess" }).click();
+  await expect(inMain(page).getByText("Excused", { exact: true })).toBeVisible();
+
+  await page.goto("/fees");
+  await billMonth(page);
+  await expect(
+    inMain(page).getByText(`Created 2 invoices for ${lastMonthLabel} worth ₹21,000.`),
+  ).toBeVisible();
+
+  // Sita's invoice lists rent and mess.
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("id")
+    .eq("resident_id", sitaId)
+    .single();
+  await page.goto(`/fees/${invoice!.id}`);
+  const lines = inMain(page).getByRole("region", { name: "What it is for" });
+  await expect(lines.getByText("Rent")).toBeVisible();
+  await expect(lines.getByText("Mess")).toBeVisible();
+  await expect(lines.getByText("₹3,000")).toBeVisible();
+  await page.goto(`/fees/${invoice!.id}/print`);
+  await expect(inMain(page).getByRole("cell", { name: "Mess" })).toBeVisible();
+  // Arun is billed first (by name), so Sita's is the hostel's second invoice.
+  await expect(inMain(page).getByText(/^INV\/\d\d-\d\d\/00002$/)).toBeVisible();
+});
