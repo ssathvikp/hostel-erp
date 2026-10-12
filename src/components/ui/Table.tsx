@@ -2,6 +2,8 @@ import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 import { cn } from "@/lib/cn";
 
+import { focusRing } from "./styles";
+
 interface TableProps extends HTMLAttributes<HTMLTableElement> {
   /** Visually hidden caption describing the table for screen readers. */
   caption?: string;
@@ -9,13 +11,22 @@ interface TableProps extends HTMLAttributes<HTMLTableElement> {
 
 /**
  * Data table. The wrapper scrolls horizontally on narrow screens so wide
- * tables never break the page layout at 375px.
+ * tables never break the page layout at 375px. It is focusable and named
+ * after the caption, so keyboard users can scroll it with the arrow keys.
  */
 export function Table({ caption, className, children, ...props }: TableProps) {
   return (
     // relative: absolutely positioned content (sr-only labels) stays inside the
     // scroll area instead of widening the page.
-    <div className="relative overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div
+      role={caption ? "region" : undefined}
+      aria-label={caption}
+      tabIndex={0}
+      className={cn(
+        "relative overflow-x-auto rounded-lg border border-slate-200 bg-white",
+        focusRing,
+      )}
+    >
       <table className={cn("min-w-full divide-y divide-slate-200 text-sm", className)} {...props}>
         {caption && <caption className="sr-only">{caption}</caption>}
         {children}

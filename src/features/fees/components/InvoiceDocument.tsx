@@ -66,9 +66,27 @@ function Party({ invoice }: { invoice: InvoiceDetail }) {
   );
 }
 
-function Money({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
+function Money({
+  label,
+  value,
+  strong,
+  total,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  /** The closing line, ruled off from the rows above. */
+  total?: boolean;
+}) {
+  const className = [
+    "flex justify-between",
+    strong && "font-semibold",
+    total && "border-t border-slate-300 pt-1",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={strong ? "flex justify-between font-semibold" : "flex justify-between"}>
+    <div className={className}>
       <dt>{label}</dt>
       <dd className="tabular-nums">{formatPaise(value)}</dd>
     </div>
@@ -144,19 +162,15 @@ export function InvoiceDocument({
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-1">
         <dl className="w-full max-w-xs space-y-1 text-sm">
           <Money label="Amount" value={invoice.amount} strong />
           <Money label="Paid" value={invoice.status === "void" ? 0 : invoice.paid} />
-          <div className="border-t border-slate-300 pt-1">
-            <Money label="Balance due" value={invoice.balance} strong />
-          </div>
-          {invoice.dueStatus && (
-            <p className="text-right text-xs text-slate-500">
-              Status: {DUE_STATUS_LABELS[invoice.dueStatus]}
-            </p>
-          )}
+          <Money label="Balance due" value={invoice.balance} strong total />
         </dl>
+        {invoice.dueStatus && (
+          <p className="text-xs text-slate-500">Status: {DUE_STATUS_LABELS[invoice.dueStatus]}</p>
+        )}
       </div>
 
       {live.length > 0 && (
@@ -229,9 +243,7 @@ export function ReceiptDocument({
         <dl className="w-full max-w-xs space-y-1 text-sm">
           <Money label="Invoice amount" value={invoice.amount} />
           <Money label="Total paid to date" value={invoice.paid} />
-          <div className="border-t border-slate-300 pt-1">
-            <Money label="Balance due" value={invoice.balance} strong />
-          </div>
+          <Money label="Balance due" value={invoice.balance} strong total />
         </dl>
       </div>
       {payment.recordedBy && (
