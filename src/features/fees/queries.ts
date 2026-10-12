@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isPastLastPage } from "@/lib/pagination";
+import { fetchAllPages, isPastLastPage } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
 import {
@@ -37,17 +37,24 @@ export interface RateSummary {
 
 /** Every rate, newest first, and a per-type summary of what applies today. */
 export async function getRates(supabase: Supabase, hostelId: string) {
-  const [{ data, error }, { data: rooms, error: roomsError }] = await Promise.all([
+  const [{ data, error }, rooms] = await Promise.all([
     supabase
       .from("fee_structures")
       .select("id, sharing_type, monthly_amount, effective_from, effective_to")
       .eq("hostel_id", hostelId)
       .order("sharing_type")
       .order("effective_from", { ascending: false }),
-    supabase.from("rooms").select("sharing_type").eq("hostel_id", hostelId).eq("status", "active"),
+    fetchAllPages((from, to) =>
+      supabase
+        .from("rooms")
+        .select("id, sharing_type")
+        .eq("hostel_id", hostelId)
+        .eq("status", "active")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
   if (error) throw error;
-  if (roomsError) throw roomsError;
 
   const today = todayIst();
   const history: RateRow[] = (data ?? []).map((row) => ({
@@ -68,7 +75,7 @@ export async function getRates(supabase: Supabase, hostelId: string) {
             rate.effectiveFrom <= today && (rate.effectiveTo === null || rate.effectiveTo >= today),
         ) ?? null,
       upcoming: rates.filter((rate) => rate.effectiveFrom > today).at(-1) ?? null,
-      rooms: (rooms ?? []).filter((room) => room.sharing_type === sharingType).length,
+      rooms: rooms.filter((room) => room.sharing_type === sharingType).length,
     };
   });
 

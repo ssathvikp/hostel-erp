@@ -20,6 +20,13 @@ export default defineConfig({
       {
         // Runs against the local Supabase stack (`npm run db:start`).
         extends: true,
+        resolve: {
+          alias: {
+            "server-only": fileURLToPath(
+              new URL("./tests/support/server-only.ts", import.meta.url),
+            ),
+          },
+        },
         test: {
           name: "db",
           include: ["tests/rls/**/*.test.ts", "tests/integration/**/*.test.ts"],
