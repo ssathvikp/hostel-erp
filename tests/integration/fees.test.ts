@@ -652,6 +652,33 @@ describe("payments", () => {
     expect(results.filter((result) => result.error?.hint === "overpayment")).toHaveLength(5);
   });
 
+  it("never land on an invoice that is voided at the same moment", async () => {
+    const hostelId = await hostel();
+    for (let round = 0; round < 20; round += 1) {
+      const invoiceId = await notYetDueInvoice(hostelId, await resident(hostelId), 500000);
+      await Promise.all([
+        pay(hostelId, invoiceId, 100000),
+        owner.client
+          .from("invoices")
+          .update({ status: "void", void_reason: "Raised in error" })
+          .eq("id", invoiceId),
+      ]);
+      const [{ data: invoice }, { count: livePayments }] = await Promise.all([
+        admin.from("invoices").select("status").eq("id", invoiceId).single(),
+        admin
+          .from("payments")
+          .select("id", { count: "exact", head: true })
+          .eq("invoice_id", invoiceId)
+          .is("voided_at", null),
+      ]);
+      // Exactly one of them wins: a paid invoice stays issued, a void one has no money on it.
+      expect({ status: invoice!.status, livePayments }).not.toEqual({
+        status: "void",
+        livePayments: 1,
+      });
+    }
+  });
+
   it("reject future dates and void invoices", async () => {
     const hostelId = await hostel();
     const residentId = await resident(hostelId);

@@ -23,6 +23,8 @@ export interface HostelContext {
   hostels: HostelSummary[];
   /** The owner's unfinished onboarding, if one exists. */
   draft: HostelSummary | null;
+  /** Hostels the user belongs to that are suspended: readable, but not worked in. */
+  suspended: HostelSummary[];
 }
 
 /**
@@ -33,7 +35,7 @@ export interface HostelContext {
  */
 export const getHostelContext = cache(async (): Promise<HostelContext> => {
   const user = await getSessionUser();
-  if (!user) return { active: null, hostels: [], draft: null };
+  if (!user) return { active: null, hostels: [], draft: null, suspended: [] };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -45,16 +47,18 @@ export const getHostelContext = cache(async (): Promise<HostelContext> => {
   const rows = (data ?? []) as HostelSummary[];
   const hostels = rows.filter((hostel) => hostel.status === "active");
   const draft = rows.find((hostel) => hostel.status === "draft") ?? null;
+  const suspended = rows.filter((hostel) => hostel.status === "suspended");
 
   const preferred = (await cookies()).get(ACTIVE_HOSTEL_COOKIE)?.value;
   const active = hostels.find((hostel) => hostel.id === preferred) ?? hostels[0] ?? null;
 
-  return { active, hostels, draft };
+  return { active, hostels, draft, suspended };
 });
 
 /**
  * For every page that works inside a hostel: returns the user and the active
- * hostel, or sends the user to finish onboarding when they have none yet.
+ * hostel, or sends the user to onboarding when they have none. Onboarding
+ * explains a suspended hostel to staff instead of sending them back here.
  */
 export async function requireActiveHostel() {
   const user = await requireUser();

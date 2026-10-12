@@ -235,7 +235,13 @@ export function TrendChart({
         <summary className="cursor-pointer text-slate-600 hover:text-slate-900">
           Show as table
         </summary>
-        <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-slate-200">
+        {/* Focusable, so keyboard users can scroll a long range with the arrow keys. */}
+        <div
+          role="region"
+          aria-label={`Occupancy by ${granularity}, as a table`}
+          tabIndex={0}
+          className="mt-2 max-h-64 overflow-y-auto rounded-md border border-slate-200 focus-visible:outline-2 focus-visible:outline-brand-600"
+        >
           <table className="min-w-full text-sm">
             <caption className="sr-only">Occupancy by {granularity}</caption>
             <thead className="sticky top-0 bg-slate-50 text-left text-xs text-slate-600">

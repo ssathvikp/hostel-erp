@@ -234,7 +234,9 @@ double_confirm_changes = true
 # local emails land in the mail catcher at http://localhost:54324.
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
-secure_password_change = false
+# On: a stolen session cookie alone cannot change the password and lock the
+# owner out. A reset link starts a fresh session, so resets still work.
+secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.

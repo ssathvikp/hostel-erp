@@ -180,7 +180,8 @@ in short:
   balance and `due_status`: paid, overdue (past due with money owed, India
   date), partial or unpaid. `resident_balances` sums them per resident.
   Overpayment is rejected per invoice, under an advisory lock so concurrent
-  collectors cannot overpay between them.
+  collectors cannot overpay between them. Voiding an invoice takes the same
+  lock, so a void and a payment racing on one invoice never both succeed.
 - **Roles.** Owners set rates, generate and void. Owners and staff read fees
   and record payments.
 - **Who recorded a payment** is snapshotted in `payments.recorded_by_name` by

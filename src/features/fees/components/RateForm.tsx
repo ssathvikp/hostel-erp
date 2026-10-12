@@ -46,6 +46,7 @@ export function RateForm({ defaultFrom }: { defaultFrom: string }) {
           label="Applies from"
           defaultValue={state.values?.effective_from || defaultFrom}
           required
+          hint="Invoices use the rate in force on the 1st of each month, so start rates on the 1st."
           error={state.fieldErrors.effective_from?.[0]}
         />
       </div>
