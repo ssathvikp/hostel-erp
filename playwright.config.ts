@@ -12,6 +12,9 @@ if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
+  // Each worker drives a browser against one shared production server; past
+  // about four, a laptop runs out of headroom and form submits time out.
+  workers: process.env.CI ? undefined : 4,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
