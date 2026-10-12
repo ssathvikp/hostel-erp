@@ -134,6 +134,13 @@ export async function resetPassword(_previous: FormState, formData: FormData): P
     if (error.code === "weak_password") {
       return formFailure(undefined, undefined, { password: ["Choose a stronger password"] });
     }
+    // Only a session from the last day may change the password without a
+    // reset link (secure_password_change), so an old session is sent there.
+    if (error.code === "reauthentication_needed") {
+      return formFailure(
+        "For your security, use a fresh reset link to change your password. Request one from the sign-in page.",
+      );
+    }
     return unexpectedFailure("resetPassword", error);
   }
 

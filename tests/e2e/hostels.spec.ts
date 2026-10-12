@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createUserFactory, TEST_PASSWORD } from "../support/supabase";
-import { inMain, openNavigation, signIn } from "./helpers";
+import { inMain, openNavigation, signIn, signOut } from "./helpers";
 
 /** Hostel onboarding, settings and switching in a real browser (EP-03). */
 const factory = createUserFactory();
@@ -157,4 +157,23 @@ test("a multi-hostel owner switches hostels and a forged cookie is ignored", asy
   await page.reload();
   await expect(inMain(page).getByText("First Home at a glance.")).toBeVisible();
   await expect(page.getByText("Not Yours")).toHaveCount(0);
+});
+
+test("a suspended hostel is explained, never a redirect loop", async ({ page }) => {
+  const owner = await factory.createUser({ fullName: "Mohan Lal" });
+  const hostel = await factory.createHostel(owner.id, { name: "Paused PG" });
+  const staff = await factory.createUser({ profile: { role: "staff", hostel_id: hostel.id } });
+  // Suspension is an operator action, done with the service role.
+  await factory.admin.from("hostels").update({ status: "suspended" }).eq("id", hostel.id);
+
+  await signIn(page, staff.email, TEST_PASSWORD);
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(inMain(page).getByText("Paused PG is not active right now")).toBeVisible();
+  await page.goto("/residents");
+  await expect(page).toHaveURL(/\/onboarding$/);
+
+  await signOut(page);
+  await signIn(page, owner.email, TEST_PASSWORD);
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(inMain(page).getByText(/Paused PG is suspended/)).toBeVisible();
 });

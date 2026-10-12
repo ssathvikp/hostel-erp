@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { connectToDatabase } from "../support/db";
 import { confirmLink, countEmails, waitForEmail } from "../support/mail";
 import { anonClient, createUserFactory, TEST_PASSWORD } from "../support/supabase";
 
@@ -172,6 +173,32 @@ describe("password reset", () => {
       token_hash: link.tokenHash,
     });
     expect(reused.error).not.toBeNull();
+  });
+
+  it("will not change a password from a session more than a day old", async () => {
+    const user = await createUser();
+    const {
+      data: { session },
+    } = await user.client.auth.getSession();
+    const sessionId = JSON.parse(
+      Buffer.from(session!.access_token.split(".")[1], "base64url").toString(),
+    ).session_id as string;
+
+    // As if the cookie had been taken from a browser signed in two days ago.
+    const sql = connectToDatabase();
+    try {
+      await sql`update auth.sessions set created_at = now() - interval '2 days' where id = ${sessionId}`;
+    } finally {
+      await sql.end();
+    }
+
+    const { error } = await user.client.auth.updateUser({ password: "Taken-over-2026" });
+    expect(error?.code).toBe("reauthentication_needed");
+    const login = await anonClient().auth.signInWithPassword({
+      email: user.email,
+      password: TEST_PASSWORD,
+    });
+    expect(login.error).toBeNull();
   });
 
   it("gives no hint whether an email is registered", async () => {

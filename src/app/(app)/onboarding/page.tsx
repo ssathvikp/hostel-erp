@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
+import { Alert, EmptyState } from "@/components/ui";
 import { HostelAddressForm } from "@/features/hostels/components/HostelAddressForm";
 import { HostelBasicsForm } from "@/features/hostels/components/HostelBasicsForm";
 import { OnboardingSteps } from "@/features/hostels/components/OnboardingSteps";
@@ -22,10 +23,28 @@ export default async function OnboardingPage({
   searchParams: Promise<{ step?: string }>;
 }) {
   const user = await requireUser();
-  // Staff join an existing hostel; only owners create one.
-  if (user.role !== "owner") redirect("/dashboard");
+  const { active, draft, hostels, suspended } = await getHostelContext();
 
-  const { draft, hostels } = await getHostelContext();
+  // Staff join an existing hostel; only owners create one. Without an active
+  // hostel there is nowhere to send them, so explain instead: redirecting to
+  // the dashboard would bounce straight back here.
+  if (user.role !== "owner") {
+    if (active) redirect("/dashboard");
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="No hostel to work in" />
+        <EmptyState
+          title={
+            suspended.length > 0
+              ? `${suspended[0].name} is not active right now`
+              : "Your account is not linked to an active hostel"
+          }
+          description="Ask the hostel owner to contact Hostel ERP support. You can sign in again once the hostel is active."
+        />
+      </div>
+    );
+  }
+
   const { step: requested } = await searchParams;
   const step = requested === "2" && draft ? 2 : 1;
 
@@ -47,6 +66,14 @@ export default async function OnboardingPage({
             : "Two short steps. You can stop at any time and pick up where you left off."
         }
       />
+      {isFirstHostel && suspended.length > 0 && (
+        <Alert tone="warning" className="mb-6">
+          {suspended.map((hostel) => hostel.name).join(", ")}{" "}
+          {suspended.length === 1 ? "is" : "are"} suspended, so{" "}
+          {suspended.length === 1 ? "it does" : "they do"} not appear in the app. Contact Hostel ERP
+          support to restore {suspended.length === 1 ? "it" : "them"}.
+        </Alert>
+      )}
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
         <OnboardingSteps current={step} />
         {step === 1 ? (

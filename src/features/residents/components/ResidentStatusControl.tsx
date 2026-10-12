@@ -12,7 +12,8 @@ import { NEXT_STATUSES, RESIDENT_STATUS_LABELS, STATUS_ACTION_LABELS } from "../
 const CONSEQUENCES: Record<ResidentStatus, string> = {
   active: "The resident can be allocated a bed and billed again.",
   notice: "The resident has given notice and is expected to leave. Billing continues.",
-  vacated: "The resident has left. They stay searchable but cannot be given a bed or billed.",
+  vacated:
+    "The resident has left. They stay searchable but cannot be given a bed. Nights already stayed are still billed.",
   blocked: "The resident cannot be given a bed until they are made active again.",
 };
 

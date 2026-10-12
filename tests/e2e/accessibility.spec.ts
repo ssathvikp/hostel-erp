@@ -17,9 +17,10 @@ const { admin } = factory;
 
 test.afterAll(factory.cleanup);
 
-async function expectNoViolations(page: Page, path: string) {
+async function expectNoViolations(page: Page, path: string, prepare?: () => Promise<void>) {
   await page.goto(path);
   await page.waitForLoadState("networkidle");
+  await prepare?.();
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -123,4 +124,9 @@ test("every signed-in screen with data on it", async ({ page }) => {
   ]) {
     await expectNoViolations(page, path);
   }
+
+  // The occupancy trend's table view, opened.
+  await expectNoViolations(page, "/dashboard?range=last_month", () =>
+    page.getByText("Show as table").click(),
+  );
 });
