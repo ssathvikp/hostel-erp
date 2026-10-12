@@ -317,6 +317,23 @@ describe("invoice generation", () => {
     expect(count).toBe(3);
   });
 
+  it("skips a part month that rounds to ₹0 without calling it already invoiced", async () => {
+    const hostelId = await hostel();
+    const month = monthStart(-1);
+    await setRate(hostelId, "single", 1000000, monthStart(-12));
+    // ₹10 a month for one night rounds to ₹0: nothing is owed.
+    const residentId = await resident(hostelId);
+    await stay(hostelId, residentId, await bed(hostelId), dayOf(month, daysIn(month)), {
+      rentOverride: 1000,
+    });
+    await stay(hostelId, await resident(hostelId), await bed(hostelId), monthStart(-2));
+
+    const { summary, error } = await generate(hostelId, month);
+    expect(error).toBeNull();
+    expect(summary).toMatchObject({ created: 1, total_amount: 1000000, already_invoiced: 0 });
+    expect(await invoiceFor(residentId, month)).toBeNull();
+  });
+
   it("creates exactly one invoice per resident when runs race", async () => {
     const hostelId = await hostel();
     const month = monthStart(-1);
