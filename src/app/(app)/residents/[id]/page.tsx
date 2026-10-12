@@ -14,6 +14,7 @@ import { FeeExemptionToggle } from "@/features/fees/components/FeeHeadForms";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
 import { ResidentCharges } from "@/features/fees/components/ResidentCharges";
+import { ResidentMoneyPanel } from "@/features/fees/components/ResidentMoneyPanel";
 import {
   getFeeHeads,
   getResidentBalance,
@@ -21,6 +22,7 @@ import {
   getResidentDiscounts,
   getResidentExemptions,
   getResidentInvoices,
+  getResidentMoney,
 } from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
@@ -102,6 +104,7 @@ export default async function ResidentPage({
     exemptions,
     charges,
     discounts,
+    money,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -120,6 +123,7 @@ export default async function ResidentPage({
     getResidentExemptions(supabase, hostel.id, id),
     getResidentCharges(supabase, hostel.id, id),
     getResidentDiscounts(supabase, hostel.id, id),
+    getResidentMoney(supabase, hostel.id, id),
   ]);
   const monthlyHeads = heads.filter((head) => head.billing === "monthly" && head.active);
   if (error) throw error;
@@ -330,6 +334,15 @@ export default async function ResidentPage({
 
         <h3 className="mt-6 mb-3 text-sm font-semibold text-slate-900">Activity log</h3>
         <AllocationHistory events={events} show="bed" caption="Allocation activity log" />
+      </Card>
+
+      <Card title="Credit and deposit" id="money-heading">
+        <ResidentMoneyPanel
+          residentId={resident.id}
+          money={money}
+          isOwner={user.role === "owner"}
+          canSettle={!current && history.length > 0}
+        />
       </Card>
 
       <Card title="Fees" id="fees-heading">

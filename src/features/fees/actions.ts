@@ -11,6 +11,8 @@ import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   chargeSchema,
+  depositAmountSchema,
+  depositDeductionSchema,
   discountEndSchema,
   discountSchema,
   feeExemptionSchema,
@@ -24,6 +26,9 @@ import {
   generateInvoicesSchema,
   lateFeeRuleSchema,
   paymentSchema,
+  refundSchema,
+  residentMoneySchema,
+  settlementSchema,
   uuid,
   voidSchema,
   validateFormData,
@@ -35,7 +40,14 @@ const FOREIGN_KEY_VIOLATION = "23503";
 
 const RATE_FIELDS = ["sharing_type", "monthly_amount", "effective_from"] as const;
 const GENERATE_FIELDS = ["period_month", "due_day"] as const;
-const PAYMENT_FIELDS = ["invoice_id", "amount", "paid_at", "mode", "reference"] as const;
+const PAYMENT_FIELDS = [
+  "invoice_id",
+  "amount",
+  "paid_at",
+  "mode",
+  "reference",
+  "keep_extra",
+] as const;
 const VOID_FIELDS = ["id", "void_reason"] as const;
 
 /**
@@ -61,10 +73,15 @@ const RULE_MESSAGES: Record<string, string> = {
   fee_head_sharing_required: "This charge is priced per sharing type. Choose one.",
   charge_not_pending: "This charge has already been billed or voided. Refresh the page.",
   discount_end_only: "A discount can only be ended earlier, not extended. Add a new one instead.",
+  payment_amount: "Enter an amount.",
+  balance_too_low: "That is more than is held.",
+  reason_required: "Give a reason.",
+  settle_has_bed: "Vacate the resident's bed before settling.",
 };
 
 const SELF_EXPLAINING_HINTS = new Set([
   "overpayment",
+  "balance_too_low",
   "fee_structure_later_exists",
   "fee_head_later_exists",
 ]);
@@ -366,33 +383,45 @@ export async function recordPayment(_previous: FormState, formData: FormData): P
   if (!hostelId) return formFailure(NO_HOSTEL, values);
 
   const supabase = await createClient();
-  const { error } = await supabase.from("payments").insert({ hostel_id: hostelId, ...parsed.data });
-  if (error) {
-    // The invoice belongs to another of the owner's hostels.
-    if (error.code === FOREIGN_KEY_VIOLATION) {
-      return formFailure(RULE_MESSAGES.invoice_not_found, values);
-    }
-    if (error.hint === "overpayment") {
-      const { data } = await supabase
-        .from("invoice_balances")
-        .select("balance")
-        .eq("id", parsed.data.invoice_id)
-        .maybeSingle();
-      if (data?.balance != null) {
-        return formFailure(undefined, values, {
-          amount: [
-            data.balance > 0
-              ? `Only ${formatPaise(data.balance)} is still due on this invoice.`
-              : "This invoice is already paid in full.",
-          ],
-        });
-      }
-    }
-    return failure("recordPayment", error, values);
+  // The invoice must belong to the hostel being worked in.
+  const { data: invoice } = await supabase
+    .from("invoice_balances")
+    .select("balance")
+    .eq("id", parsed.data.invoice_id)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+  if (!invoice) return formFailure(RULE_MESSAGES.invoice_not_found, values);
+
+  // Paying more than is due is kept as credit (E13-T7), but only when the
+  // collector says so: an extra zero should never quietly become credit.
+  const keepExtra = formData.get("keep_extra") === "on";
+  const balance = invoice.balance ?? 0;
+  if (parsed.data.amount > balance && !keepExtra) {
+    return formFailure(undefined, values, {
+      amount: [
+        balance > 0
+          ? `Only ${formatPaise(balance)} is still due on this invoice. To keep the rest as credit, tick the box below.`
+          : "This invoice is already paid in full. To keep this as credit, tick the box below.",
+      ],
+    });
   }
 
+  const { data, error } = await supabase.rpc("record_payment", {
+    p_invoice_id: parsed.data.invoice_id,
+    p_amount: parsed.data.amount,
+    p_paid_at: parsed.data.paid_at,
+    p_mode: parsed.data.mode,
+    p_reference: parsed.data.reference ?? undefined,
+  });
+  if (error) return failure("recordPayment", error, values);
+
   revalidateFees();
-  return formSuccess(`Payment of ${formatPaise(parsed.data.amount)} recorded.`);
+  const extra = Number((data as { extra?: number } | null)?.extra ?? 0);
+  return formSuccess(
+    extra > 0
+      ? `Payment of ${formatPaise(parsed.data.amount)} recorded. ${formatPaise(extra)} beyond this invoice went to other open invoices or credit.`
+      : `Payment of ${formatPaise(parsed.data.amount)} recorded.`,
+  );
 }
 
 export async function voidPayment(_previous: FormState, formData: FormData): Promise<FormState> {
@@ -639,4 +668,189 @@ export async function applyLateFeesNow(): Promise<FormState> {
       ? `Late fees updated on ${data} ${data === 1 ? "invoice" : "invoices"}.`
       : "No late fees are due.",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Credit, deposits and settlement (E13-T7, E13-T4, E13-T8)
+// ---------------------------------------------------------------------------
+
+const MONEY_FIELDS = ["amount", "paid_at", "mode", "reference"] as const;
+const REFUND_FIELDS = ["amount", "mode", "reference"] as const;
+const DEDUCTION_FIELDS = ["amount", "reason"] as const;
+
+type MoneyKind = "advance" | "deposit";
+
+/** Money received for a resident outside an invoice: an advance, or their deposit. */
+async function receiveMoney(kind: MoneyKind, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, MONEY_FIELDS);
+  try {
+    await requireRole(["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(residentMoneySchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const args = {
+    p_resident_id: parsed.data.resident_id,
+    p_amount: parsed.data.amount,
+    p_paid_at: parsed.data.paid_at,
+    p_mode: parsed.data.mode,
+    p_reference: parsed.data.reference ?? undefined,
+  };
+  const { error } =
+    kind === "advance"
+      ? await supabase.rpc("record_advance", args)
+      : await supabase.rpc("record_deposit", args);
+  if (error) return failure(kind === "advance" ? "recordAdvance" : "recordDeposit", error, values);
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess(
+    kind === "advance"
+      ? `${formatPaise(parsed.data.amount)} received. It pays open invoices first; the rest is kept as credit.`
+      : `Deposit of ${formatPaise(parsed.data.amount)} received.`,
+  );
+}
+
+export async function recordAdvance(_previous: FormState, formData: FormData) {
+  return receiveMoney("advance", formData);
+}
+
+export async function recordDeposit(_previous: FormState, formData: FormData) {
+  return receiveMoney("deposit", formData);
+}
+
+/** Pays credit or deposit back to the resident. Owners only. */
+async function refund(ledger: "credit" | "deposit", formData: FormData): Promise<FormState> {
+  const values = formValues(formData, REFUND_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(refundSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const args = {
+    p_resident_id: parsed.data.resident_id,
+    p_amount: parsed.data.amount,
+    p_mode: parsed.data.mode,
+    p_reference: parsed.data.reference ?? undefined,
+  };
+  const { error } =
+    ledger === "credit"
+      ? await supabase.rpc("refund_credit", args)
+      : await supabase.rpc("refund_deposit", args);
+  if (error) return failure(ledger === "credit" ? "refundCredit" : "refundDeposit", error, values);
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess(`${formatPaise(parsed.data.amount)} paid back.`);
+}
+
+export async function refundCredit(_previous: FormState, formData: FormData) {
+  return refund("credit", formData);
+}
+
+export async function refundDeposit(_previous: FormState, formData: FormData) {
+  return refund("deposit", formData);
+}
+
+/** Keeps part of a deposit, with a reason. Owners only. */
+export async function deductDeposit(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, DEDUCTION_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(depositDeductionSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("deduct_deposit", {
+    p_resident_id: parsed.data.resident_id,
+    p_amount: parsed.data.amount,
+    p_reason: parsed.data.reason,
+  });
+  if (error) return failure("deductDeposit", error, values);
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess(`${formatPaise(parsed.data.amount)} kept from the deposit.`);
+}
+
+/** The deposit asked for on a resident's first stay, per sharing type. */
+export async function saveDepositAmount(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, ["sharing_type", "amount"]);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(depositAmountSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { sharing_type, amount } = parsed.data;
+  if (amount === null) {
+    const { error } = await supabase
+      .from("deposit_amounts")
+      .delete()
+      .eq("hostel_id", hostelId)
+      .eq("sharing_type", sharing_type);
+    if (error) return failure("saveDepositAmount", error, values);
+  } else {
+    const { data: updated, error } = await supabase
+      .from("deposit_amounts")
+      .update({ amount })
+      .eq("hostel_id", hostelId)
+      .eq("sharing_type", sharing_type)
+      .select("sharing_type");
+    if (error) return failure("saveDepositAmount", error, values);
+    if (!updated?.length) {
+      const { error: insertError } = await supabase
+        .from("deposit_amounts")
+        .insert({ hostel_id: hostelId, sharing_type, amount });
+      if (insertError) return failure("saveDepositAmount", insertError, values);
+    }
+  }
+
+  revalidatePath("/settings/fees");
+  return formSuccess(amount === null ? "Deposit removed." : "Deposit saved.");
+}
+
+/** Settles a resident who has left: dues, deposit, deductions and refund. Owners only. */
+export async function settleResident(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const parsed = validateFormData(settlementSchema, formData);
+  if (!parsed.ok) {
+    return formFailure(parsed.fieldErrors.deductions?.[0] ?? "Check the settlement details.");
+  }
+  if (!(await activeHostelId())) return formFailure(NO_HOSTEL);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("settle_resident", {
+    p_resident_id: parsed.data.resident_id,
+    p_deductions: parsed.data.deductions,
+    p_use_deposit: parsed.data.use_deposit,
+    p_refund_mode: parsed.data.refund_mode ?? undefined,
+    p_refund_reference: parsed.data.refund_reference ?? undefined,
+  });
+  if (error) return failure("settleResident", error);
+
+  revalidateResident(parsed.data.resident_id);
+  return formSuccess("Settled. The statement below shows what was done.");
 }

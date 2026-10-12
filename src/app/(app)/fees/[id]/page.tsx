@@ -166,13 +166,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       <span className="text-xs whitespace-normal">Void: {payment.voidReason}</span>
                     ) : (
                       <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/fees/${invoice.id}/print?payment=${payment.id}`}
-                          className={buttonClass({ variant: "secondary", size: "sm" })}
-                          aria-label={`Receipt for ${formatPaise(payment.amount)} on ${formatDay(payment.paidAt)}`}
-                        >
-                          Receipt
-                        </Link>
+                        {payment.number && (
+                          <Link
+                            href={`/fees/${invoice.id}/print?payment=${payment.id}`}
+                            className={buttonClass({ variant: "secondary", size: "sm" })}
+                            aria-label={`Receipt for ${formatPaise(payment.amount)} on ${formatDay(payment.paidAt)}`}
+                          >
+                            Receipt
+                          </Link>
+                        )}
                         {isOwner && (
                           <VoidDialog
                             kind="payment"

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
-import { Alert, Button, Input, Modal, Select } from "@/components/ui";
+import { Alert, Button, Checkbox, Input, Modal, Select } from "@/components/ui";
 import { formatPaise, paiseToInput } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
 import { initialFormState } from "@/lib/validation/result";
@@ -115,7 +115,7 @@ export function PaymentDialog({
             inputMode="decimal"
             defaultValue={state.values?.amount || paiseToInput(selected.balance)}
             required
-            hint={`Up to ${formatPaise(selected.balance)}.`}
+            hint={`${formatPaise(selected.balance)} is due.`}
             error={state.fieldErrors.amount?.[0]}
           />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -148,6 +148,13 @@ export function PaymentDialog({
             hint="Optional. UPI transaction ID, cheque or receipt number."
             maxLength={100}
             error={state.fieldErrors.reference?.[0]}
+          />
+          <Checkbox
+            id={`${formId}-extra`}
+            name="keep_extra"
+            label="Keep anything above what is due as credit"
+            hint="It pays the resident's other open invoices first, then the next ones issued."
+            defaultChecked={state.values?.keep_extra === "on"}
           />
         </form>
       </Modal>

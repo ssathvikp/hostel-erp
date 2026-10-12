@@ -144,6 +144,8 @@ export function createUserFactory() {
         "payments",
         "invoice_lines",
         "resident_charges",
+        "resident_credit",
+        "deposit_ledger",
         "discounts",
         "invoices",
         "allocations",

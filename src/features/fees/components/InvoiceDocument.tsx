@@ -271,7 +271,7 @@ export function ReceiptDocument({
       <Header
         hostel={hostel}
         title={payment.voidedAt ? "Receipt (void)" : "Payment receipt"}
-        number={payment.number}
+        number={payment.number ?? PAYMENT_MODE_LABELS[payment.mode]}
       />
       {payment.voidedAt && (
         <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-800">

@@ -399,8 +399,8 @@ export async function getBilledMonths(supabase: Supabase, hostelId: string): Pro
 
 export interface PaymentRow {
   id: string;
-  /** The receipt number, e.g. RCT/26-27/00042. */
-  number: string;
+  /** The receipt number, e.g. RCT/26-27/00042; none when paid from credit or deposit. */
+  number: string | null;
   amount: number;
   paidAt: string;
   mode: PaymentMode;
@@ -590,4 +590,157 @@ export async function getLateFeeRule(
         active: data.active,
       }
     : null;
+}
+
+// ---------------------------------------------------------------------------
+// Credit and deposits (E13-T7, E13-T4)
+// ---------------------------------------------------------------------------
+
+export interface MoneyEntry {
+  id: string;
+  ledger: "credit" | "deposit";
+  kind: string;
+  amount: number;
+  date: string;
+  mode: string | null;
+  reference: string | null;
+  number: string | null;
+  note: string | null;
+  invoiceId: string | null;
+  recordedAt: string;
+}
+
+export interface ResidentMoney {
+  credit: number;
+  deposit: {
+    due: number;
+    received: number;
+    deducted: number;
+    applied: number;
+    refunded: number;
+    held: number;
+    outstanding: number;
+  };
+  /** Both ledgers, newest first. */
+  entries: MoneyEntry[];
+}
+
+export async function getResidentMoney(
+  supabase: Supabase,
+  hostelId: string,
+  residentId: string,
+): Promise<ResidentMoney> {
+  const columns =
+    "id, kind, amount, paid_at, mode, reference, number, note, invoice_id, created_at";
+  const [credit, deposit, creditRows, depositRows] = await Promise.all([
+    supabase
+      .from("resident_credit_balances")
+      .select("balance")
+      .eq("hostel_id", hostelId)
+      .eq("resident_id", residentId)
+      .maybeSingle(),
+    supabase
+      .from("resident_deposits")
+      .select("due, received, deducted, applied, refunded, held, outstanding")
+      .eq("hostel_id", hostelId)
+      .eq("resident_id", residentId)
+      .maybeSingle(),
+    supabase
+      .from("resident_credit")
+      .select(columns)
+      .eq("hostel_id", hostelId)
+      .eq("resident_id", residentId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("deposit_ledger")
+      .select(columns)
+      .eq("hostel_id", hostelId)
+      .eq("resident_id", residentId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
+  for (const result of [credit, deposit, creditRows, depositRows]) {
+    if (result.error) throw result.error;
+  }
+
+  const toEntry =
+    (ledger: MoneyEntry["ledger"]) =>
+    (row: NonNullable<typeof creditRows.data>[number]): MoneyEntry => ({
+      id: row.id,
+      ledger,
+      kind: row.kind,
+      amount: row.amount,
+      date: row.paid_at,
+      mode: row.mode,
+      reference: row.reference,
+      number: row.number,
+      note: row.note,
+      invoiceId: row.invoice_id,
+      recordedAt: row.created_at,
+    });
+
+  const d = deposit.data;
+  return {
+    credit: credit.data?.balance ?? 0,
+    deposit: {
+      due: d?.due ?? 0,
+      received: d?.received ?? 0,
+      deducted: d?.deducted ?? 0,
+      applied: d?.applied ?? 0,
+      refunded: d?.refunded ?? 0,
+      held: d?.held ?? 0,
+      outstanding: d?.outstanding ?? 0,
+    },
+    entries: [
+      ...(creditRows.data ?? []).map(toEntry("credit")),
+      ...(depositRows.data ?? []).map(toEntry("deposit")),
+    ].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
+  };
+}
+
+/** The deposit asked for per sharing type. */
+export async function getDepositAmounts(
+  supabase: Supabase,
+  hostelId: string,
+): Promise<Partial<Record<SharingType, number>>> {
+  const { data, error } = await supabase
+    .from("deposit_amounts")
+    .select("sharing_type, amount")
+    .eq("hostel_id", hostelId);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((row) => [row.sharing_type, row.amount]));
+}
+
+export interface SettlementPreview {
+  unusedInvoiceNumber: string | null;
+  unusedMonth: string | null;
+  unusedCredit: number;
+  pendingCharges: number;
+  dues: number;
+  credit: number;
+  depositHeld: number;
+  depositOutstanding: number;
+  /** Positive: to refund. Negative: still owed. */
+  net: number;
+}
+
+export async function getSettlementPreview(
+  supabase: Supabase,
+  residentId: string,
+): Promise<SettlementPreview> {
+  const { data, error } = await supabase.rpc("settlement_preview", { p_resident_id: residentId });
+  if (error) throw error;
+  const p = data as Record<string, unknown>;
+  return {
+    unusedInvoiceNumber: (p.unused_invoice_number as string | null) ?? null,
+    unusedMonth: (p.unused_month as string | null) ?? null,
+    unusedCredit: Number(p.unused_credit ?? 0),
+    pendingCharges: Number(p.pending_charges ?? 0),
+    dues: Number(p.dues ?? 0),
+    credit: Number(p.credit ?? 0),
+    depositHeld: Number(p.deposit_held ?? 0),
+    depositOutstanding: Number(p.deposit_outstanding ?? 0),
+    net: Number(p.net ?? 0),
+  };
 }

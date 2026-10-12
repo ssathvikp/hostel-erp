@@ -10,12 +10,20 @@ import {
 import { RateForm } from "@/features/fees/components/RateForm";
 import { FEE_HEAD_BILLING_LABELS } from "@/features/fees/options";
 import { LateFeeRuleForm } from "@/features/fees/components/ChargeForms";
-import { getFeeHeads, getLateFeeRule, getRates, type FeeHead } from "@/features/fees/queries";
+import { DepositAmountForm } from "@/features/fees/components/MoneyForms";
+import {
+  getDepositAmounts,
+  getFeeHeads,
+  getLateFeeRule,
+  getRates,
+  type FeeHead,
+} from "@/features/fees/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatPaise, paiseToInput, shiftMonth } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
+import { SHARING_TYPES } from "@/types";
 
 export const metadata: Metadata = { title: "Fee settings" };
 
@@ -41,10 +49,11 @@ function currentPrice(head: FeeHead): string {
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const [{ history, summaries }, heads, lateFees] = await Promise.all([
+  const [{ history, summaries }, heads, lateFees, deposits] = await Promise.all([
     getRates(supabase, hostel.id),
     getFeeHeads(supabase, hostel.id),
     getLateFeeRule(supabase, hostel.id),
+    getDepositAmounts(supabase, hostel.id),
   ]);
   const isOwner = user.role === "owner";
 
@@ -203,6 +212,32 @@ export default async function FeeSettingsPage() {
             )}
           </div>
         )}
+      </section>
+
+      <section
+        aria-labelledby="deposits"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="deposits" className="text-base font-semibold text-slate-900">
+          Security deposits
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          Asked for when a resident first gets a bed, by the room&apos;s sharing type. Deposits are
+          held for the resident and never counted as rent.
+        </p>
+        {Object.keys(deposits).length === 0 ? (
+          <p className="mb-4 text-sm text-slate-600">No deposits are asked for.</p>
+        ) : (
+          <ul className="mb-4 space-y-1 text-sm">
+            {SHARING_TYPES.filter((type) => deposits[type] !== undefined).map((type) => (
+              <li key={type}>
+                {SHARING_TYPE_LABELS[type]}:{" "}
+                <span className="font-medium tabular-nums">{formatPaise(deposits[type]!)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {isOwner && <DepositAmountForm />}
       </section>
 
       <section

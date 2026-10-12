@@ -77,17 +77,12 @@ test("an owner sets a rate, bills a month, collects it in parts and prints proof
   // Rates: rooms without one are flagged before anything is billed.
   await page.goto("/settings/fees");
   await expect(inMain(page).getByText("Some rooms have no rate")).toBeVisible();
-  await inMain(page)
-    .getByLabel(/^Sharing type/)
-    .selectOption("double");
-  await inMain(page)
-    .getByLabel(/^Monthly rent/)
-    .fill("8000");
-  await inMain(page)
-    .getByLabel(/^Applies from/)
-    .fill(lastMonth);
-  await inMain(page).getByRole("button", { name: "Save rate" }).click();
-  await expect(inMain(page).getByText("Rate saved.")).toBeVisible();
+  const setRate = inMain(page).getByRole("region", { name: "Set a rate" });
+  await setRate.getByLabel(/^Sharing type/).selectOption("double");
+  await setRate.getByLabel(/^Monthly rent/).fill("8000");
+  await setRate.getByLabel(/^Applies from/).fill(lastMonth);
+  await setRate.getByRole("button", { name: "Save rate" }).click();
+  await expect(setRate.getByText("Rate saved.")).toBeVisible();
   const current = inMain(page).getByRole("table", { name: "Current rates" });
   await expect(current.getByRole("row", { name: /Double.*₹8,000/ })).toBeVisible();
   await expect(inMain(page).getByText(/^Single \(1 room\) has no rate/)).toBeVisible();
@@ -394,4 +389,79 @@ test("an owner charges, discounts and fines a resident, then waives the fine", a
   await voidDialog.getByLabel(/^Reason/).fill("First delay, waived");
   await voidDialog.getByRole("button", { name: "Void charge" }).click();
   await expect(charges.getByRole("row", { name: /Late fee on INV.*Void/ })).toBeVisible();
+});
+
+test("an owner takes a deposit, keeps an overpayment as credit, and settles on move-out", async ({
+  page,
+}) => {
+  const { owner, hostel, beds } = await setup("Deposit PG");
+  await owner.client
+    .from("deposit_amounts")
+    .insert({ hostel_id: hostel.id, sharing_type: "double", amount: 1500000 });
+  const raviId = await residentInBed(hostel.id, owner.id, "Ravi Kiran", beds["101"]);
+  await owner.client.rpc("set_fee_structure", {
+    p_hostel_id: hostel.id,
+    p_sharing_type: "double",
+    p_monthly_amount: 800000,
+    p_effective_from: shiftMonth(todayIst(), -6),
+  });
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // The deposit asked for on his first stay, then received.
+  await page.goto(`/residents/${raviId}`);
+  const money = inMain(page).getByRole("region", { name: "Credit and deposit" });
+  await expect(money.getByText("₹15,000 still to receive")).toBeVisible();
+  await money.getByRole("button", { name: "Record deposit" }).click();
+  const depositDialog = page.getByRole("dialog", { name: "Record the deposit received" });
+  await expect(depositDialog.getByLabel(/^Amount/)).toHaveValue("15000");
+  await depositDialog.getByLabel(/^Mode/).selectOption("bank_transfer");
+  await depositDialog.getByRole("button", { name: "Record deposit" }).click();
+  await expect(depositDialog).toBeHidden();
+  await expect(money.getByRole("row", { name: /Deposit received.*₹15,000.*RCT\// })).toBeVisible();
+
+  // Last month's rent, paid with ₹2,000 extra, kept as credit.
+  await page.goto("/fees");
+  await billMonth(page);
+  const row = inMain(page)
+    .getByRole("table", { name: "Invoices" })
+    .getByRole("row", { name: /Ravi Kiran/ });
+  await row.getByRole("button", { name: "Record payment for Ravi Kiran" }).click();
+  const payDialog = page.getByRole("dialog", { name: "Record a payment from Ravi Kiran" });
+  await payDialog.getByLabel(/^Amount/).fill("10000");
+  await payDialog.getByLabel(/^Mode/).selectOption("cash");
+  await payDialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(payDialog.getByText(/To keep the rest as credit/)).toBeVisible();
+  await payDialog.getByLabel("Keep anything above what is due as credit").check();
+  await payDialog.getByRole("button", { name: "Record payment" }).click();
+  await expect(payDialog).toBeHidden();
+
+  // He leaves today.
+  await page.goto(`/residents/${raviId}`);
+  await expect(money.getByText("₹2,000").first()).toBeVisible();
+  await inMain(page)
+    .getByRole("button", { name: /^Vacate bed/ })
+    .click();
+  const vacate = page.getByRole("dialog", { name: /^Vacate bed/ });
+  await vacate.getByLabel(/^Reason/).selectOption("moved_out");
+  await vacate.getByRole("button", { name: "Vacate bed" }).click();
+  await expect(vacate).toBeHidden();
+
+  // Settle: keep ₹500 for cleaning, pay back the rest by UPI.
+  await money.getByRole("link", { name: "Settle and close" }).click();
+  await expect(page).toHaveURL(new RegExp(`/residents/${raviId}/settlement$`));
+  const statement = inMain(page).getByRole("region", { name: "Statement" });
+  await expect(statement.getByText("To pay back to the resident")).toBeVisible();
+  await inMain(page).getByLabel("Deduction 1 (₹)").fill("500");
+  await inMain(page).getByLabel("Reason 1").fill("Room cleaning");
+  await inMain(page)
+    .getByLabel(/^Pay back what is left by/)
+    .selectOption("upi");
+  await inMain(page).getByRole("button", { name: "Settle" }).click();
+  await expect(inMain(page).getByText("Nothing left to settle")).toBeVisible();
+  const movements = inMain(page).getByRole("table", { name: "Credit and deposit movements" });
+  await expect(
+    movements.getByRole("row", { name: /Kept from deposit.*₹500.*Room cleaning/ }),
+  ).toBeVisible();
+  await expect(movements.getByRole("row", { name: /Deposit paid back.*₹14,500/ })).toBeVisible();
+  await expect(movements.getByRole("row", { name: /Credit paid back.*₹2,000/ })).toBeVisible();
 });

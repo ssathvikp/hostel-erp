@@ -390,6 +390,85 @@ export const paymentSchema = z
     path: ["paid_at"],
   });
 
+/** Money received for a resident, not tied to one invoice: an advance or a deposit. */
+export const residentMoneySchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  paid_at: notFuture("Received on"),
+  mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+  reference: optional(requiredText("Reference", 100)),
+});
+
+/** Money paid back to a resident from their credit or deposit. */
+export const refundSchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  mode: z.enum(PAYMENT_MODES, { error: "Choose how it is paid back" }),
+  reference: optional(requiredText("Reference", 100)),
+});
+
+/** Part of a deposit kept, always with a reason. */
+export const depositDeductionSchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  reason: requiredText("Reason", 500),
+});
+
+/** The deposit asked for on a resident's first stay, per sharing type. Blank removes it. */
+export const depositAmountSchema = z.object({
+  sharing_type: z.enum(SHARING_TYPES, { error: "Choose a sharing type" }),
+  amount: optional(rupees("Deposit")),
+});
+
+const asList = (value: unknown) =>
+  Array.isArray(value) ? value : value === undefined ? [] : [value];
+
+/** Settling a resident who has left (E13-T8). Up to three deductions. */
+export const settlementSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    deduction_amount: z.preprocess(asList, z.array(z.string()).max(3)),
+    deduction_reason: z.preprocess(asList, z.array(z.string()).max(3)),
+    use_deposit: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+    refund_mode: optional(z.enum(PAYMENT_MODES, { error: "Choose how it is paid back" })),
+    refund_reference: optional(requiredText("Reference", 100)),
+  })
+  .transform((input, ctx) => {
+    const deductions: { amount: number; reason: string }[] = [];
+    input.deduction_amount.forEach((raw, index) => {
+      const reason = (input.deduction_reason[index] ?? "").trim();
+      if (!raw.trim() && !reason) return;
+      const amount = rupees("Deduction").safeParse(raw);
+      if (!amount.success) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter each deduction as an amount",
+          path: ["deductions"],
+        });
+        return;
+      }
+      if (!reason) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Give a reason for each deduction",
+          path: ["deductions"],
+        });
+        return;
+      }
+      deductions.push({ amount: amount.data, reason });
+    });
+    return {
+      resident_id: input.resident_id,
+      deductions,
+      use_deposit: input.use_deposit,
+      refund_mode: input.refund_mode,
+      refund_reference: input.refund_reference,
+    };
+  });
+
 /** A charge other than rent (E13-T1). Rent is built in and cannot be a head. */
 export const feeHeadSchema = z
   .object({

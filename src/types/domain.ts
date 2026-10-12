@@ -161,8 +161,14 @@ export interface InvoiceLine {
   detail: { nights?: number; monthly_rate?: Paise; stays?: StayBreakdown[] };
 }
 
+/** Modes a person records money in. */
 export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
-export type PaymentMode = (typeof PAYMENT_MODES)[number];
+export type RecordablePaymentMode = (typeof PAYMENT_MODES)[number];
+/**
+ * Every mode a payment row can carry: also credit and deposit money applied
+ * to an invoice by the database (E13-T7, E13-T4).
+ */
+export type PaymentMode = RecordablePaymentMode | "credit" | "deposit";
 
 // ---------------------------------------------------------------------------
 // Profile (EP-02) - id equals auth.users.id

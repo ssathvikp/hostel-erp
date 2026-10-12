@@ -47,6 +47,8 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   upi: "UPI",
   bank_transfer: "Bank transfer",
   card: "Card",
+  credit: "From credit",
+  deposit: "From deposit",
 };
 
 export const PAYMENT_MODE_OPTIONS: readonly SelectOption[] = PAYMENT_MODES.map((mode) => ({

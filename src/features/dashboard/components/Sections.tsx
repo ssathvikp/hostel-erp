@@ -125,6 +125,14 @@ export async function KpiSection({ hostelId, range }: { hostelId: string; range:
             href="/fees?status=overdue"
           />
         </div>
+        {money.depositsHeld > 0 && (
+          <p className="mt-2 text-sm text-slate-600">
+            <span className="font-medium text-slate-900 tabular-nums">
+              {formatPaise(money.depositsHeld)}
+            </span>{" "}
+            in security deposits is held for residents. It is not counted as collected.
+          </p>
+        )}
       </section>
     </div>
   );
