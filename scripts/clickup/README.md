@@ -7,7 +7,7 @@ This folder is the repo-side mirror of the ClickUp development plan. **ClickUp i
 | File | Purpose |
 |---|---|
 | `targets.json` | ClickUp team, space, folder and list IDs |
-| `plan-0N.ndjson` | The full plan spec, one JSON object per task |
+| `plan-NN.ndjson` | The full plan spec, one JSON object per task. `plan-10`, `plan-13` and `plan-14` hold the detailed backlog epics |
 | `created-tasks.json` | Map of plan key (for example `E6-T3`) to ClickUp task id and URL |
 | `sync-plan.ps1` | Idempotent push: creates only missing tasks, wires dependencies, writes the mapping |
 | `sync.log` | Log of the last push: created, skipped and failed counts |
@@ -33,7 +33,8 @@ Workspace : Sai Sathvik P s Workspace
 Space     : HOSTEL ERP
 Folder    : Hostel/PG ERP
   List    : MVP - v0.1            -> 9 epic parent tasks + 63 subtasks
-  List    : Backlog - Post-MVP    -> 3 epic parent tasks, no subtasks yet
+  List    : Backlog - Post-MVP    -> 5 epic parent tasks: EP-10, EP-13 and EP-14 with 12 subtasks
+                                     each; EP-11 and EP-12 not yet detailed
 ```
 
 ## Known ClickUp API limitations
@@ -50,12 +51,13 @@ Folder    : Hostel/PG ERP
 | 2026-09-21 | MVP is fixed at the 9 MVP epics, 63 tasks, 280 hours | Ship a usable product before widening scope |
 | 2026-09-21 | EP-10, EP-11 and EP-12 remain container epics with zero subtasks | Detail is written only when an epic is scheduled; no invented requirements |
 | 2026-09-21 | The gaps listed below stay out of the MVP by choice | Owner decision, taken with the retrofit cost understood |
+| 2026-10-12 | EP-10 detailed into 12 tasks; EP-13 (resident fee structure and online collection) and EP-14 (SaaS subscription billing) added with 12 tasks each, all still backlog | Owner asked for the payment structure in detail and a complete super-admin epic; EP-12's online payments and deposit ledger moved to EP-13 |
 
 ### Gaps knowingly deferred out of the MVP
 
-- SaaS billing and subscriptions: how the hostel owner actually pays you
+- SaaS billing and subscriptions: how the hostel owner actually pays you (now planned in EP-14)
 - Data import from an owner s existing spreadsheets (rooms, beds, residents)
-- Data protection and DPDP Act 2023: consent, retention, export and erasure of stored KYC data
+- Data protection and DPDP Act 2023: consent, retention, export and erasure of stored KYC data (export and erasure now planned in E10-T10)
 - Resident-facing portal or mobile app
 - Marketing site and trial signup funnel
 - Backups, disaster recovery, paid monitoring and product analytics

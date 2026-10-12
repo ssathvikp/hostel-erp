@@ -98,7 +98,9 @@ try {
     if ($existing.ContainsKey($o.name)) { Log ('SKIP exists: ' + $o.name); $created[$o.k] = @{ id = $existing[$o.name] }; continue }
     $parentTaskId = $null
     if ($o.p) { if ($created.ContainsKey($o.p)) { $parentTaskId = $created[$o.p].id } else { Log ('PARENT MISSING for ' + $o.k + ' -> ' + $o.p) } }
-    $r = New-Task $o $listMvp $parentTaskId
+    $lid = $listMvp
+    if ($o.list -eq 'backlog') { $lid = $listBacklog }
+    $r = New-Task $o $lid $parentTaskId
     $created[$o.k] = @{ id = $r.id }
     Log ('CREATED task ' + $o.k + ' -> ' + $r.id + ' parent=' + $parentTaskId)
   }
