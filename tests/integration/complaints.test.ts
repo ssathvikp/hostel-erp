@@ -348,10 +348,7 @@ describe("routing", () => {
       (await staff.client.rpc("assign_complaint", { p_complaint_id: id!, p_worker_id: local }))
         .error,
     ).toBeNull();
-    expect(
-      (await staff.client.rpc("assign_complaint", { p_complaint_id: id!, p_worker_id: null }))
-        .error,
-    ).toBeNull();
+    expect((await staff.client.rpc("assign_complaint", { p_complaint_id: id! })).error).toBeNull();
     expect((await complaint(id!)).status).toBe("open");
     const kinds = (await events(id!)).map((event) => event.kind);
     expect(kinds).toEqual(expect.arrayContaining(["assigned", "unassigned"]));

@@ -445,3 +445,54 @@ export type PaymentInsert = Omit<
  * prove otherwise. Use this for views whose columns are known to be set.
  */
 export type ViewRow<T> = { [K in keyof T]-?: NonNullable<T[K]> };
+
+// ---------------------------------------------------------------------------
+// Complaints and maintenance (EP-15)
+// ---------------------------------------------------------------------------
+
+export const COMPLAINT_STATUSES = [
+  "open",
+  "assigned",
+  "in_progress",
+  "on_hold",
+  "resolved",
+  "closed",
+  "reopened",
+] as const;
+export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number];
+
+/** Where each status may go next; the database enforces the same paths. */
+export const COMPLAINT_NEXT_STATUSES: Record<ComplaintStatus, readonly ComplaintStatus[]> = {
+  open: ["assigned", "in_progress", "on_hold", "resolved", "closed"],
+  assigned: ["open", "in_progress", "on_hold", "resolved", "closed"],
+  in_progress: ["assigned", "on_hold", "resolved", "closed"],
+  on_hold: ["open", "assigned", "in_progress", "closed"],
+  resolved: ["closed", "reopened"],
+  closed: ["reopened"],
+  reopened: ["assigned", "in_progress", "on_hold", "resolved", "closed"],
+};
+
+export const COMPLAINT_PRIORITIES = ["urgent", "high", "normal", "low"] as const;
+export type ComplaintPriority = (typeof COMPLAINT_PRIORITIES)[number];
+
+export const TRADES = [
+  "electrician",
+  "plumber",
+  "carpenter",
+  "cleaner",
+  "technician",
+  "pest_control",
+  "general",
+] as const;
+export type Trade = (typeof TRADES)[number];
+
+export const WORKER_KINDS = ["on_site", "vendor"] as const;
+export type WorkerKind = (typeof WORKER_KINDS)[number];
+
+export type ComplaintTargetState = "on_track" | "due_soon" | "overdue" | "paused" | "done";
+
+export const MAINTENANCE_UNITS = ["day", "week", "month"] as const;
+export type MaintenanceUnit = (typeof MAINTENANCE_UNITS)[number];
+
+export const PAYOUT_MODES = ["cash", "upi", "bank_transfer", "cheque"] as const;
+export type PayoutMode = (typeof PAYOUT_MODES)[number];

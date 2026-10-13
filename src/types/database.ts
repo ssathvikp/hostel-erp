@@ -2908,7 +2908,7 @@ export type Database = {
       };
       apply_late_fees: { Args: { p_hostel_id: string }; Returns: number };
       assign_complaint: {
-        Args: { p_complaint_id: string; p_worker_id: string };
+        Args: { p_complaint_id: string; p_worker_id?: string };
         Returns: undefined;
       };
       bill_pending_charges: { Args: { p_resident_id: string }; Returns: string };

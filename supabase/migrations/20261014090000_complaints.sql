@@ -686,7 +686,7 @@ end;
 $$;
 
 -- Assigns a worker serving the hostel, or with null unassigns. Owners and staff.
-create or replace function public.assign_complaint(p_complaint_id uuid, p_worker_id uuid)
+create or replace function public.assign_complaint(p_complaint_id uuid, p_worker_id uuid default null)
 returns void
 language plpgsql
 security invoker

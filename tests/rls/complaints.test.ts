@@ -82,7 +82,10 @@ describe("another hostel", () => {
         "complaint_job_links",
         "vendor_payouts",
       ] as const) {
-        const { data } = await user.client.from(table).select("id").eq("hostel_id", hostelA);
+        const { data } = await user.client
+          .from(table as "complaints")
+          .select("id")
+          .eq("hostel_id", hostelA);
         expect(data, `${table}`).toEqual([]);
       }
       const { data: workers } = await user.client.from("workers").select("id").eq("id", workerA);
@@ -97,7 +100,7 @@ describe("another hostel", () => {
 
   it("cannot act on hostel A's complaint through any function", async () => {
     const calls = [
-      ownerB.client.rpc("assign_complaint", { p_complaint_id: complaintA, p_worker_id: null }),
+      ownerB.client.rpc("assign_complaint", { p_complaint_id: complaintA }),
       ownerB.client.rpc("set_complaint_status", { p_complaint_id: complaintA, p_status: "closed" }),
       ownerB.client.rpc("comment_complaint", { p_complaint_id: complaintA, p_note: "hi" }),
       ownerB.client.rpc("route_complaint", { p_complaint_id: complaintA }),
