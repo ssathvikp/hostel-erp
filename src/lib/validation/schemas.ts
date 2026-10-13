@@ -1,14 +1,23 @@
 import { z } from "zod";
 
 import {
+  COMPLAINT_PRIORITIES,
+  COMPLAINT_STATUSES,
+  FEE_HEAD_BILLINGS,
+  FEE_HEAD_PRICINGS,
   GENDERS,
   HOSTEL_TYPES,
   ID_PROOF_TYPES,
   INDIAN_STATES,
+  MAINTENANCE_UNITS,
   MANUAL_BED_STATUSES,
+  INVOICE_PAYMENT_MODES,
   PAYMENT_MODES,
+  PAYOUT_MODES,
   RESIDENT_STATUSES,
   SHARING_TYPES,
+  TRADES,
+  WORKER_KINDS,
   type IdProofType,
   type SharingType,
 } from "@/types";
@@ -380,14 +389,454 @@ export const paymentSchema = z
     invoice_id: uuid("Invoice"),
     amount: rupees("Amount"),
     paid_at: isoDate("Payment date"),
-    mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+    mode: z.enum(INVOICE_PAYMENT_MODES, { error: "Choose a payment mode" }),
     reference: optional(requiredText("Reference", 100)),
+    cheque_bank: optional(requiredText("Bank", 100)),
   })
   .refine((payment) => payment.paid_at <= todayIst(), {
     error: "Payment date cannot be in the future",
     path: ["paid_at"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.reference, {
+    error: "Enter the cheque number",
+    path: ["reference"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.cheque_bank, {
+    error: "Enter the bank",
+    path: ["cheque_bank"],
   });
+
+/** Metered electricity (E13-T3): the rate per unit. Blank stops billing electricity. */
+export const electricityRateSchema = z.object({
+  unit_rate: optional(rupees("Rate per unit", { max: 1000 })),
+});
+
+/** A meter reading in units, to one decimal place. */
+const meterUnits = (label: string) =>
+  z.coerce
+    .number({ error: `${label} must be a number` })
+    .refine((value) => Number.isFinite(value) && value >= 0, {
+      error: `${label} cannot be negative`,
+    })
+    .refine((value) => value < 1_000_000_000, { error: `${label} is too large` })
+    .refine((value) => Math.abs(value * 10 - Math.round(value * 10)) < 1e-6, {
+      error: `${label} can have at most 1 decimal place`,
+    });
+
+/** A room's sub-meter for a month. */
+export const meterReadingSchema = z
+  .object({
+    room_id: uuid("Room"),
+    period_month: billingMonth,
+    opening: meterUnits("Opening reading"),
+    closing: meterUnits("Closing reading"),
+  })
+  .refine((reading) => reading.closing >= reading.opening, {
+    error: "The closing reading cannot be below the opening reading",
+    path: ["closing"],
+  });
+
+/** A pending cheque the bank has paid (E13-T11). */
+export const chequeClearSchema = z.object({
+  id: uuid("Cheque"),
+  cleared_on: notFuture("Cleared on"),
+});
+
+/** A cheque the bank returned, with why and an optional bounce charge. */
+export const chequeBounceSchema = z.object({
+  id: uuid("Cheque"),
+  reason: requiredText("Reason", 500),
+  charge: optional(rupees("Bounce charge")),
+});
+
+/** Money received for a resident, not tied to one invoice: an advance or a deposit. */
+export const residentMoneySchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  paid_at: notFuture("Received on"),
+  mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+  reference: optional(requiredText("Reference", 100)),
+});
+
+/** Money paid back to a resident from their credit or deposit. */
+export const refundSchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  mode: z.enum(PAYMENT_MODES, { error: "Choose how it is paid back" }),
+  reference: optional(requiredText("Reference", 100)),
+});
+
+/** Part of a deposit kept, always with a reason. */
+export const depositDeductionSchema = z.object({
+  resident_id: uuid("Resident"),
+  amount: rupees("Amount"),
+  reason: requiredText("Reason", 500),
+});
+
+/** The deposit asked for on a resident's first stay, per sharing type. Blank removes it. */
+export const depositAmountSchema = z.object({
+  sharing_type: z.enum(SHARING_TYPES, { error: "Choose a sharing type" }),
+  amount: optional(rupees("Deposit")),
+});
+
+const asList = (value: unknown) =>
+  Array.isArray(value) ? value : value === undefined ? [] : [value];
+
+/** Settling a resident who has left (E13-T8). Up to three deductions. */
+export const settlementSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    deduction_amount: z.preprocess(asList, z.array(z.string()).max(3)),
+    deduction_reason: z.preprocess(asList, z.array(z.string()).max(3)),
+    use_deposit: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+    refund_mode: optional(z.enum(PAYMENT_MODES, { error: "Choose how it is paid back" })),
+    refund_reference: optional(requiredText("Reference", 100)),
+  })
+  .transform((input, ctx) => {
+    const deductions: { amount: number; reason: string }[] = [];
+    input.deduction_amount.forEach((raw, index) => {
+      const reason = (input.deduction_reason[index] ?? "").trim();
+      if (!raw.trim() && !reason) return;
+      const amount = rupees("Deduction").safeParse(raw);
+      if (!amount.success) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter each deduction as an amount",
+          path: ["deductions"],
+        });
+        return;
+      }
+      if (!reason) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Give a reason for each deduction",
+          path: ["deductions"],
+        });
+        return;
+      }
+      deductions.push({ amount: amount.data, reason });
+    });
+    return {
+      resident_id: input.resident_id,
+      deductions,
+      use_deposit: input.use_deposit,
+      refund_mode: input.refund_mode,
+      refund_reference: input.refund_reference,
+    };
+  });
+
+/** A charge other than rent (E13-T1). Rent is built in and cannot be a head. */
+export const feeHeadSchema = z
+  .object({
+    name: requiredText("Name", 60).refine((name) => name.toLowerCase() !== "rent", {
+      error: "Rent is set in the rates above",
+    }),
+    billing: z.enum(FEE_HEAD_BILLINGS, { error: "Choose how often it is billed" }),
+    pricing: z.enum(FEE_HEAD_PRICINGS, { error: "Choose how it is priced" }),
+    /** One-time heads only: added as a charge when a resident first gets a bed. */
+    charge_on_first_stay: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+  })
+  .refine((head) => !head.charge_on_first_stay || head.billing === "one_time", {
+    error: "Only a one-time charge can be added on a resident's first stay",
+    path: ["charge_on_first_stay"],
+  });
+
+/** A head's rate from a date; per-sharing heads also name the sharing type. */
+export const feeHeadRateSchema = z.object({
+  fee_head_id: uuid("Charge"),
+  sharing_type: optional(z.enum(SHARING_TYPES, { error: "Choose a sharing type" })),
+  amount: rupees("Amount"),
+  effective_from: isoDate("Effective from"),
+});
+
+export const feeHeadToggleSchema = z.object({
+  fee_head_id: uuid("Charge"),
+  active: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
+
+/** Excusing a resident from a monthly charge, or billing them again. */
+export const feeExemptionSchema = z.object({
+  resident_id: uuid("Resident"),
+  fee_head_id: uuid("Charge"),
+  exempt: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
+
+/**
+ * A charge outside the monthly cycle (E13-T2): from a one-time head, or
+ * described by hand. It is billed on the next invoice, or now.
+ */
+export const chargeSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    fee_head_id: optional(uuid("Charge")),
+    description: optional(requiredText("Description", 200)),
+    amount: rupees("Amount"),
+    charge_date: notFuture("Date"),
+  })
+  .refine((charge) => charge.fee_head_id || charge.description, {
+    error: "Describe the charge or choose one from the list",
+    path: ["description"],
+  });
+
+/** `YYYY-MM` from `<input type="month">`, as `YYYY-MM-01`. */
+const monthInput = (label: string) =>
+  z
+    .string({ error: `Choose ${label}` })
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, { error: `Choose ${label}` })
+    .transform((value) => `${value}-01`);
+
+/** A discount off rent or one charge, for a range of months (E13-T5). */
+export const discountSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    /** "rent", or the fee head it comes off. */
+    target: z.union([z.literal("rent"), uuid("Charge")], { error: "Choose what it comes off" }),
+    measure: z.enum(["percent", "fixed"], { error: "Choose a percentage or an amount" }),
+    value: z.coerce.number({ error: "Enter a number" }).positive({ error: "Enter more than zero" }),
+    from_month: monthInput("the first month"),
+    to_month: optional(monthInput("the last month")),
+    reason: requiredText("Reason", 200),
+  })
+  .refine((d) => d.measure !== "percent" || (Number.isInteger(d.value) && d.value <= 100), {
+    error: "A percentage is a whole number up to 100",
+    path: ["value"],
+  })
+  .refine(
+    (d) => d.measure !== "fixed" || Math.abs(d.value * 100 - Math.round(d.value * 100)) < 1e-6,
+    {
+      error: "Amount can have at most 2 decimal places",
+      path: ["value"],
+    },
+  )
+  .refine((d) => !d.to_month || d.to_month >= d.from_month, {
+    error: "The last month must not be before the first",
+    path: ["to_month"],
+  })
+  .transform((d) => ({
+    resident_id: d.resident_id,
+    fee_head_id: d.target === "rent" ? null : d.target,
+    percent: d.measure === "percent" ? d.value : null,
+    amount: d.measure === "fixed" ? Math.round(d.value * 100) : null,
+    from_month: d.from_month,
+    to_month: d.to_month,
+    reason: d.reason,
+  }));
+
+/** Ends a discount after a month. */
+export const discountEndSchema = z.object({
+  id: uuid("Discount"),
+  resident_id: uuid("Resident"),
+  to_month: monthInput("the last month"),
+});
+
+/** The hostel's late fee rule (E13-T6). */
+export const lateFeeRuleSchema = z
+  .object({
+    grace_days: integer("Grace days", 0, 60),
+    kind: z.enum(["fixed", "per_day"], { error: "Choose a fixed fee or a fee per day" }),
+    amount: rupees("Fee", { max: 1_00_000 }),
+    cap: optional(rupees("Most it can reach", { max: 1_00_000 })),
+    active: z
+      .literal("on")
+      .optional()
+      .transform((value) => value === "on"),
+  })
+  .refine((rule) => rule.kind === "fixed" || rule.cap !== null, {
+    error: "Set the most a per-day fee can reach",
+    path: ["cap"],
+  })
+  .refine((rule) => rule.cap === null || rule.cap >= rule.amount, {
+    error: "The most it can reach must be at least the daily fee",
+    path: ["cap"],
+  })
+  .transform((rule) => ({ ...rule, cap: rule.kind === "fixed" ? null : rule.cap }));
 
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;
 export type PaymentInput = z.output<typeof paymentSchema>;
+
+// ---------------------------------------------------------------------------
+// Complaints and maintenance (EP-15)
+// ---------------------------------------------------------------------------
+
+const checkbox = z
+  .literal("on")
+  .optional()
+  .transform((value) => value === "on");
+
+const where = {
+  place: z.enum(["room", "area"], { error: "Choose a room or a common area" }),
+  room_id: optional(uuid("Room")),
+  area: optional(requiredText("Area", 100)),
+};
+
+function whereIsGiven(input: {
+  place: "room" | "area";
+  room_id: string | null;
+  area: string | null;
+}) {
+  return input.place === "room" ? Boolean(input.room_id) : Boolean(input.area);
+}
+
+/** A complaint raised by an owner or staff member (E15-T2). */
+export const complaintSchema = z
+  .object({
+    category_id: uuid("Category"),
+    priority: z.enum(COMPLAINT_PRIORITIES, { error: "Choose a priority" }),
+    title: requiredText("What is wrong", 120),
+    description: optional(requiredText("Details", 2000)),
+    ...where,
+    bed_id: optional(uuid("Bed")),
+    resident_id: optional(uuid("Resident")),
+    bed_maintenance: checkbox,
+  })
+  .refine(whereIsGiven, {
+    error: "Choose the room, or name the common area",
+    path: ["room_id"],
+  });
+
+export const complaintStatusSchema = z.object({
+  id: uuid("Complaint"),
+  status: z.enum(COMPLAINT_STATUSES, { error: "Choose a status" }),
+  note: optional(requiredText("Note", 2000)),
+});
+
+export const complaintAssignSchema = z.object({
+  id: uuid("Complaint"),
+  worker_id: optional(uuid("Worker")),
+});
+
+export const complaintCommentSchema = z.object({
+  id: uuid("Complaint"),
+  note: requiredText("Comment", 2000),
+});
+
+export const complaintUpdateSchema = z.object({
+  id: uuid("Complaint"),
+  priority: z.enum(COMPLAINT_PRIORITIES, { error: "Choose a priority" }),
+  share_resident_phone: checkbox,
+});
+
+const optionalRupees = (label: string) =>
+  z.preprocess(
+    (value) => (value === "" || value === undefined || value === null ? "0" : value),
+    rupees(label, { positive: false, max: 1_00_000 }),
+  );
+
+/** What a repair cost and who pays (E15-T9). */
+export const complaintCostsSchema = z
+  .object({
+    id: uuid("Complaint"),
+    labour_cost: optionalRupees("Labour"),
+    material_cost: optionalRupees("Materials"),
+    vendor_charge: optionalRupees("Worker's charge"),
+    payer: z.enum(["hostel", "resident"], { error: "Choose who pays" }),
+    resident_id: optional(uuid("Resident")),
+  })
+  .refine(
+    (costs) =>
+      costs.payer === "hostel" || costs.labour_cost + costs.material_cost + costs.vendor_charge > 0,
+    { error: "Enter what the repair cost before charging the resident", path: ["labour_cost"] },
+  );
+
+export const vendorPayoutSchema = z.object({
+  id: uuid("Complaint"),
+  amount: rupees("Amount"),
+  paid_at: notFuture("Paid on"),
+  mode: z.enum(PAYOUT_MODES, { error: "Choose how it was paid" }),
+  reference: optional(requiredText("Reference", 100)),
+});
+
+/** A worker: the hostel's own staff or an outside vendor (E15-T6). */
+export const workerSchema = z
+  .object({
+    kind: z.enum(WORKER_KINDS, { error: "Choose on-site staff or an outside vendor" }),
+    name: requiredText("Name", 100),
+    business_name: optional(requiredText("Business name", 100)),
+    phone: indianMobile,
+    trades: z.preprocess(
+      asList,
+      z.array(z.enum(TRADES)).min(1, { error: "Choose at least one trade" }),
+    ),
+    preferred_trades: z.preprocess(asList, z.array(z.enum(TRADES))),
+    call_out_charge: optional(rupees("Call-out charge", { positive: false, max: 1_00_000 })),
+    notes: optional(requiredText("Notes", 500)),
+  })
+  .refine((worker) => worker.preferred_trades.every((trade) => worker.trades.includes(trade)), {
+    error: "A worker can only be first choice for trades they do",
+    path: ["preferred_trades"],
+  });
+
+export const workerUnavailableSchema = z
+  .object({
+    worker_id: uuid("Worker"),
+    from_date: isoDate("From"),
+    to_date: isoDate("To"),
+    reason: optional(requiredText("Reason", 200)),
+  })
+  .refine((range) => range.to_date >= range.from_date, {
+    error: "The last day must be on or after the first",
+    path: ["to_date"],
+  });
+
+export const complaintCategorySchema = z.object({
+  name: requiredText("Category", 60),
+  trade: z.enum(TRADES, { error: "Choose a trade" }),
+});
+
+const hours = (label: string) =>
+  z.coerce
+    .number({ error: `${label} must be a number` })
+    .refine((value) => Number.isFinite(value) && value > 0 && value <= 2160, {
+      error: `${label} must be between 0 and 2160 hours`,
+    })
+    .refine((value) => Number.isInteger(value * 4), { error: `${label} must be in quarter hours` });
+
+/** Response and resolution targets for one priority (E15-T10). */
+export const complaintTargetSchema = z
+  .object({
+    priority: z.enum(COMPLAINT_PRIORITIES, { error: "Choose a priority" }),
+    respond_hours: hours("Respond within"),
+    resolve_hours: hours("Fix within"),
+  })
+  .refine((target) => target.resolve_hours >= target.respond_hours, {
+    error: "The fix cannot be due before the response",
+    path: ["resolve_hours"],
+  });
+
+/** Recurring preventive maintenance (E15-T12). */
+export const maintenanceScheduleSchema = z
+  .object({
+    title: requiredText("Task", 120),
+    description: optional(requiredText("Details", 2000)),
+    category_id: uuid("Category"),
+    ...where,
+    every: integer("Every", 1, 365),
+    unit: z.enum(MAINTENANCE_UNITS, { error: "Choose days, weeks or months" }),
+    next_due: isoDate("Next due"),
+    priority: z.enum(COMPLAINT_PRIORITIES, { error: "Choose a priority" }),
+  })
+  .refine(whereIsGiven, {
+    error: "Choose the room, or name the common area",
+    path: ["room_id"],
+  });
+
+/** What a worker does from their job link (E15-T8). */
+export const jobActionSchema = z
+  .object({
+    action: z.enum(["accept", "decline", "on_the_way", "start", "done"], {
+      error: "Choose what to do",
+    }),
+    note: optional(requiredText("Note", 2000)),
+    charge: optional(rupees("Your charge", { positive: false, max: 1_00_000 })),
+  })
+  .refine((input) => input.action !== "decline" || input.note, {
+    error: "Say why you cannot take this job",
+    path: ["note"],
+  });

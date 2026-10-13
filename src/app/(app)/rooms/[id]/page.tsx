@@ -7,6 +7,8 @@ import { Alert, Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/co
 import { AllocateDialog } from "@/features/allocations/components/AllocateDialog";
 import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
 import { getAllocationEvents, getUnallocatedResidents } from "@/features/allocations/queries";
+import { ComplaintTable } from "@/features/complaints/components/ComplaintTable";
+import { getOpenComplaints } from "@/features/complaints/queries";
 import { BedStatusControl } from "@/features/rooms/components/BedStatusControl";
 import { RoomDangerZone } from "@/features/rooms/components/RoomDangerZone";
 import {
@@ -59,6 +61,7 @@ export default async function RoomPage({
     { data: occupants, error: occupantsError },
     residents,
     events,
+    complaints,
   ] = await Promise.all([
     supabase
       .from("rooms")
@@ -79,6 +82,7 @@ export default async function RoomPage({
       .eq("hostel_id", hostel.id),
     getUnallocatedResidents(supabase, hostel.id),
     getAllocationEvents(supabase, hostel.id, { roomId: id }),
+    getOpenComplaints(supabase, hostel.id, { roomId: id }),
   ]);
   if (error) throw error;
   if (bedsError) throw bedsError;
@@ -208,6 +212,31 @@ export default async function RoomPage({
               })}
             </TBody>
           </Table>
+        </section>
+      )}
+
+      {!archived && (
+        <section aria-labelledby="complaints-heading" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="complaints-heading" className="text-base font-semibold text-slate-900">
+              Open complaints
+            </h2>
+            <Link
+              href={`/complaints/new?room=${room.id}`}
+              className={buttonClass({ variant: "secondary", size: "sm" })}
+            >
+              Raise complaint
+            </Link>
+          </div>
+          {complaints.length === 0 ? (
+            <p className="text-sm text-slate-600">Nothing reported in this room is open.</p>
+          ) : (
+            <ComplaintTable
+              rows={complaints}
+              caption={`Open complaints in room ${room.room_number}`}
+              compact
+            />
+          )}
         </section>
       )}
 

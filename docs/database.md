@@ -180,7 +180,8 @@ in short:
   balance and `due_status`: paid, overdue (past due with money owed, India
   date), partial or unpaid. `resident_balances` sums them per resident.
   Overpayment is rejected per invoice, under an advisory lock so concurrent
-  collectors cannot overpay between them.
+  collectors cannot overpay between them. Voiding an invoice takes the same
+  lock, so a void and a payment racing on one invoice never both succeed.
 - **Roles.** Owners set rates, generate and void. Owners and staff read fees
   and record payments.
 - **Who recorded a payment** is snapshotted in `payments.recorded_by_name` by
@@ -196,7 +197,9 @@ PostgREST returns at most 1000 rows per request (`max_rows` in
 that can grow past that is paged (`.range()`), aggregated in the database,
 or returned by a function, never read whole and reduced in the app. A page
 that starts past the last row answers HTTP 416 (`PGRST103`); list pages
-treat that as "go to the first page" (`src/lib/pagination.ts`).
+treat that as "go to the first page" (`src/lib/pagination.ts`). A screen
+that genuinely needs every row (the occupancy grid, the vacant-bed picker,
+room filters) reads it with `fetchAllPages`, page by page in a total order.
 
 ## Dashboard (EP-08)
 

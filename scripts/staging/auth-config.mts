@@ -104,7 +104,7 @@ export function buildAuthConfig(env: Env, root: string) {
     security_refresh_token_reuse_interval: 10,
     password_min_length: 8,
     password_required_characters: LETTERS_DIGITS,
-    security_update_password_require_reauthentication: false,
+    security_update_password_require_reauthentication: true,
 
     // Custom SMTP: Supabase's built-in sender only reaches project members.
     smtp_host: env.SMTP_HOST,

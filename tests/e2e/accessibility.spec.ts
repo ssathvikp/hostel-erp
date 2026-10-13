@@ -17,9 +17,10 @@ const { admin } = factory;
 
 test.afterAll(factory.cleanup);
 
-async function expectNoViolations(page: Page, path: string) {
+async function expectNoViolations(page: Page, path: string, prepare?: () => Promise<void>) {
   await page.goto(path);
   await page.waitForLoadState("networkidle");
+  await prepare?.();
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -99,6 +100,62 @@ test("every signed-in screen with data on it", async ({ page }) => {
     })
     .select("id")
     .single();
+  // A pending cheque and a meter reading, so both lists have rows.
+  await owner.client.rpc("record_cheque", {
+    p_invoice_id: invoice!.id,
+    p_amount: 100000,
+    p_paid_at: todayIst(),
+    p_cheque_number: "000123",
+    p_bank: "Indian Bank",
+  });
+  await owner.client.from("electricity_rates").insert({ hostel_id: hostel.id, unit_rate: 800 });
+  await owner.client.rpc("record_meter_reading", {
+    p_room_id: room!.id,
+    p_period_month: shiftMonth(todayIst(), -1),
+    p_opening: 10,
+    p_closing: 40,
+  });
+
+  // A worker and a complaint with history, so the complaint screens have rows.
+  const { data: worker } = await owner.client
+    .from("workers")
+    .insert({
+      owner_id: owner.id,
+      kind: "vendor",
+      name: "Ravi",
+      phone: "9845011111",
+      trades: ["plumber"],
+    })
+    .select("id")
+    .single();
+  await owner.client
+    .from("worker_hostels")
+    .insert({ worker_id: worker!.id, hostel_id: hostel.id, preferred_trades: ["plumber"] });
+  const { data: plumbing } = await admin
+    .from("complaint_categories")
+    .select("id")
+    .eq("hostel_id", hostel.id)
+    .eq("name", "Plumbing")
+    .single();
+  const { data: complaint } = await owner.client.rpc("raise_complaint", {
+    p_hostel_id: hostel.id,
+    p_category_id: plumbing!.id,
+    p_title: "Tap leaking",
+    p_room_id: room!.id,
+    p_resident_id: resident!.id,
+  });
+  await owner.client.from("maintenance_schedules").insert({
+    hostel_id: hostel.id,
+    title: "Clean the water tank",
+    category_id: plumbing!.id,
+    area: "Terrace",
+    every: 3,
+    unit: "month",
+    next_due: todayIst(),
+  });
+  const { data: jobToken } = await owner.client.rpc("create_job_link", {
+    p_complaint_id: complaint!,
+  });
 
   await signIn(page, owner.email, TEST_PASSWORD);
   for (const path of [
@@ -114,13 +171,30 @@ test("every signed-in screen with data on it", async ({ page }) => {
     `/residents/${resident!.id}`,
     `/residents/${resident!.id}/edit`,
     "/fees",
+    "/fees/cheques",
+    "/fees/electricity",
+    "/reports",
     `/fees/${invoice!.id}`,
     `/fees/${invoice!.id}/print`,
     `/fees/${invoice!.id}/print?payment=${payment!.id}`,
     "/settings",
     "/settings/hostel",
     "/settings/fees",
+    "/settings/workers",
+    "/settings/complaints",
+    "/complaints",
+    "/complaints/new",
+    `/complaints/${complaint}`,
+    "/complaints/maintenance",
+    "/reports/complaints",
+    `/job/${jobToken}`,
+    `/job/${"0".repeat(48)}`,
   ]) {
     await expectNoViolations(page, path);
   }
+
+  // The occupancy trend's table view, opened.
+  await expectNoViolations(page, "/dashboard?range=last_month", () =>
+    page.getByText("Show as table").click(),
+  );
 });

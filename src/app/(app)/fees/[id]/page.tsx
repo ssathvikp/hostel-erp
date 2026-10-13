@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
-import { documentNumber } from "@/features/fees/components/InvoiceDocument";
+import { ChequeActions } from "@/features/fees/components/ChequeDialogs";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
@@ -32,6 +32,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const isOwner = user.role === "owner";
   const month = formatMonth(invoice.periodMonth);
   const livePayments = invoice.payments.filter((payment) => !payment.voidedAt);
+  const payable = invoice.balance - invoice.pendingCheques;
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -44,7 +45,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             title={`${invoice.residentName}, ${month}`}
             description={
               <span className="inline-flex items-center gap-2">
-                <span className="font-mono">{documentNumber("INV", invoice.id)}</span>
+                <span className="font-mono">{invoice.number}</span>
                 {invoice.dueStatus ? (
                   <Badge tone={DUE_STATUS_TONES[invoice.dueStatus]}>
                     {DUE_STATUS_LABELS[invoice.dueStatus]}
@@ -62,10 +63,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 >
                   Print invoice
                 </Link>
-                {invoice.balance > 0 && (
+                {payable > 0 && (
                   <PaymentDialog
                     residentName={invoice.residentName}
-                    invoices={[{ id: invoice.id, label: month, balance: invoice.balance }]}
+                    invoices={[{ id: invoice.id, label: month, balance: payable }]}
                   />
                 )}
               </>
@@ -93,6 +94,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
       </section>
 
+      {invoice.pendingCheques > 0 && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {formatPaise(invoice.pendingCheques)} in cheques is waiting to clear. It counts towards
+          the balance once marked cleared.
+        </p>
+      )}
+
       {invoice.status === "void" && (
         <p className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           Voided: {invoice.voidReason}. It does not count towards any balance.
@@ -112,6 +120,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         · {invoice.residentPhone}
         {invoice.residentEmail && ` · ${invoice.residentEmail}`}
         {invoice.bedLabel && ` · Bed ${invoice.bedLabel}`}
+      </section>
+
+      <section aria-labelledby="lines-heading">
+        <h2 id="lines-heading" className="mb-3 text-base font-semibold text-slate-900">
+          What it is for
+        </h2>
+        <dl className="max-w-md divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+          {invoice.lines.map((line) => (
+            <div key={line.position} className="flex justify-between gap-4 px-4 py-2">
+              <dt className="text-slate-700">{line.description}</dt>
+              <dd className="text-slate-900 tabular-nums">{formatPaise(line.amount)}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section aria-labelledby="payments-heading">
@@ -138,7 +160,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               {invoice.payments.map((payment) => (
                 <Tr key={payment.id} className={payment.voidedAt ? "text-slate-400" : undefined}>
                   <Td>{formatDay(payment.paidAt)}</Td>
-                  <Td>{PAYMENT_MODE_LABELS[payment.mode]}</Td>
+                  <Td>
+                    {PAYMENT_MODE_LABELS[payment.mode]}
+                    {payment.cheque && (
+                      <span className="block text-xs text-slate-500">
+                        {payment.cheque.bank} ·{" "}
+                        {payment.cheque.bounced
+                          ? "Bounced"
+                          : payment.cheque.clearedOn
+                            ? `Cleared ${formatDay(payment.cheque.clearedOn)}`
+                            : payment.voidedAt
+                              ? "Void"
+                              : "Waiting to clear"}
+                      </span>
+                    )}
+                  </Td>
                   <Td>{payment.reference ?? "—"}</Td>
                   <Td className="text-right tabular-nums">
                     {payment.voidedAt ? (
@@ -150,16 +186,26 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <Td>{payment.recordedBy ?? "—"}</Td>
                   <Td>
                     {payment.voidedAt ? (
-                      <span className="text-xs whitespace-normal">Void: {payment.voidReason}</span>
+                      <span className="text-xs whitespace-normal">
+                        {payment.cheque?.bounced ? "Bounced" : "Void"}: {payment.voidReason}
+                      </span>
+                    ) : isOwner && payment.cheque && !payment.cheque.clearedOn ? (
+                      <ChequeActions
+                        id={payment.id}
+                        subject={`cheque ${payment.reference} for ${formatPaise(payment.amount)}`}
+                        receivedOn={payment.paidAt}
+                      />
                     ) : (
                       <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/fees/${invoice.id}/print?payment=${payment.id}`}
-                          className={buttonClass({ variant: "secondary", size: "sm" })}
-                          aria-label={`Receipt for ${formatPaise(payment.amount)} on ${formatDay(payment.paidAt)}`}
-                        >
-                          Receipt
-                        </Link>
+                        {payment.number && (
+                          <Link
+                            href={`/fees/${invoice.id}/print?payment=${payment.id}`}
+                            className={buttonClass({ variant: "secondary", size: "sm" })}
+                            aria-label={`Receipt for ${formatPaise(payment.amount)} on ${formatDay(payment.paidAt)}`}
+                          >
+                            Receipt
+                          </Link>
+                        )}
                         {isOwner && (
                           <VoidDialog
                             kind="payment"

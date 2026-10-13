@@ -11,6 +11,8 @@ const PROTECTED_PREFIXES = [
   "/residents",
   "/occupancy",
   "/fees",
+  "/complaints",
+  "/reports",
   "/settings",
 ];
 

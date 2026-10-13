@@ -9,6 +9,8 @@ import { cn } from "@/lib/cn";
 const TABS = [
   { href: "/settings/hostel", label: "Hostel" },
   { href: "/settings/fees", label: "Fees" },
+  { href: "/settings/workers", label: "Workers" },
+  { href: "/settings/complaints", label: "Complaints" },
 ] as const;
 
 export function SettingsTabs() {

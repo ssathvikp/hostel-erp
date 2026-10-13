@@ -7,7 +7,7 @@ import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from 
 import { ResidentFilters } from "@/features/residents/components/ResidentFilters";
 import { RESIDENT_STATUS_LABELS, RESIDENT_STATUS_TONES } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { isPastLastPage } from "@/lib/pagination";
+import { fetchAllPages, isPastLastPage } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 import { RESIDENT_STATUSES, type ResidentStatus } from "@/types";
@@ -83,22 +83,22 @@ export default async function ResidentsPage({
   }
 
   const from = (filters.page - 1) * PAGE_SIZE;
-  const [
-    { data: residents, count, error },
-    { data: rooms, error: roomsError },
-    { count: anyCount },
-  ] = await Promise.all([
+  const [{ data: residents, count, error }, rooms, { count: anyCount }] = await Promise.all([
     query
       .order("full_name")
       .order("id")
       .range(from, from + PAGE_SIZE - 1),
-    supabase
-      .from("room_inventory")
-      .select("id, room_number")
-      .eq("hostel_id", hostel.id)
-      .eq("status", "active")
-      .order("floor")
-      .order("room_sort"),
+    fetchAllPages((first, last) =>
+      supabase
+        .from("room_inventory")
+        .select("id, room_number")
+        .eq("hostel_id", hostel.id)
+        .eq("status", "active")
+        .order("floor")
+        .order("room_sort")
+        .order("id")
+        .range(first, last),
+    ),
     supabase
       .from("residents")
       .select("id", { count: "exact", head: true })
@@ -116,12 +116,11 @@ export default async function ResidentsPage({
 
   if (isPastLastPage(error)) redirect(pageHref(1));
   if (error) throw error;
-  if (roomsError) throw roomsError;
 
   const rows = residents ?? [];
   const total = count ?? 0;
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const roomOptions = (rooms ?? []).map((room) => ({
+  const roomOptions = rooms.map((room) => ({
     value: room.id ?? "",
     label: `Room ${room.room_number}`,
   }));

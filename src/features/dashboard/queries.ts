@@ -23,6 +23,8 @@ export interface DashboardMoney {
   outstanding: number;
   overdue: number;
   overdueResidents: number;
+  /** Refundable deposits held now; never part of collected. */
+  depositsHeld: number;
 }
 
 export async function getDashboardMoney(
@@ -45,6 +47,7 @@ export async function getDashboardMoney(
     outstanding: row?.outstanding ?? 0,
     overdue: row?.overdue ?? 0,
     overdueResidents: row?.overdue_residents ?? 0,
+    depositsHeld: row?.deposits_held ?? 0,
   };
 }
 

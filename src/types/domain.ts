@@ -143,8 +143,35 @@ export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 export const INVOICE_DUE_STATUSES = ["unpaid", "partial", "paid", "overdue"] as const;
 export type InvoiceDueStatus = (typeof INVOICE_DUE_STATUSES)[number];
 
+export const FEE_HEAD_BILLINGS = ["monthly", "one_time"] as const;
+export type FeeHeadBilling = (typeof FEE_HEAD_BILLINGS)[number];
+export const FEE_HEAD_PRICINGS = ["flat", "per_sharing"] as const;
+export type FeeHeadPricing = (typeof FEE_HEAD_PRICINGS)[number];
+
+export const INVOICE_LINE_KINDS = ["rent", "fee", "charge", "discount", "late_fee"] as const;
+export type InvoiceLineKind = (typeof INVOICE_LINE_KINDS)[number];
+
+/** One line of an invoice; the lines add up to the invoice amount. */
+export interface InvoiceLine {
+  position: number;
+  kind: InvoiceLineKind;
+  description: string;
+  /** Negative only for discounts. */
+  amount: Paise;
+  detail: { nights?: number; monthly_rate?: Paise; stays?: StayBreakdown[] };
+}
+
+/** Modes a person records money in. */
 export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
-export type PaymentMode = (typeof PAYMENT_MODES)[number];
+export type RecordablePaymentMode = (typeof PAYMENT_MODES)[number];
+/** Modes a payment against an invoice can take: also a cheque (E13-T11). */
+export const INVOICE_PAYMENT_MODES = [...PAYMENT_MODES, "cheque"] as const;
+export type InvoicePaymentMode = (typeof INVOICE_PAYMENT_MODES)[number];
+/**
+ * Every mode a payment row can carry: also credit and deposit money applied
+ * to an invoice by the database (E13-T7, E13-T4).
+ */
+export type PaymentMode = InvoicePaymentMode | "credit" | "deposit";
 
 // ---------------------------------------------------------------------------
 // Profile (EP-02) - id equals auth.users.id
@@ -349,8 +376,8 @@ export type FeeStructureInsert = Pick<
   "hostel_id" | "sharing_type" | "monthly_amount" | "effective_from"
 >;
 
-/** One stay's share of an invoice: its nights in the month at its rate. */
-export interface InvoiceLine {
+/** One stay's share of an invoice's rent: its nights in the month at its rate. */
+export interface StayBreakdown {
   allocation_id: Uuid;
   room_number: string;
   bed_label: string;
@@ -374,8 +401,8 @@ export interface Invoice {
   void_reason: string | null;
   voided_at: IsoTimestamp | null;
   voided_by: Uuid | null;
-  /** How the amount was reached; see `InvoiceLine`. */
-  breakdown: InvoiceLine[];
+  /** How the rent was reached; see `StayBreakdown`. */
+  breakdown: StayBreakdown[];
   created_by: Uuid | null;
   created_at: IsoTimestamp;
   updated_at: IsoTimestamp;
@@ -418,3 +445,54 @@ export type PaymentInsert = Omit<
  * prove otherwise. Use this for views whose columns are known to be set.
  */
 export type ViewRow<T> = { [K in keyof T]-?: NonNullable<T[K]> };
+
+// ---------------------------------------------------------------------------
+// Complaints and maintenance (EP-15)
+// ---------------------------------------------------------------------------
+
+export const COMPLAINT_STATUSES = [
+  "open",
+  "assigned",
+  "in_progress",
+  "on_hold",
+  "resolved",
+  "closed",
+  "reopened",
+] as const;
+export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number];
+
+/** Where each status may go next; the database enforces the same paths. */
+export const COMPLAINT_NEXT_STATUSES: Record<ComplaintStatus, readonly ComplaintStatus[]> = {
+  open: ["assigned", "in_progress", "on_hold", "resolved", "closed"],
+  assigned: ["open", "in_progress", "on_hold", "resolved", "closed"],
+  in_progress: ["assigned", "on_hold", "resolved", "closed"],
+  on_hold: ["open", "assigned", "in_progress", "closed"],
+  resolved: ["closed", "reopened"],
+  closed: ["reopened"],
+  reopened: ["assigned", "in_progress", "on_hold", "resolved", "closed"],
+};
+
+export const COMPLAINT_PRIORITIES = ["urgent", "high", "normal", "low"] as const;
+export type ComplaintPriority = (typeof COMPLAINT_PRIORITIES)[number];
+
+export const TRADES = [
+  "electrician",
+  "plumber",
+  "carpenter",
+  "cleaner",
+  "technician",
+  "pest_control",
+  "general",
+] as const;
+export type Trade = (typeof TRADES)[number];
+
+export const WORKER_KINDS = ["on_site", "vendor"] as const;
+export type WorkerKind = (typeof WORKER_KINDS)[number];
+
+export type ComplaintTargetState = "on_track" | "due_soon" | "overdue" | "paused" | "done";
+
+export const MAINTENANCE_UNITS = ["day", "week", "month"] as const;
+export type MaintenanceUnit = (typeof MAINTENANCE_UNITS)[number];
+
+export const PAYOUT_MODES = ["cash", "upi", "bank_transfer", "cheque"] as const;
+export type PayoutMode = (typeof PAYOUT_MODES)[number];

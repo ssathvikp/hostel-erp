@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { todayIst } from "@/lib/validation";
 
+import { connectToDatabase } from "../support/db";
 import { residentRow } from "../support/residents";
 import { createUserFactory, type TestUser } from "../support/supabase";
 
@@ -652,6 +653,33 @@ describe("payments", () => {
     expect(results.filter((result) => result.error?.hint === "overpayment")).toHaveLength(5);
   });
 
+  it("never land on an invoice that is voided at the same moment", async () => {
+    const hostelId = await hostel();
+    for (let round = 0; round < 20; round += 1) {
+      const invoiceId = await notYetDueInvoice(hostelId, await resident(hostelId), 500000);
+      await Promise.all([
+        pay(hostelId, invoiceId, 100000),
+        owner.client
+          .from("invoices")
+          .update({ status: "void", void_reason: "Raised in error" })
+          .eq("id", invoiceId),
+      ]);
+      const [{ data: invoice }, { count: livePayments }] = await Promise.all([
+        admin.from("invoices").select("status").eq("id", invoiceId).single(),
+        admin
+          .from("payments")
+          .select("id", { count: "exact", head: true })
+          .eq("invoice_id", invoiceId)
+          .is("voided_at", null),
+      ]);
+      // Exactly one of them wins: a paid invoice stays issued, a void one has no money on it.
+      expect({ status: invoice!.status, livePayments }).not.toEqual({
+        status: "void",
+        livePayments: 1,
+      });
+    }
+  });
+
   it("reject future dates and void invoices", async () => {
     const hostelId = await hostel();
     const residentId = await resident(hostelId);
@@ -862,5 +890,103 @@ describe("outstanding balances", () => {
       paid: 0,
       balance: 1000000,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Document numbers (E13-T9)
+// ---------------------------------------------------------------------------
+
+describe("invoice and receipt numbers", () => {
+  const fy = (() => {
+    const [year, month] = todayIst().split("-").map(Number);
+    const start = month < 4 ? year - 1 : year;
+    return `${String(start % 100).padStart(2, "0")}-${String((start + 1) % 100).padStart(2, "0")}`;
+  })();
+
+  async function numbersOf(table: "invoices" | "payments", hostelId: string) {
+    const { data } = await admin
+      .from(table)
+      .select("number")
+      .eq("hostel_id", hostelId)
+      .order("number");
+    return (data ?? []).map((row) => row.number);
+  }
+
+  it("run consecutively per hostel, with no gaps even when runs race", async () => {
+    const hostelId = await hostel();
+    const otherHostelId = await hostel();
+    const month = monthStart(-1);
+    await setRate(hostelId, "single", 1000000, monthStart(-12));
+    await setRate(otherHostelId, "single", 1000000, monthStart(-12));
+    for (let i = 0; i < 4; i += 1) {
+      await stay(hostelId, await resident(hostelId), await bed(hostelId), monthStart(-2));
+    }
+    await stay(
+      otherHostelId,
+      await resident(otherHostelId),
+      await bed(otherHostelId),
+      monthStart(-2),
+    );
+
+    await Promise.all(Array.from({ length: 5 }, () => generate(hostelId, month)));
+    await generate(otherHostelId, month);
+
+    expect(await numbersOf("invoices", hostelId)).toEqual(
+      [1, 2, 3, 4].map((n) => `INV/${fy}/${String(n).padStart(5, "0")}`),
+    );
+    expect(await numbersOf("invoices", otherHostelId)).toEqual([`INV/${fy}/00001`]);
+  });
+
+  it("keep a void invoice's number and give the regenerated one the next", async () => {
+    const hostelId = await hostel();
+    const month = monthStart(-1);
+    await setRate(hostelId, "single", 1000000, monthStart(-12));
+    const residentId = await resident(hostelId);
+    await stay(hostelId, residentId, await bed(hostelId), monthStart(-2));
+    await generate(hostelId, month);
+    const first = await invoiceFor(residentId, month);
+    await owner.client
+      .from("invoices")
+      .update({ status: "void", void_reason: "Wrong month" })
+      .eq("id", first!.id!);
+    await generate(hostelId, month);
+
+    expect(await numbersOf("invoices", hostelId)).toEqual([`INV/${fy}/00001`, `INV/${fy}/00002`]);
+    expect((await invoiceFor(residentId, month))!.number).toBe(`INV/${fy}/00002`);
+  });
+
+  it("number receipts in order, ignore a number sent by the client, and skip refused payments", async () => {
+    const hostelId = await hostel();
+    const invoiceId = await notYetDueInvoice(hostelId, await resident(hostelId), 500000);
+
+    expect((await pay(hostelId, invoiceId, 100000)).error).toBeNull();
+    // Over the balance: refused, so it must not use up a number.
+    expect((await pay(hostelId, invoiceId, 900000)).error?.hint).toBe("overpayment");
+    const forged = await owner.client.from("payments").insert({
+      hostel_id: hostelId,
+      invoice_id: invoiceId,
+      amount: 100000,
+      paid_at: todayIst(),
+      mode: "cash",
+      number: "RCT/99-00/99999",
+    });
+    expect(forged.error?.code).toBe(PERMISSION_DENIED);
+    expect((await pay(hostelId, invoiceId, 100000)).error).toBeNull();
+
+    expect(await numbersOf("payments", hostelId)).toEqual([`RCT/${fy}/00001`, `RCT/${fy}/00002`]);
+  });
+
+  it("use India's April-to-March financial year", async () => {
+    const sql = connectToDatabase();
+    try {
+      const [row] = await sql`
+        select private.financial_year('2027-03-31') as march,
+               private.financial_year('2027-04-01') as april,
+               private.financial_year('2099-06-01') as century`;
+      expect(row).toEqual({ march: "26-27", april: "27-28", century: "99-00" });
+    } finally {
+      await sql.end();
+    }
   });
 });

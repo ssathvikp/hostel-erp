@@ -5,9 +5,16 @@ import { useActionState, useEffect, useState } from "react";
 import { Alert, Button, Modal, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
-import { voidInvoice, voidPayment } from "../actions";
+import { voidCharge, voidInvoice, voidMeterReading, voidPayment } from "../actions";
 
 const COPY = {
+  charge: {
+    action: voidCharge,
+    title: "Void this charge",
+    description:
+      "For a charge added by mistake, or a late fee you are waiving. It stays on record, marked void, and is never billed.",
+    confirm: "Void charge",
+  },
   invoice: {
     action: voidInvoice,
     title: "Void this invoice",
@@ -22,9 +29,16 @@ const COPY = {
       "Use this for a payment recorded by mistake or one that bounced. It stays on record, marked void, and no longer counts towards any total.",
     confirm: "Void payment",
   },
+  reading: {
+    action: voidMeterReading,
+    title: "Void this meter reading",
+    description:
+      "For a reading taken wrongly. Its charges are voided with it, and the month can be read again. Not possible once a charge is on an invoice.",
+    confirm: "Void reading",
+  },
 } as const;
 
-/** Voids an invoice or a payment with a reason. Nothing is ever edited or deleted. */
+/** Voids an invoice, payment, charge or meter reading with a reason. Nothing is ever edited or deleted. */
 export function VoidDialog({
   kind,
   id,

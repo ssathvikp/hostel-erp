@@ -1,7 +1,9 @@
 /**
  * Seeds the local database with a demo hostel (E9-T6): an owner and a staff
  * member, 40 beds over three floors, 25 residents, live allocations, rates,
- * three months of invoices and a realistic mix of payments.
+ * three months of invoices and a realistic mix of payments, plus a mess
+ * charge, metered electricity, deposits, late fees and a pending cheque,
+ * and the hostel's workers, a few complaints and preventive maintenance.
  *
  * Idempotent: every step looks for what it would create first, so running
  * it again adds nothing. Test suites never depend on it.
@@ -332,6 +334,374 @@ async function ensureBilling(hostelId: string, owner: SupabaseClient) {
 }
 
 // ---------------------------------------------------------------------------
+// Fees beyond rent (EP-13): mess, electricity, late fees, deposits, a cheque
+// ---------------------------------------------------------------------------
+
+/** A monthly mess charge and metered electricity, before anything is billed. */
+async function ensureFeeSetup(hostelId: string, owner: SupabaseClient) {
+  const existing = check(
+    await admin.from("fee_heads").select("id").eq("hostel_id", hostelId).eq("name", "Mess"),
+    "reading fee heads",
+  );
+  if (existing.length === 0) {
+    const [head] = check(
+      await owner
+        .from("fee_heads")
+        .insert({ hostel_id: hostelId, name: "Mess", billing: "monthly", pricing: "flat" })
+        .select("id"),
+      "adding the mess charge",
+    );
+    check(
+      await owner.rpc("set_fee_head_rate", {
+        p_fee_head_id: head.id,
+        p_amount: 250000,
+        p_effective_from: monthStart(-12),
+      }),
+      "pricing the mess charge",
+    );
+  }
+
+  const rate = check(
+    await admin.from("electricity_rates").select("hostel_id").eq("hostel_id", hostelId),
+    "reading the electricity rate",
+  );
+  if (rate.length === 0) {
+    check(
+      await owner.from("electricity_rates").insert({ hostel_id: hostelId, unit_rate: 900 }),
+      "setting the electricity rate",
+    );
+  }
+
+  const rule = check(
+    await admin.from("late_fee_rules").select("hostel_id").eq("hostel_id", hostelId),
+    "reading the late fee rule",
+  );
+  if (rule.length === 0) {
+    check(
+      await owner.from("late_fee_rules").insert({
+        hostel_id: hostelId,
+        grace_days: 5,
+        kind: "fixed",
+        amount: 20000,
+      }),
+      "setting the late fee rule",
+    );
+  }
+}
+
+/**
+ * Meter readings for the three months before this one, for every room that
+ * had someone in it. Each month's units follow on from the last.
+ */
+async function ensureMeterReadings(hostelId: string, owner: SupabaseClient) {
+  const rooms = check(
+    await admin
+      .from("rooms")
+      .select("id, room_number")
+      .eq("hostel_id", hostelId)
+      .order("room_number"),
+    "reading rooms",
+  );
+  for (const [i, room] of rooms.entries()) {
+    let closing = 1000 + i * 250;
+    for (const offset of [-3, -2, -1]) {
+      const month = monthStart(offset);
+      const [read] = check(
+        await admin
+          .from("meter_readings")
+          .select("closing")
+          .eq("room_id", room.id)
+          .eq("period_month", month)
+          .is("voided_at", null),
+        "reading meter readings",
+      );
+      if (read) {
+        closing = Number(read.closing);
+        continue;
+      }
+      const missing = check(
+        await owner.rpc("missing_meter_readings", { p_hostel_id: hostelId, p_period_month: month }),
+        "finding rooms to read",
+      );
+      if (!missing.some((row: { room_id: string }) => row.room_id === room.id)) continue;
+      const opening = closing;
+      closing = opening + 40 + ((i * 37 + offset * 11) % 90);
+      check(
+        await owner.rpc("record_meter_reading", {
+          p_room_id: room.id,
+          p_period_month: month,
+          p_opening: opening,
+          p_closing: closing,
+        }),
+        `reading room ${room.room_number}`,
+      );
+    }
+  }
+}
+
+/** Deposits for most residents, a pending cheque, and today's late fees. */
+async function ensureMoneyExtras(hostelId: string, owner: SupabaseClient) {
+  const residents = check(
+    await admin
+      .from("residents")
+      .select("id")
+      .eq("hostel_id", hostelId)
+      .eq("status", "active")
+      .order("full_name"),
+    "reading residents",
+  );
+  for (const [i, resident] of residents.entries()) {
+    if (i % 5 === 4) continue;
+    const held = check(
+      await admin.from("deposit_ledger").select("id").eq("resident_id", resident.id).limit(1),
+      "reading deposits",
+    );
+    if (held.length > 0) continue;
+    check(
+      await owner.rpc("record_deposit", {
+        p_resident_id: resident.id,
+        p_amount: 1000000,
+        p_paid_at: monthStart(-2),
+        p_mode: i % 2 === 0 ? "bank_transfer" : "upi",
+      }),
+      "recording a deposit",
+    );
+  }
+
+  const pending = check(
+    await admin.from("pending_cheques").select("id").eq("hostel_id", hostelId),
+    "reading pending cheques",
+  );
+  if (pending.length === 0) {
+    const [open] = check(
+      await admin
+        .from("invoice_balances")
+        .select("id, balance, pending_cheques")
+        .eq("hostel_id", hostelId)
+        .eq("period_month", monthStart(0))
+        .eq("status", "issued")
+        .gt("balance", 0)
+        .order("resident_name")
+        .limit(1),
+      "finding an invoice for a cheque",
+    );
+    if (open) {
+      check(
+        await owner.rpc("record_cheque", {
+          p_invoice_id: open.id!,
+          p_amount: open.balance! - open.pending_cheques!,
+          p_paid_at: today,
+          p_cheque_number: "004127",
+          p_bank: "Canara Bank",
+        }),
+        "recording a cheque",
+      );
+    }
+  }
+
+  check(await owner.rpc("apply_late_fees", { p_hostel_id: hostelId }), "applying late fees");
+}
+
+// ---------------------------------------------------------------------------
+// Complaints and maintenance (EP-15)
+// ---------------------------------------------------------------------------
+
+const WORKERS = [
+  {
+    kind: "on_site",
+    name: "Ramesh Caretaker",
+    phone: "9845000001",
+    trades: ["general", "cleaner"],
+  },
+  {
+    kind: "vendor",
+    name: "Manjunath",
+    business_name: "Sri Ganesh Electricals",
+    phone: "9845000002",
+    trades: ["electrician"],
+    call_out_charge: 30000,
+    preferred: ["electrician"],
+  },
+  {
+    kind: "vendor",
+    name: "Imran",
+    business_name: "Imran Plumbing Works",
+    phone: "9845000003",
+    trades: ["plumber"],
+    call_out_charge: 25000,
+    preferred: ["plumber"],
+  },
+  { kind: "vendor", name: "Joseph", phone: "9845000004", trades: ["carpenter", "general"] },
+] as const;
+
+/** Workers, a handful of complaints in different states, and two recurring tasks. */
+async function ensureComplaints(hostelId: string, ownerId: string, owner: SupabaseClient) {
+  for (const worker of WORKERS) {
+    const found = check(
+      await admin.from("workers").select("id").eq("owner_id", ownerId).eq("phone", worker.phone),
+      "looking up workers",
+    );
+    let id = found[0]?.id as string | undefined;
+    if (!id) {
+      const { preferred, ...row } = { preferred: [] as readonly string[], ...worker };
+      void preferred;
+      id = check(
+        await admin
+          .from("workers")
+          .insert({ ...row, trades: [...row.trades], owner_id: ownerId })
+          .select("id")
+          .single(),
+        "adding a worker",
+      ).id as string;
+    }
+    check(
+      await admin.from("worker_hostels").upsert(
+        {
+          worker_id: id,
+          hostel_id: hostelId,
+          preferred_trades: "preferred" in worker ? [...worker.preferred] : [],
+        },
+        { onConflict: "worker_id,hostel_id", ignoreDuplicates: true },
+      ),
+      "linking a worker to the hostel",
+    );
+  }
+
+  const existing = check(
+    await admin.from("complaints").select("id").eq("hostel_id", hostelId).limit(1),
+    "reading complaints",
+  );
+  if (existing.length === 0) {
+    const categories = check(
+      await admin.from("complaint_categories").select("id, name").eq("hostel_id", hostelId),
+      "reading complaint categories",
+    );
+    const category = (name: string) => categories.find((c) => c.name === name)!.id as string;
+    const rooms = check(
+      await admin.from("rooms").select("id, room_number").eq("hostel_id", hostelId),
+      "reading rooms",
+    );
+    const room = (number: string) => rooms.find((r) => r.room_number === number)!.id as string;
+    const occupants = check(
+      await admin
+        .from("resident_directory")
+        .select("id, room_id")
+        .eq("hostel_id", hostelId)
+        .not("room_id", "is", null)
+        .order("full_name"),
+      "reading residents with rooms",
+    );
+    const residentIn = (roomId: string) => occupants.find((r) => r.room_id === roomId)?.id;
+
+    const raise = async (input: {
+      category: string;
+      title: string;
+      description?: string;
+      priority?: string;
+      room?: string;
+      area?: string;
+    }) => {
+      const roomId = input.room ? room(input.room) : undefined;
+      return check(
+        await owner.rpc("raise_complaint", {
+          p_hostel_id: hostelId,
+          p_category_id: category(input.category),
+          p_title: input.title,
+          p_description: input.description,
+          p_priority: input.priority ?? "normal",
+          p_room_id: roomId,
+          p_area: input.area,
+          p_resident_id: roomId ? residentIn(roomId) : undefined,
+        }),
+        `raising "${input.title}"`,
+      ) as string;
+    };
+
+    await raise({
+      category: "Electrical",
+      title: "Ceiling fan not working",
+      description: "Makes a humming sound but does not turn.",
+      priority: "high",
+      room: "102",
+    });
+    const tap = await raise({
+      category: "Plumbing",
+      title: "Bathroom tap leaking",
+      room: "201",
+    });
+    check(
+      await owner.rpc("set_complaint_status", { p_complaint_id: tap, p_status: "in_progress" }),
+      "starting a complaint",
+    );
+    const door = await raise({
+      category: "Carpentry",
+      title: "Cupboard door off its hinge",
+      priority: "low",
+      room: "303",
+    });
+    check(
+      await owner.rpc("set_complaint_costs", {
+        p_complaint_id: door,
+        p_labour: 20000,
+        p_material: 15000,
+        p_vendor_charge: 0,
+        p_payer: "hostel",
+      }),
+      "recording repair costs",
+    );
+    check(
+      await owner.rpc("set_complaint_status", {
+        p_complaint_id: door,
+        p_status: "resolved",
+        p_note: "New hinges fitted.",
+      }),
+      "resolving a complaint",
+    );
+    await raise({
+      category: "Internet",
+      title: "Wi-Fi drops every evening",
+      priority: "urgent",
+      area: "Second floor corridor",
+    });
+  }
+
+  const schedules = check(
+    await admin.from("maintenance_schedules").select("id").eq("hostel_id", hostelId).limit(1),
+    "reading maintenance schedules",
+  );
+  if (schedules.length === 0) {
+    const categories = check(
+      await admin.from("complaint_categories").select("id, name").eq("hostel_id", hostelId),
+      "reading complaint categories",
+    );
+    const category = (name: string) => categories.find((c) => c.name === name)!.id as string;
+    check(
+      await owner.from("maintenance_schedules").insert([
+        {
+          hostel_id: hostelId,
+          title: "Clean the overhead water tank",
+          category_id: category("Plumbing"),
+          area: "Terrace",
+          every: 3,
+          unit: "month",
+          next_due: addDays(today, 20),
+        },
+        {
+          hostel_id: hostelId,
+          title: "Pest control spray",
+          category_id: category("Pest control"),
+          area: "Whole building",
+          every: 1,
+          unit: "month",
+          next_due: addDays(today, 6),
+        },
+      ]),
+      "adding maintenance schedules",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 const ownerId = await ensureUser(OWNER.email, OWNER.fullName);
 const hostelId = await ensureHostel(ownerId);
@@ -349,7 +719,11 @@ check(
   await ownerClient.auth.signInWithPassword({ email: OWNER.email, password: PASSWORD }),
   "signing in as the owner",
 );
+await ensureFeeSetup(hostelId, ownerClient);
+await ensureMeterReadings(hostelId, ownerClient);
 await ensureBilling(hostelId, ownerClient);
+await ensureMoneyExtras(hostelId, ownerClient);
+await ensureComplaints(hostelId, ownerId, ownerClient);
 
 const [{ count: beds }, { count: residents }, { count: invoices }, { count: payments }] =
   await Promise.all(

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { floorLabel, SHARING_TYPE_LABELS } from "@/features/rooms/options";
+import { fetchAllPages } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import type { SharingType } from "@/types";
 
@@ -36,24 +37,29 @@ export interface AllocationEvent {
  * room. Choosing from this list is the only way to pick a bed (E6-T2).
  */
 export async function getVacantBeds(supabase: Supabase, hostelId: string): Promise<BedChoice[]> {
-  const [{ data: beds, error }, { data: rooms, error: roomsError }] = await Promise.all([
-    supabase
-      .from("bed_states")
-      .select("id, room_id, bed_label")
-      .eq("hostel_id", hostelId)
-      .eq("status", "available")
-      .order("bed_label"),
-    supabase
-      .from("room_inventory")
-      .select("id, room_number, room_sort, floor, sharing_type")
-      .eq("hostel_id", hostelId)
-      .eq("status", "active"),
+  const [beds, rooms] = await Promise.all([
+    fetchAllPages((from, to) =>
+      supabase
+        .from("bed_states")
+        .select("id, room_id, bed_label")
+        .eq("hostel_id", hostelId)
+        .eq("status", "available")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllPages((from, to) =>
+      supabase
+        .from("room_inventory")
+        .select("id, room_number, room_sort, floor, sharing_type")
+        .eq("hostel_id", hostelId)
+        .eq("status", "active")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
-  if (error) throw error;
-  if (roomsError) throw roomsError;
 
-  const roomById = new Map((rooms ?? []).map((room) => [room.id!, room]));
-  return (beds ?? [])
+  const roomById = new Map(rooms.map((room) => [room.id!, room]));
+  return beds
     .flatMap((bed) => {
       const room = roomById.get(bed.room_id!);
       return room ? [{ bed, room }] : [];
@@ -76,16 +82,18 @@ export async function getUnallocatedResidents(
   supabase: Supabase,
   hostelId: string,
 ): Promise<ResidentChoice[]> {
-  const { data, error } = await supabase
-    .from("resident_directory")
-    .select("id, full_name, phone")
-    .eq("hostel_id", hostelId)
-    .in("status", ["active", "notice"])
-    .is("bed_label", null)
-    .order("full_name")
-    .limit(1000);
-  if (error) throw error;
-  return (data ?? []).map((resident) => ({
+  const data = await fetchAllPages((from, to) =>
+    supabase
+      .from("resident_directory")
+      .select("id, full_name, phone")
+      .eq("hostel_id", hostelId)
+      .in("status", ["active", "notice"])
+      .is("bed_label", null)
+      .order("full_name")
+      .order("id")
+      .range(from, to),
+  );
+  return data.map((resident) => ({
     id: resident.id!,
     label: `${resident.full_name} · ${resident.phone}`,
   }));

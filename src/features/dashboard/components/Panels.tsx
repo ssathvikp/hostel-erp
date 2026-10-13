@@ -170,3 +170,55 @@ export function OverduePanel({
     </Panel>
   );
 }
+
+/** Complaints waiting on someone (E15-T2, E15-T10), each linking to its filtered list. */
+export function ComplaintsPanel({
+  counts,
+}: {
+  counts: { open: number; overdue: number; needsWorker: number };
+}) {
+  const items = [
+    { label: "Open complaints", value: counts.open, href: "/complaints", alert: false },
+    {
+      label: "Past their target",
+      value: counts.overdue,
+      href: "/complaints?overdue=1",
+      alert: counts.overdue > 0,
+    },
+    {
+      label: "Waiting for a worker",
+      value: counts.needsWorker,
+      href: "/complaints",
+      alert: counts.needsWorker > 0,
+    },
+  ];
+  return (
+    <Panel
+      title="Complaints"
+      id="complaints-heading"
+      action={
+        <Link href="/complaints/new" className="text-sm font-medium text-brand-700 hover:underline">
+          Raise complaint
+        </Link>
+      }
+    >
+      <ul className="grid gap-3 sm:grid-cols-3">
+        {items.map((item) => (
+          <li key={item.label}>
+            <Link
+              href={item.href}
+              className="block rounded-md border border-slate-200 p-3 hover:bg-slate-50"
+            >
+              <span className="block text-sm text-slate-500">{item.label}</span>
+              <span
+                className={`text-xl font-semibold tabular-nums ${item.alert ? "text-red-700" : "text-slate-900"}`}
+              >
+                {item.value}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
