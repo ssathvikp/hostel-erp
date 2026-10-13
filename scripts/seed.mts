@@ -2,7 +2,8 @@
  * Seeds the local database with a demo hostel (E9-T6): an owner and a staff
  * member, 40 beds over three floors, 25 residents, live allocations, rates,
  * three months of invoices and a realistic mix of payments, plus a mess
- * charge, metered electricity, deposits, late fees and a pending cheque.
+ * charge, metered electricity, deposits, late fees and a pending cheque,
+ * and the hostel's workers, a few complaints and preventive maintenance.
  *
  * Idempotent: every step looks for what it would create first, so running
  * it again adds nothing. Test suites never depend on it.
@@ -502,6 +503,205 @@ async function ensureMoneyExtras(hostelId: string, owner: SupabaseClient) {
 }
 
 // ---------------------------------------------------------------------------
+// Complaints and maintenance (EP-15)
+// ---------------------------------------------------------------------------
+
+const WORKERS = [
+  {
+    kind: "on_site",
+    name: "Ramesh Caretaker",
+    phone: "9845000001",
+    trades: ["general", "cleaner"],
+  },
+  {
+    kind: "vendor",
+    name: "Manjunath",
+    business_name: "Sri Ganesh Electricals",
+    phone: "9845000002",
+    trades: ["electrician"],
+    call_out_charge: 30000,
+    preferred: ["electrician"],
+  },
+  {
+    kind: "vendor",
+    name: "Imran",
+    business_name: "Imran Plumbing Works",
+    phone: "9845000003",
+    trades: ["plumber"],
+    call_out_charge: 25000,
+    preferred: ["plumber"],
+  },
+  { kind: "vendor", name: "Joseph", phone: "9845000004", trades: ["carpenter", "general"] },
+] as const;
+
+/** Workers, a handful of complaints in different states, and two recurring tasks. */
+async function ensureComplaints(hostelId: string, ownerId: string, owner: SupabaseClient) {
+  for (const worker of WORKERS) {
+    const found = check(
+      await admin.from("workers").select("id").eq("owner_id", ownerId).eq("phone", worker.phone),
+      "looking up workers",
+    );
+    let id = found[0]?.id as string | undefined;
+    if (!id) {
+      const { preferred, ...row } = { preferred: [] as readonly string[], ...worker };
+      void preferred;
+      id = check(
+        await admin
+          .from("workers")
+          .insert({ ...row, trades: [...row.trades], owner_id: ownerId })
+          .select("id")
+          .single(),
+        "adding a worker",
+      ).id as string;
+    }
+    check(
+      await admin.from("worker_hostels").upsert(
+        {
+          worker_id: id,
+          hostel_id: hostelId,
+          preferred_trades: "preferred" in worker ? [...worker.preferred] : [],
+        },
+        { onConflict: "worker_id,hostel_id", ignoreDuplicates: true },
+      ),
+      "linking a worker to the hostel",
+    );
+  }
+
+  const existing = check(
+    await admin.from("complaints").select("id").eq("hostel_id", hostelId).limit(1),
+    "reading complaints",
+  );
+  if (existing.length === 0) {
+    const categories = check(
+      await admin.from("complaint_categories").select("id, name").eq("hostel_id", hostelId),
+      "reading complaint categories",
+    );
+    const category = (name: string) => categories.find((c) => c.name === name)!.id as string;
+    const rooms = check(
+      await admin.from("rooms").select("id, room_number").eq("hostel_id", hostelId),
+      "reading rooms",
+    );
+    const room = (number: string) => rooms.find((r) => r.room_number === number)!.id as string;
+    const occupants = check(
+      await admin
+        .from("resident_directory")
+        .select("id, room_id")
+        .eq("hostel_id", hostelId)
+        .not("room_id", "is", null)
+        .order("full_name"),
+      "reading residents with rooms",
+    );
+    const residentIn = (roomId: string) => occupants.find((r) => r.room_id === roomId)?.id;
+
+    const raise = async (input: {
+      category: string;
+      title: string;
+      description?: string;
+      priority?: string;
+      room?: string;
+      area?: string;
+    }) => {
+      const roomId = input.room ? room(input.room) : undefined;
+      return check(
+        await owner.rpc("raise_complaint", {
+          p_hostel_id: hostelId,
+          p_category_id: category(input.category),
+          p_title: input.title,
+          p_description: input.description,
+          p_priority: input.priority ?? "normal",
+          p_room_id: roomId,
+          p_area: input.area,
+          p_resident_id: roomId ? residentIn(roomId) : undefined,
+        }),
+        `raising "${input.title}"`,
+      ) as string;
+    };
+
+    await raise({
+      category: "Electrical",
+      title: "Ceiling fan not working",
+      description: "Makes a humming sound but does not turn.",
+      priority: "high",
+      room: "102",
+    });
+    const tap = await raise({
+      category: "Plumbing",
+      title: "Bathroom tap leaking",
+      room: "201",
+    });
+    check(
+      await owner.rpc("set_complaint_status", { p_complaint_id: tap, p_status: "in_progress" }),
+      "starting a complaint",
+    );
+    const door = await raise({
+      category: "Carpentry",
+      title: "Cupboard door off its hinge",
+      priority: "low",
+      room: "303",
+    });
+    check(
+      await owner.rpc("set_complaint_costs", {
+        p_complaint_id: door,
+        p_labour: 20000,
+        p_material: 15000,
+        p_vendor_charge: 0,
+        p_payer: "hostel",
+      }),
+      "recording repair costs",
+    );
+    check(
+      await owner.rpc("set_complaint_status", {
+        p_complaint_id: door,
+        p_status: "resolved",
+        p_note: "New hinges fitted.",
+      }),
+      "resolving a complaint",
+    );
+    await raise({
+      category: "Internet",
+      title: "Wi-Fi drops every evening",
+      priority: "urgent",
+      area: "Second floor corridor",
+    });
+  }
+
+  const schedules = check(
+    await admin.from("maintenance_schedules").select("id").eq("hostel_id", hostelId).limit(1),
+    "reading maintenance schedules",
+  );
+  if (schedules.length === 0) {
+    const categories = check(
+      await admin.from("complaint_categories").select("id, name").eq("hostel_id", hostelId),
+      "reading complaint categories",
+    );
+    const category = (name: string) => categories.find((c) => c.name === name)!.id as string;
+    check(
+      await owner.from("maintenance_schedules").insert([
+        {
+          hostel_id: hostelId,
+          title: "Clean the overhead water tank",
+          category_id: category("Plumbing"),
+          area: "Terrace",
+          every: 3,
+          unit: "month",
+          next_due: addDays(today, 20),
+        },
+        {
+          hostel_id: hostelId,
+          title: "Pest control spray",
+          category_id: category("Pest control"),
+          area: "Whole building",
+          every: 1,
+          unit: "month",
+          next_due: addDays(today, 6),
+        },
+      ]),
+      "adding maintenance schedules",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 const ownerId = await ensureUser(OWNER.email, OWNER.fullName);
 const hostelId = await ensureHostel(ownerId);
@@ -523,6 +723,7 @@ await ensureFeeSetup(hostelId, ownerClient);
 await ensureMeterReadings(hostelId, ownerClient);
 await ensureBilling(hostelId, ownerClient);
 await ensureMoneyExtras(hostelId, ownerClient);
+await ensureComplaints(hostelId, ownerId, ownerClient);
 
 const [{ count: beds }, { count: residents }, { count: invoices }, { count: payments }] =
   await Promise.all(

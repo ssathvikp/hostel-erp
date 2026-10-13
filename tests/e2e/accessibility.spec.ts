@@ -116,6 +116,47 @@ test("every signed-in screen with data on it", async ({ page }) => {
     p_closing: 40,
   });
 
+  // A worker and a complaint with history, so the complaint screens have rows.
+  const { data: worker } = await owner.client
+    .from("workers")
+    .insert({
+      owner_id: owner.id,
+      kind: "vendor",
+      name: "Ravi",
+      phone: "9845011111",
+      trades: ["plumber"],
+    })
+    .select("id")
+    .single();
+  await owner.client
+    .from("worker_hostels")
+    .insert({ worker_id: worker!.id, hostel_id: hostel.id, preferred_trades: ["plumber"] });
+  const { data: plumbing } = await admin
+    .from("complaint_categories")
+    .select("id")
+    .eq("hostel_id", hostel.id)
+    .eq("name", "Plumbing")
+    .single();
+  const { data: complaint } = await owner.client.rpc("raise_complaint", {
+    p_hostel_id: hostel.id,
+    p_category_id: plumbing!.id,
+    p_title: "Tap leaking",
+    p_room_id: room!.id,
+    p_resident_id: resident!.id,
+  });
+  await owner.client.from("maintenance_schedules").insert({
+    hostel_id: hostel.id,
+    title: "Clean the water tank",
+    category_id: plumbing!.id,
+    area: "Terrace",
+    every: 3,
+    unit: "month",
+    next_due: todayIst(),
+  });
+  const { data: jobToken } = await owner.client.rpc("create_job_link", {
+    p_complaint_id: complaint!,
+  });
+
   await signIn(page, owner.email, TEST_PASSWORD);
   for (const path of [
     "/dashboard",
@@ -139,6 +180,15 @@ test("every signed-in screen with data on it", async ({ page }) => {
     "/settings",
     "/settings/hostel",
     "/settings/fees",
+    "/settings/workers",
+    "/settings/complaints",
+    "/complaints",
+    "/complaints/new",
+    `/complaints/${complaint}`,
+    "/complaints/maintenance",
+    "/reports/complaints",
+    `/job/${jobToken}`,
+    `/job/${"0".repeat(48)}`,
   ]) {
     await expectNoViolations(page, path);
   }
