@@ -12,7 +12,7 @@
 -- Every job-link function takes the token and does nothing for a token that
 -- is unknown, replaced or expired. The worker's page is served by the app,
 -- which calls these functions with the service role; signed-out visitors
--- cannot call them directly, so the app can rate-limit every request.
+-- cannot call them directly, so every request passes through the app.
 --
 -- Costs: labour, materials and the vendor's charge are recorded on the
 -- complaint. When the resident pays, the total becomes a pending charge
