@@ -139,8 +139,12 @@ export function createUserFactory() {
     const { data: hostels } = await admin.from("hostels").select("id").in("owner_id", created);
     const hostelIds = (hostels ?? []).map((row) => row.id);
     if (hostelIds.length > 0) {
-      // Money rows protect the stays and people they name, so they go first.
+      // Complaints name charges, residents and rooms; money rows protect the
+      // stays and people they name. Both go first.
       for (const table of [
+        "vendor_payouts",
+        "complaints",
+        "maintenance_schedules",
         "payments",
         "invoice_lines",
         "resident_charges",
