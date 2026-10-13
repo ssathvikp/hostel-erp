@@ -33,6 +33,8 @@ if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
 const PASSWORD = "Demo-passw0rd";
 const OWNER = { email: "owner@demo.hostel-erp.test", fullName: "Lakshmi Narayanan" };
 const STAFF = { email: "warden@demo.hostel-erp.test", fullName: "Suresh Kumar" };
+// A platform admin (EP-10). They set up MFA at /admin/mfa on first sign-in.
+const ADMIN = { email: "admin@demo.hostel-erp.test", fullName: "Platform Admin" };
 const HOSTEL_NAME = "Sunrise Residency";
 
 const options = { auth: { autoRefreshToken: false, persistSession: false } } as const;
@@ -711,6 +713,12 @@ check(
   "making the warden staff",
 );
 
+const adminId = await ensureUser(ADMIN.email, ADMIN.fullName);
+check(
+  await admin.from("profiles").update({ role: "platform_admin" }).eq("id", adminId),
+  "making the platform admin",
+);
+
 await ensureInventory(hostelId);
 await ensureResidents(hostelId, ownerId);
 
@@ -737,7 +745,8 @@ Seeded "${HOSTEL_NAME}": ${beds} beds, ${residents} residents, ${invoices} invoi
 
   Owner   ${OWNER.email}
   Staff   ${STAFF.email}
-  Password for both: ${PASSWORD}
+  Admin   ${ADMIN.email}   (set up an authenticator app at /admin/mfa)
+  Password for all three: ${PASSWORD}
 
 Sign in at http://localhost:3000/login
 `);

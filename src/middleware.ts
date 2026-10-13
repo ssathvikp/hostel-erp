@@ -14,6 +14,7 @@ const PROTECTED_PREFIXES = [
   "/complaints",
   "/reports",
   "/settings",
+  "/admin",
 ];
 
 /** Pages a signed-in user has no reason to see. */

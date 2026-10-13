@@ -1,9 +1,10 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { publicEnv } from "@/lib/env";
+import { REQUEST_ID_HEADER } from "@/lib/logger";
 import type { Database } from "@/types/database";
 
 /**
@@ -13,8 +14,12 @@ import type { Database } from "@/types/database";
  */
 export async function createClient() {
   const cookieStore = await cookies();
+  // The middleware's correlation id, passed on so database audit rows can
+  // quote it (E10-T3).
+  const requestId = (await headers()).get(REQUEST_ID_HEADER);
 
   return createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+    global: { headers: requestId ? { [REQUEST_ID_HEADER]: requestId } : {} },
     cookies: {
       getAll() {
         return cookieStore.getAll();
