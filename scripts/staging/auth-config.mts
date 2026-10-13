@@ -106,6 +106,11 @@ export function buildAuthConfig(env: Env, root: string) {
     password_required_characters: LETTERS_DIGITS,
     security_update_password_require_reauthentication: true,
 
+    // Platform admins sign in with TOTP MFA (E10-T1), as in config.toml.
+    mfa_totp_enroll_enabled: true,
+    mfa_totp_verify_enabled: true,
+    mfa_max_enrolled_factors: 10,
+
     // Custom SMTP: Supabase's built-in sender only reaches project members.
     smtp_host: env.SMTP_HOST,
     smtp_port: env.SMTP_PORT,

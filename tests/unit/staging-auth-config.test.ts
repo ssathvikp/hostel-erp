@@ -36,6 +36,7 @@ describe("buildAuthConfig", () => {
   it("uses the same subjects and templates as the local stack", () => {
     const config = buildAuthConfig(ENV, ROOT);
     expect(config.mailer_subjects_confirmation).toBe("Confirm your Hostel ERP account");
+    expect(config).toMatchObject({ mfa_totp_enroll_enabled: true, mfa_totp_verify_enabled: true });
     expect(config.mailer_subjects_recovery).toBe("Reset your Hostel ERP password");
     expect(config.mailer_subjects_password_changed_notification).toBe(
       "Your Hostel ERP password was changed",

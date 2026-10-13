@@ -3,6 +3,52 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          account_email: string | null;
+          account_id: string | null;
+          action: string;
+          actor_email: string;
+          actor_id: string | null;
+          created_at: string;
+          details: NonNullable<Json>;
+          hostel_id: string | null;
+          hostel_name: string | null;
+          id: number;
+          reason: string | null;
+          request_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          account_email?: string | null;
+          account_id?: string | null;
+          action: string;
+          actor_email: string;
+          actor_id?: string | null;
+          created_at?: string;
+          details?: NonNullable<Json>;
+          hostel_id?: string | null;
+          hostel_name?: string | null;
+          id?: never;
+          reason?: string | null;
+          request_id?: string | null;
+        };
+        Update: {
+          account_email?: string | null;
+          account_id?: string | null;
+          action?: string;
+          actor_email?: string;
+          actor_id?: string | null;
+          created_at?: string;
+          details?: NonNullable<Json>;
+          hostel_id?: string | null;
+          hostel_name?: string | null;
+          id?: never;
+          reason?: string | null;
+          request_id?: string | null;
+        };
+        Relationships: [];
+      };
       allocation_events: {
         Row: {
           action: string;
@@ -230,6 +276,79 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "rooms";
             referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
+      announcement_dismissals: {
+        Row: {
+          announcement_id: string;
+          dismissed_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          announcement_id: string;
+          dismissed_at?: string;
+          user_id?: string;
+        };
+        Update: {
+          announcement_id?: string;
+          dismissed_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcement_dismissals_announcement_id_fkey";
+            columns: ["announcement_id"];
+            isOneToOne: false;
+            referencedRelation: "announcements";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "announcement_dismissals_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      announcements: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          ends_at: string;
+          id: string;
+          message: string;
+          severity: string;
+          starts_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          ends_at: string;
+          id?: string;
+          message: string;
+          severity?: string;
+          starts_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string;
+          id?: string;
+          message?: string;
+          severity?: string;
+          starts_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -788,6 +907,71 @@ export type Database = {
           },
         ];
       };
+      data_requests: {
+        Row: {
+          completed_at: string | null;
+          created_at: string;
+          hostel_id: string | null;
+          id: string;
+          kind: string;
+          owner_id: string;
+          reason: string | null;
+          requested_by: string | null;
+          resident_id: string | null;
+          scheduled_for: string | null;
+          status: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          completed_at?: string | null;
+          created_at?: string;
+          hostel_id?: string | null;
+          id?: string;
+          kind: string;
+          owner_id: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          resident_id?: string | null;
+          scheduled_for?: string | null;
+          status: string;
+        };
+        Update: {
+          completed_at?: string | null;
+          created_at?: string;
+          hostel_id?: string | null;
+          id?: string;
+          kind?: string;
+          owner_id?: string;
+          reason?: string | null;
+          requested_by?: string | null;
+          resident_id?: string | null;
+          scheduled_for?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "data_requests_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "data_requests_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "data_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       deposit_amounts: {
         Row: {
           amount: number;
@@ -1021,6 +1205,37 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      email_outbox: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          kind: string;
+          sent_at: string | null;
+          subject: string;
+          to_email: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          sent_at?: string | null;
+          subject: string;
+          to_email: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          sent_at?: string | null;
+          subject?: string;
+          to_email?: string;
+        };
+        Relationships: [];
       };
       fee_head_rates: {
         Row: {
@@ -2086,22 +2301,23 @@ export type Database = {
           alt_phone: string | null;
           created_at: string;
           created_by: string | null;
-          dob: string;
+          dob: string | null;
           email: string | null;
+          erased_at: string | null;
           full_name: string;
-          gender: string;
+          gender: string | null;
           guardian_name: string | null;
           guardian_phone: string | null;
           hostel_id: string;
           id: string;
-          id_proof_hash: string;
-          id_proof_last4: string;
+          id_proof_hash: string | null;
+          id_proof_last4: string | null;
           id_proof_path: string | null;
-          id_proof_type: string;
+          id_proof_type: string | null;
           joining_date: string;
           notes: string | null;
-          permanent_address: string;
-          phone: string;
+          permanent_address: string | null;
+          phone: string | null;
           status: string;
           status_changed_at: string | null;
           status_changed_by: string | null;
@@ -2112,22 +2328,23 @@ export type Database = {
           alt_phone?: string | null;
           created_at?: string;
           created_by?: string | null;
-          dob: string;
+          dob?: string | null;
           email?: string | null;
+          erased_at?: string | null;
           full_name: string;
-          gender: string;
+          gender?: string | null;
           guardian_name?: string | null;
           guardian_phone?: string | null;
           hostel_id: string;
           id?: string;
-          id_proof_hash: string;
-          id_proof_last4: string;
+          id_proof_hash?: string | null;
+          id_proof_last4?: string | null;
           id_proof_path?: string | null;
-          id_proof_type: string;
+          id_proof_type?: string | null;
           joining_date: string;
           notes?: string | null;
-          permanent_address: string;
-          phone: string;
+          permanent_address?: string | null;
+          phone?: string | null;
           status?: string;
           status_changed_at?: string | null;
           status_changed_by?: string | null;
@@ -2137,22 +2354,23 @@ export type Database = {
           alt_phone?: string | null;
           created_at?: string;
           created_by?: string | null;
-          dob?: string;
+          dob?: string | null;
           email?: string | null;
+          erased_at?: string | null;
           full_name?: string;
-          gender?: string;
+          gender?: string | null;
           guardian_name?: string | null;
           guardian_phone?: string | null;
           hostel_id?: string;
           id?: string;
-          id_proof_hash?: string;
-          id_proof_last4?: string;
+          id_proof_hash?: string | null;
+          id_proof_last4?: string | null;
           id_proof_path?: string | null;
-          id_proof_type?: string;
+          id_proof_type?: string | null;
           joining_date?: string;
           notes?: string | null;
-          permanent_address?: string;
-          phone?: string;
+          permanent_address?: string | null;
+          phone?: string | null;
           status?: string;
           status_changed_at?: string | null;
           status_changed_by?: string | null;
@@ -2897,6 +3115,42 @@ export type Database = {
         Args: { p_complaint_id: string; p_kind: string; p_path: string };
         Returns: string;
       };
+      admin_account: { Args: { p_account_id: string }; Returns: Json };
+      admin_audit_search: {
+        Args: {
+          p_actor?: string;
+          p_from?: string;
+          p_hostel_id?: string;
+          p_page?: number;
+          p_to?: string;
+        };
+        Returns: Json;
+      };
+      admin_complete_closure: {
+        Args: { p_reason: string; p_request_id: string };
+        Returns: undefined;
+      };
+      admin_create_announcement: {
+        Args: { p_ends_at: string; p_message: string; p_severity: string; p_starts_at: string };
+        Returns: string;
+      };
+      admin_customers: { Args: { p_page?: number; p_search?: string }; Returns: Json };
+      admin_data_requests: { Args: { p_page?: number }; Returns: Json };
+      admin_end_announcement: { Args: { p_announcement_id: string }; Returns: undefined };
+      admin_hostels: {
+        Args: { p_page?: number; p_search?: string; p_status?: string };
+        Returns: Json;
+      };
+      admin_platform_metrics: { Args: Record<PropertyKey, never>; Returns: Json };
+      admin_set_hostel_status: {
+        Args: { p_hostel_id: string; p_reason: string; p_status: string };
+        Returns: undefined;
+      };
+      admin_support_action: {
+        Args: { p_account_id: string; p_action: string; p_reason: string };
+        Returns: string;
+      };
+      admin_view_hostel: { Args: { p_hostel_id: string; p_reason: string }; Returns: Json };
       allocate_bed: {
         Args: {
           p_bed_id: string;
@@ -2917,6 +3171,7 @@ export type Database = {
         Args: { p_charge?: number; p_payment_id: string; p_reason: string };
         Returns: string;
       };
+      cancel_account_closure: { Args: Record<PropertyKey, never>; Returns: undefined };
       collections_csv: {
         Args: { p_from: string; p_hostel_id: string; p_to: string };
         Returns: string;
@@ -2968,6 +3223,8 @@ export type Database = {
         Returns: string;
       };
       dues_ageing: { Args: { p_hostel_id: string }; Returns: Json };
+      erase_resident: { Args: { p_reason: string; p_resident_id: string }; Returns: string };
+      export_hostel_data: { Args: { p_hostel_id: string }; Returns: Json };
       fee_register_csv: { Args: { p_hostel_id: string; p_month: string }; Returns: string };
       fee_status_totals: {
         Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
@@ -3083,6 +3340,7 @@ export type Database = {
         Args: { p_amount: number; p_mode: string; p_reference?: string; p_resident_id: string };
         Returns: string;
       };
+      request_account_closure: { Args: { p_reason?: string }; Returns: string };
       route_complaint: { Args: { p_complaint_id: string }; Returns: string };
       set_complaint_costs: {
         Args: {
