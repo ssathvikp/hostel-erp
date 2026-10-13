@@ -8,6 +8,7 @@ import {
   ID_PROOF_TYPES,
   INDIAN_STATES,
   MANUAL_BED_STATUSES,
+  INVOICE_PAYMENT_MODES,
   PAYMENT_MODES,
   RESIDENT_STATUSES,
   SHARING_TYPES,
@@ -382,13 +383,35 @@ export const paymentSchema = z
     invoice_id: uuid("Invoice"),
     amount: rupees("Amount"),
     paid_at: isoDate("Payment date"),
-    mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+    mode: z.enum(INVOICE_PAYMENT_MODES, { error: "Choose a payment mode" }),
     reference: optional(requiredText("Reference", 100)),
+    cheque_bank: optional(requiredText("Bank", 100)),
   })
   .refine((payment) => payment.paid_at <= todayIst(), {
     error: "Payment date cannot be in the future",
     path: ["paid_at"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.reference, {
+    error: "Enter the cheque number",
+    path: ["reference"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.cheque_bank, {
+    error: "Enter the bank",
+    path: ["cheque_bank"],
   });
+
+/** A pending cheque the bank has paid (E13-T11). */
+export const chequeClearSchema = z.object({
+  id: uuid("Cheque"),
+  cleared_on: notFuture("Cleared on"),
+});
+
+/** A cheque the bank returned, with why and an optional bounce charge. */
+export const chequeBounceSchema = z.object({
+  id: uuid("Cheque"),
+  reason: requiredText("Reason", 500),
+  charge: optional(rupees("Bounce charge")),
+});
 
 /** Money received for a resident, not tied to one invoice: an advance or a deposit. */
 export const residentMoneySchema = z.object({

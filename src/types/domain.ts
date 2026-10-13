@@ -164,11 +164,14 @@ export interface InvoiceLine {
 /** Modes a person records money in. */
 export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
 export type RecordablePaymentMode = (typeof PAYMENT_MODES)[number];
+/** Modes a payment against an invoice can take: also a cheque (E13-T11). */
+export const INVOICE_PAYMENT_MODES = [...PAYMENT_MODES, "cheque"] as const;
+export type InvoicePaymentMode = (typeof INVOICE_PAYMENT_MODES)[number];
 /**
  * Every mode a payment row can carry: also credit and deposit money applied
  * to an invoice by the database (E13-T7, E13-T4).
  */
-export type PaymentMode = RecordablePaymentMode | "credit" | "deposit";
+export type PaymentMode = InvoicePaymentMode | "credit" | "deposit";
 
 // ---------------------------------------------------------------------------
 // Profile (EP-02) - id equals auth.users.id

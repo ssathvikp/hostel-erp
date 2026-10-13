@@ -465,3 +465,79 @@ test("an owner takes a deposit, keeps an overpayment as credit, and settles on m
   await expect(movements.getByRole("row", { name: /Deposit paid back.*₹14,500/ })).toBeVisible();
   await expect(movements.getByRole("row", { name: /Credit paid back.*₹2,000/ })).toBeVisible();
 });
+
+test("a cheque waits to clear, one clears and one bounces with a charge", async ({ page }) => {
+  const { owner, hostel, beds } = await setup("Cheque PG");
+  const asha = await residentInBed(hostel.id, owner.id, "Asha Nair", beds["101"]);
+  await residentInBed(hostel.id, owner.id, "Kabir Shah", beds["201"]);
+  for (const [sharing, amount] of [
+    ["double", 600000],
+    ["single", 900000],
+  ] as const) {
+    await owner.client.rpc("set_fee_structure", {
+      p_hostel_id: hostel.id,
+      p_sharing_type: sharing,
+      p_monthly_amount: amount,
+      p_effective_from: lastMonth,
+    });
+  }
+  await owner.client.rpc("generate_invoices", {
+    p_hostel_id: hostel.id,
+    p_period_month: lastMonth,
+  });
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // Both pay by cheque from the fee list.
+  await page.goto("/fees");
+  const invoices = inMain(page).getByRole("table", { name: "Invoices" });
+  for (const [name, number] of [
+    ["Asha Nair", "100201"],
+    ["Kabir Shah", "553002"],
+  ]) {
+    await invoices.getByRole("button", { name: `Record payment for ${name}` }).click();
+    const dialog = page.getByRole("dialog", { name: `Record a payment from ${name}` });
+    await dialog.getByLabel(/^Mode/).selectOption("cheque");
+    await dialog.getByRole("button", { name: "Record payment" }).click();
+    await expect(dialog.getByText("Enter the cheque number")).toBeVisible();
+    await dialog.getByLabel(/^Cheque number/).fill(number);
+    await dialog.getByLabel(/^Bank/).fill("Canara Bank");
+    await dialog.getByRole("button", { name: "Record payment" }).click();
+    await expect(dialog).toBeHidden();
+  }
+  // Nothing is paid yet, and nothing more can be recorded against them.
+  await expect(invoices.getByRole("row", { name: /Asha Nair.*₹6,000.*₹0.*₹6,000/ })).toBeVisible();
+  await expect(invoices.getByRole("button", { name: "Record payment for Asha Nair" })).toHaveCount(
+    0,
+  );
+
+  await inMain(page).getByRole("link", { name: "Cheques" }).click();
+  await expect(page).toHaveURL(/\/fees\/cheques$/);
+  await expect(inMain(page).getByText(/2 cheques, ₹15,000/)).toBeVisible();
+
+  await inMain(page).getByRole("button", { name: "Mark cheque 100201 for ₹6,000 cleared" }).click();
+  const clear = page.getByRole("dialog", { name: "Mark this cheque cleared" });
+  await clear.getByRole("button", { name: "Mark cleared" }).click();
+  await expect(clear).toBeHidden();
+
+  await inMain(page).getByRole("button", { name: "Mark cheque 553002 for ₹9,000 bounced" }).click();
+  const bounce = page.getByRole("dialog", { name: "Mark this cheque bounced" });
+  await bounce.getByLabel(/^Reason/).fill("Insufficient funds");
+  await bounce.getByLabel(/^Bounce charge/).fill("500");
+  await bounce.getByRole("button", { name: "Mark bounced" }).click();
+  await expect(bounce).toBeHidden();
+  await expect(inMain(page).getByText("No cheques waiting")).toBeVisible();
+
+  // Asha's invoice is paid; Kabir owes it again, plus the charge.
+  await page.goto(`/residents/${asha}`);
+  await expect(inMain(page).getByText(/Paid/).first()).toBeVisible();
+  await page.goto("/fees");
+  await expect(invoices.getByRole("row", { name: /Asha Nair.*₹6,000.*₹6,000.*₹0/ })).toBeVisible();
+  await invoices.getByRole("link", { name: /View invoice for Kabir Shah/ }).click();
+  await expect(inMain(page).getByText("Bounced: Insufficient funds")).toBeVisible();
+  const { data: charge } = await admin
+    .from("resident_charges")
+    .select("amount, description")
+    .eq("hostel_id", hostel.id)
+    .single();
+  expect(charge).toEqual({ amount: 50000, description: "Cheque bounce charge (cheque 553002)" });
+});

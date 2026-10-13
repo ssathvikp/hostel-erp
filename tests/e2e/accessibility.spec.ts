@@ -115,6 +115,7 @@ test("every signed-in screen with data on it", async ({ page }) => {
     `/residents/${resident!.id}`,
     `/residents/${resident!.id}/edit`,
     "/fees",
+    "/fees/cheques",
     `/fees/${invoice!.id}`,
     `/fees/${invoice!.id}/print`,
     `/fees/${invoice!.id}/print?payment=${payment!.id}`,

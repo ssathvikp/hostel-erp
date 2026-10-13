@@ -111,9 +111,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees"
         description="Invoices, payments and what is still due."
         actions={
-          <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
-            Rates
-          </Link>
+          <>
+            <Link href="/fees/cheques" className={buttonClass({ variant: "secondary" })}>
+              Cheques
+            </Link>
+            <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
+              Rates
+            </Link>
+          </>
         }
       />
 
@@ -263,14 +268,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                       </Td>
                       <Td>
                         <div className="flex justify-end gap-2">
-                          {row.balance > 0 && (
+                          {row.balance - row.pendingCheques > 0 && (
                             <PaymentDialog
                               residentName={row.residentName}
                               invoices={[
                                 {
                                   id: row.id,
                                   label: formatMonth(row.periodMonth),
-                                  balance: row.balance,
+                                  balance: row.balance - row.pendingCheques,
                                 },
                               ]}
                               triggerLabel="Record"

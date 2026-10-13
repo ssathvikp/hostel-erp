@@ -228,6 +228,8 @@ export interface InvoiceRow {
   amount: number;
   paid: number;
   balance: number;
+  /** Cheques received but not yet cleared (E13-T11). Part of the balance until they clear. */
+  pendingCheques: number;
   dueDate: string;
   status: "issued" | "void";
   /** Null for void invoices. */
@@ -236,7 +238,7 @@ export interface InvoiceRow {
 }
 
 const INVOICE_COLUMNS =
-  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, number";
+  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, number, pending_cheques";
 
 type InvoiceBalanceRow = {
   id: string | null;
@@ -256,6 +258,7 @@ type InvoiceBalanceRow = {
   due_status: string | null;
   void_reason: string | null;
   number: string | null;
+  pending_cheques: number | null;
 };
 
 function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
@@ -273,6 +276,7 @@ function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
     amount: row.amount ?? 0,
     paid: row.paid ?? 0,
     balance: row.balance ?? 0,
+    pendingCheques: row.pending_cheques ?? 0,
     dueDate: row.due_date!,
     status: row.status as InvoiceRow["status"],
     dueStatus: row.due_status as InvoiceDueStatus | null,
@@ -409,6 +413,8 @@ export interface PaymentRow {
   recordedAt: string;
   voidedAt: string | null;
   voidReason: string | null;
+  /** Cheques only (E13-T11). */
+  cheque: { bank: string; clearedOn: string | null; bounced: boolean } | null;
 }
 
 export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId: string) {
@@ -455,7 +461,7 @@ async function getInvoicePayments(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, number, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name",
+      "id, number, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name, cheque_bank, cleared_on, bounced",
     )
     .eq("hostel_id", hostelId)
     .eq("invoice_id", invoiceId)
@@ -473,6 +479,53 @@ async function getInvoicePayments(
     recordedAt: row.created_at,
     voidedAt: row.voided_at,
     voidReason: row.void_reason,
+    cheque:
+      row.mode === "cheque"
+        ? { bank: row.cheque_bank ?? "", clearedOn: row.cleared_on, bounced: row.bounced }
+        : null,
+  }));
+}
+
+export interface PendingCheque {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  residentId: string;
+  residentName: string;
+  amount: number;
+  receivedOn: string;
+  chequeNumber: string;
+  bank: string;
+  recordedBy: string | null;
+}
+
+/** Cheques waiting to clear, oldest first (E13-T11). */
+export async function getPendingCheques(
+  supabase: Supabase,
+  hostelId: string,
+): Promise<PendingCheque[]> {
+  const rows = await fetchAllPages((first, last) =>
+    supabase
+      .from("pending_cheques")
+      .select(
+        "id, invoice_id, invoice_number, resident_id, resident_name, amount, paid_at, cheque_number, cheque_bank, recorded_by_name",
+      )
+      .eq("hostel_id", hostelId)
+      .order("paid_at")
+      .order("id")
+      .range(first, last),
+  );
+  return rows.map((row) => ({
+    id: row.id!,
+    invoiceId: row.invoice_id!,
+    invoiceNumber: row.invoice_number ?? "",
+    residentId: row.resident_id!,
+    residentName: row.resident_name ?? "",
+    amount: row.amount ?? 0,
+    receivedOn: row.paid_at!,
+    chequeNumber: row.cheque_number ?? "",
+    bank: row.cheque_bank ?? "",
+    recordedBy: row.recorded_by_name,
   }));
 }
 

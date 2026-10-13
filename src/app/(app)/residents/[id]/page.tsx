@@ -142,12 +142,12 @@ export default async function ResidentPage({
   const allocatable = status === "active" || status === "notice";
   // Oldest first, so the payment dialog preselects the longest-owed month.
   const payable = invoices
-    .filter((invoice) => invoice.balance > 0)
+    .filter((invoice) => invoice.balance - invoice.pendingCheques > 0)
     .reverse()
     .map((invoice) => ({
       id: invoice.id,
       label: formatMonth(invoice.periodMonth),
-      balance: invoice.balance,
+      balance: invoice.balance - invoice.pendingCheques,
     }));
 
   return (

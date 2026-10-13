@@ -282,9 +282,24 @@ export function ReceiptDocument({
         Received from <span className="font-medium">{invoice.residentName}</span> the sum of{" "}
         <span className="font-semibold">{formatPaise(payment.amount)}</span> by{" "}
         {PAYMENT_MODE_LABELS[payment.mode]} on {formatDay(payment.paidAt)}
-        {payment.reference && <> (reference {payment.reference})</>}, towards invoice{" "}
-        <span className="font-mono">{invoice.number}</span> for {formatMonth(invoice.periodMonth)}.
+        {payment.cheque ? (
+          <>
+            {" "}
+            (cheque {payment.reference}, {payment.cheque.bank})
+          </>
+        ) : (
+          payment.reference && <> (reference {payment.reference})</>
+        )}
+        , towards invoice <span className="font-mono">{invoice.number}</span> for{" "}
+        {formatMonth(invoice.periodMonth)}.
       </p>
+      {payment.cheque && !payment.voidedAt && (
+        <p className="text-sm">
+          {payment.cheque.clearedOn
+            ? `Cheque cleared on ${formatDay(payment.cheque.clearedOn)}.`
+            : "Subject to realisation of the cheque. It is not counted as paid until it clears."}
+        </p>
+      )}
       <Party invoice={invoice} />
       <div className="flex justify-end">
         <dl className="w-full max-w-xs space-y-1 text-sm">

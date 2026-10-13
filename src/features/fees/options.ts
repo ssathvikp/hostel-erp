@@ -3,6 +3,7 @@ import {
   FEE_HEAD_BILLINGS,
   FEE_HEAD_PRICINGS,
   INVOICE_DUE_STATUSES,
+  INVOICE_PAYMENT_MODES,
   type FeeHeadBilling,
   type FeeHeadPricing,
   PAYMENT_MODES,
@@ -47,6 +48,7 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   upi: "UPI",
   bank_transfer: "Bank transfer",
   card: "Card",
+  cheque: "Cheque",
   credit: "From credit",
   deposit: "From deposit",
 };
@@ -55,6 +57,10 @@ export const PAYMENT_MODE_OPTIONS: readonly SelectOption[] = PAYMENT_MODES.map((
   value: mode,
   label: PAYMENT_MODE_LABELS[mode],
 }));
+
+export const INVOICE_PAYMENT_MODE_OPTIONS: readonly SelectOption[] = INVOICE_PAYMENT_MODES.map(
+  (mode) => ({ value: mode, label: PAYMENT_MODE_LABELS[mode] }),
+);
 
 export const FEE_HEAD_BILLING_LABELS: Record<FeeHeadBilling, string> = {
   monthly: "Every month",

@@ -11,6 +11,8 @@ import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   chargeSchema,
+  chequeBounceSchema,
+  chequeClearSchema,
   depositAmountSchema,
   depositDeductionSchema,
   discountEndSchema,
@@ -46,6 +48,7 @@ const PAYMENT_FIELDS = [
   "paid_at",
   "mode",
   "reference",
+  "cheque_bank",
   "keep_extra",
 ] as const;
 const VOID_FIELDS = ["id", "void_reason"] as const;
@@ -77,6 +80,10 @@ const RULE_MESSAGES: Record<string, string> = {
   balance_too_low: "That is more than is held.",
   reason_required: "Give a reason.",
   settle_has_bed: "Vacate the resident's bed before settling.",
+  settle_cheque_pending: "Clear or bounce the resident's pending cheques before settling.",
+  cheque_details: "Enter the cheque number and bank.",
+  cheque_not_pending: "This cheque has already cleared or bounced. Refresh the page.",
+  cheque_cleared_date: "The clearing date must be between the day it was received and today.",
 };
 
 const SELF_EXPLAINING_HINTS = new Set([
@@ -386,16 +393,39 @@ export async function recordPayment(_previous: FormState, formData: FormData): P
   // The invoice must belong to the hostel being worked in.
   const { data: invoice } = await supabase
     .from("invoice_balances")
-    .select("balance")
+    .select("balance, pending_cheques")
     .eq("id", parsed.data.invoice_id)
     .eq("hostel_id", hostelId)
     .maybeSingle();
   if (!invoice) return formFailure(RULE_MESSAGES.invoice_not_found, values);
 
+  // What no pending cheque already covers.
+  const balance = (invoice.balance ?? 0) - (invoice.pending_cheques ?? 0);
+
+  // A cheque is pending until it clears and never becomes credit (E13-T11).
+  if (parsed.data.mode === "cheque") {
+    if (parsed.data.amount > balance) {
+      return formFailure(undefined, values, {
+        amount: [`A cheque can pay at most the ${formatPaise(balance)} still due on this invoice.`],
+      });
+    }
+    const { error } = await supabase.rpc("record_cheque", {
+      p_invoice_id: parsed.data.invoice_id,
+      p_amount: parsed.data.amount,
+      p_paid_at: parsed.data.paid_at,
+      p_cheque_number: parsed.data.reference!,
+      p_bank: parsed.data.cheque_bank!,
+    });
+    if (error) return failure("recordCheque", error, values);
+    revalidateFees();
+    return formSuccess(
+      `Cheque for ${formatPaise(parsed.data.amount)} recorded. It counts once you mark it cleared.`,
+    );
+  }
+
   // Paying more than is due is kept as credit (E13-T7), but only when the
   // collector says so: an extra zero should never quietly become credit.
   const keepExtra = formData.get("keep_extra") === "on";
-  const balance = invoice.balance ?? 0;
   if (parsed.data.amount > balance && !keepExtra) {
     return formFailure(undefined, values, {
       amount: [
@@ -450,6 +480,80 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   revalidateFees();
   return formSuccess("Payment voided. It no longer counts towards any total.");
+}
+
+// ---------------------------------------------------------------------------
+// Cheques (E13-T11)
+// ---------------------------------------------------------------------------
+
+const CLEAR_FIELDS = ["id", "cleared_on"] as const;
+const BOUNCE_FIELDS = ["id", "reason", "charge"] as const;
+
+/** Owners mark a pending cheque as paid by the bank. */
+export async function clearCheque(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, CLEAR_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(chequeClearSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payments")
+    .update({ cleared_on: parsed.data.cleared_on })
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostelId)
+    .eq("mode", "cheque")
+    .select("amount");
+  if (error) return failure("clearCheque", error, values);
+  if (!data?.length)
+    return formFailure("This cheque could not be found. Refresh the page.", values);
+
+  revalidateFees();
+  return formSuccess(`Cheque for ${formatPaise(data[0].amount)} marked cleared.`);
+}
+
+/** Owners record a cheque the bank returned, with an optional bounce charge. */
+export async function bounceCheque(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, BOUNCE_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(chequeBounceSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { data: cheque } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostelId)
+    .eq("mode", "cheque")
+    .maybeSingle();
+  if (!cheque) return formFailure("This cheque could not be found. Refresh the page.", values);
+
+  const { error } = await supabase.rpc("bounce_cheque", {
+    p_payment_id: parsed.data.id,
+    p_reason: parsed.data.reason,
+    p_charge: parsed.data.charge ?? undefined,
+  });
+  if (error) return failure("bounceCheque", error, values);
+
+  revalidateFees();
+  return formSuccess(
+    parsed.data.charge
+      ? `Cheque marked bounced. A bounce charge of ${formatPaise(parsed.data.charge)} will be on the next invoice.`
+      : "Cheque marked bounced. The amount is due again.",
+  );
 }
 
 // ---------------------------------------------------------------------------

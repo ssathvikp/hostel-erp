@@ -8,20 +8,20 @@ import { todayIst } from "@/lib/validation";
 import { initialFormState } from "@/lib/validation/result";
 
 import { recordPayment } from "../actions";
-import { PAYMENT_MODE_OPTIONS } from "../options";
+import { INVOICE_PAYMENT_MODE_OPTIONS } from "../options";
 
 export interface PayableInvoice {
   id: string;
   /** e.g. "October 2026". */
   label: string;
-  /** Still due, in paise. */
+  /** Still due and not covered by a pending cheque, in paise. */
   balance: number;
 }
 
 /**
  * Records money received against an invoice (E7-T4). Partial payments are
- * normal; the amount defaults to what is still due and the database refuses
- * anything above it.
+ * normal; the amount defaults to what is still due. A cheque (E13-T11) also
+ * takes its bank and stays pending until the owner marks it cleared.
  */
 export function PaymentDialog({
   residentName,
@@ -40,6 +40,8 @@ export function PaymentDialog({
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(recordPayment, initialFormState);
   const [invoiceId, setInvoiceId] = useState(invoices[0]?.id ?? "");
+  const [mode, setMode] = useState(state.values?.mode ?? "");
+  const cheque = mode === "cheque";
   const today = todayIst();
   const formId = `payment-${invoices[0]?.id ?? "none"}`;
   const selected = invoices.find((invoice) => invoice.id === invoiceId) ?? invoices[0];
@@ -134,28 +136,57 @@ export function PaymentDialog({
               name="mode"
               label="Mode"
               placeholder="Choose a mode"
-              options={PAYMENT_MODE_OPTIONS}
-              defaultValue={state.values?.mode ?? ""}
+              options={INVOICE_PAYMENT_MODE_OPTIONS}
+              value={mode}
+              onChange={(event) => setMode(event.target.value)}
               required
               error={state.fieldErrors.mode?.[0]}
             />
           </div>
-          <Input
-            id={`${formId}-reference`}
-            name="reference"
-            label="Reference"
-            defaultValue={state.values?.reference ?? ""}
-            hint="Optional. UPI transaction ID, cheque or receipt number."
-            maxLength={100}
-            error={state.fieldErrors.reference?.[0]}
-          />
-          <Checkbox
-            id={`${formId}-extra`}
-            name="keep_extra"
-            label="Keep anything above what is due as credit"
-            hint="It pays the resident's other open invoices first, then the next ones issued."
-            defaultChecked={state.values?.keep_extra === "on"}
-          />
+          {cheque ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                id={`${formId}-reference`}
+                name="reference"
+                label="Cheque number"
+                defaultValue={state.values?.reference ?? ""}
+                required
+                maxLength={100}
+                error={state.fieldErrors.reference?.[0]}
+              />
+              <Input
+                id={`${formId}-bank`}
+                name="cheque_bank"
+                label="Bank"
+                defaultValue={state.values?.cheque_bank ?? ""}
+                required
+                maxLength={100}
+                error={state.fieldErrors.cheque_bank?.[0]}
+              />
+              <p className="text-sm text-slate-600 sm:col-span-2">
+                The cheque stays pending, and the balance unchanged, until you mark it cleared.
+              </p>
+            </div>
+          ) : (
+            <>
+              <Input
+                id={`${formId}-reference`}
+                name="reference"
+                label="Reference"
+                defaultValue={state.values?.reference ?? ""}
+                hint="Optional. UPI transaction ID or receipt number."
+                maxLength={100}
+                error={state.fieldErrors.reference?.[0]}
+              />
+              <Checkbox
+                id={`${formId}-extra`}
+                name="keep_extra"
+                label="Keep anything above what is due as credit"
+                hint="It pays the resident's other open invoices first, then the next ones issued."
+                defaultChecked={state.values?.keep_extra === "on"}
+              />
+            </>
+          )}
         </form>
       </Modal>
     </>
