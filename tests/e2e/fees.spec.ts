@@ -541,3 +541,82 @@ test("a cheque waits to clear, one clears and one bounces with a charge", async 
     .single();
   expect(charge).toEqual({ amount: 50000, description: "Cheque bounce charge (cheque 553002)" });
 });
+
+test("an owner bills a room's electricity, split by nights, after a missing reading is flagged", async ({
+  page,
+}) => {
+  const { owner, hostel, beds } = await setup("Meter PG");
+  const usageMonth = shiftMonth(todayIst(), -2);
+  const usageLabel = formatMonth(usageMonth);
+  // Both in room 101 (double) since two months ago; Ravi alone in 201.
+  await residentInBed(hostel.id, owner.id, "Leela Rao", beds["101"]);
+  const { data: secondBed } = await admin
+    .from("beds")
+    .select("id")
+    .eq("hostel_id", hostel.id)
+    .neq("id", beds["101"])
+    .neq("id", beds["201"])
+    .single();
+  await residentInBed(hostel.id, owner.id, "Tara Bose", secondBed!.id);
+  await residentInBed(hostel.id, owner.id, "Ravi Das", beds["201"]);
+  for (const [sharing, amount] of [
+    ["double", 600000],
+    ["single", 900000],
+  ] as const) {
+    await owner.client.rpc("set_fee_structure", {
+      p_hostel_id: hostel.id,
+      p_sharing_type: sharing,
+      p_monthly_amount: amount,
+      p_effective_from: usageMonth,
+    });
+  }
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // The rate.
+  await page.goto("/fees");
+  await inMain(page).getByRole("link", { name: "Electricity" }).click();
+  await expect(inMain(page).getByText("Electricity is not billed")).toBeVisible();
+  await inMain(page)
+    .getByLabel(/^Rate per unit/)
+    .fill("9");
+  await inMain(page).getByRole("button", { name: "Save rate" }).click();
+  await expect(inMain(page).getByText("Electricity is billed at ₹9 a unit.")).toBeVisible();
+
+  // Generating last month's invoices stops: nobody read the meters two months ago.
+  await page.goto("/fees");
+  await billMonth(page);
+  await expect(
+    inMain(page).getByText(`No electricity reading for ${usageLabel} in rooms 101, 201.`, {
+      exact: false,
+    }),
+  ).toBeVisible();
+
+  // Read room 101: 100 units, shared by two for the whole month.
+  await page.goto(`/fees/electricity?month=${usageMonth.slice(0, 7)}`);
+  const sheet = inMain(page).getByRole("table", { name: `Meter readings for ${usageLabel}` });
+  await expect(sheet.getByRole("row", { name: /101.*No reading/ })).toBeVisible();
+  await sheet.getByRole("button", { name: "Record reading for room 101" }).click();
+  const dialog = page.getByRole("dialog", { name: `Room 101, ${usageLabel}` });
+  await dialog.getByLabel(/^Opening units/).fill("2000");
+  await dialog.getByLabel(/^Closing units/).fill("1900");
+  await dialog.getByRole("button", { name: "Record reading" }).click();
+  await expect(dialog.getByText("cannot be below the opening reading")).toBeVisible();
+  await dialog.getByLabel(/^Closing units/).fill("2100");
+  await dialog.getByRole("button", { name: "Record reading" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(sheet.getByRole("row", { name: /101.*2,000.*2,100.*100.*₹900/ })).toBeVisible();
+  await expect(sheet.getByText("Leela Rao: ₹450")).toBeVisible();
+  await expect(sheet.getByText("Tara Bose: ₹450")).toBeVisible();
+
+  // Room 201 stays unread: go ahead without it.
+  await page.goto("/fees");
+  await inMain(page).getByLabel("Generate without the missing readings").check();
+  await billMonth(page);
+  await expect(inMain(page).getByText(`Created 3 invoices for ${lastMonthLabel}`)).toBeVisible();
+  await inMain(page)
+    .getByRole("link", { name: `View invoice for Leela Rao, ${lastMonthLabel}` })
+    .click();
+  await expect(
+    inMain(page).getByText(`Electricity, room 101, ${usageLabel}: 100.0 units × ₹9.00`),
+  ).toBeVisible();
+});

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
-import { formatMonth, formatPaise } from "@/lib/money";
+import { formatMonth, formatPaise, shiftMonth } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -17,6 +17,7 @@ import {
   depositDeductionSchema,
   discountEndSchema,
   discountSchema,
+  electricityRateSchema,
   feeExemptionSchema,
   feeHeadRateSchema,
   feeHeadSchema,
@@ -27,6 +28,7 @@ import {
   formValues,
   generateInvoicesSchema,
   lateFeeRuleSchema,
+  meterReadingSchema,
   paymentSchema,
   refundSchema,
   residentMoneySchema,
@@ -41,7 +43,7 @@ const NO_HOSTEL = "Finish setting up your hostel first.";
 const FOREIGN_KEY_VIOLATION = "23503";
 
 const RATE_FIELDS = ["sharing_type", "monthly_amount", "effective_from"] as const;
-const GENERATE_FIELDS = ["period_month", "due_day"] as const;
+const GENERATE_FIELDS = ["period_month", "due_day", "skip_electricity"] as const;
 const PAYMENT_FIELDS = [
   "invoice_id",
   "amount",
@@ -84,10 +86,20 @@ const RULE_MESSAGES: Record<string, string> = {
   cheque_details: "Enter the cheque number and bank.",
   cheque_not_pending: "This cheque has already cleared or bounced. Refresh the page.",
   cheque_cleared_date: "The clearing date must be between the day it was received and today.",
+  room_not_found: "This room could not be found. Refresh the page.",
+  meter_month: "Choose this month or an earlier one.",
+  meter_units: "Enter the opening and closing readings.",
+  electricity_rate_missing: "Set the rate per unit first.",
+  meter_reading_exists: "This room already has a reading for that month. Refresh the page.",
+  meter_reading_void: "This reading is already void. Refresh the page.",
+  meter_reading_billed:
+    "Its charges are already on an invoice. Void that invoice first, then the reading.",
 };
 
 const SELF_EXPLAINING_HINTS = new Set([
   "overpayment",
+  "meter_reading_lower",
+  "meter_reading_higher",
   "balance_too_low",
   "fee_structure_later_exists",
   "fee_head_later_exists",
@@ -315,6 +327,25 @@ export async function generateInvoices(
   if (!hostelId) return formFailure(NO_HOSTEL, values);
 
   const supabase = await createClient();
+
+  // Electricity used last month is billed on this month's invoice (E13-T3).
+  // A room with occupants but no reading would quietly bill nothing.
+  if (formData.get("skip_electricity") !== "on") {
+    const usageMonth = shiftMonth(parsed.data.period_month, -1);
+    const { data: missing, error: missingError } = await supabase.rpc("missing_meter_readings", {
+      p_hostel_id: hostelId,
+      p_period_month: usageMonth,
+    });
+    if (missingError) return failure("generateInvoices", missingError, values);
+    if (missing?.length) {
+      const rooms = missing.map((room) => room.room_number).join(", ");
+      return formFailure(
+        `No electricity reading for ${formatMonth(usageMonth)} in ${missing.length === 1 ? "room" : "rooms"} ${rooms}. Record ${missing.length === 1 ? "it" : "them"} under Fees → Electricity first, or tick “Generate without the missing readings” to bill electricity on a later invoice.`,
+        values,
+      );
+    }
+  }
+
   const { data, error } = await supabase.rpc("generate_invoices", {
     p_hostel_id: hostelId,
     p_period_month: parsed.data.period_month,
@@ -480,6 +511,141 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   revalidateFees();
   return formSuccess("Payment voided. It no longer counts towards any total.");
+}
+
+// ---------------------------------------------------------------------------
+// Electricity (E13-T3)
+// ---------------------------------------------------------------------------
+
+const ELECTRICITY_RATE_FIELDS = ["unit_rate"] as const;
+const METER_FIELDS = ["room_id", "period_month", "opening", "closing"] as const;
+
+function revalidateElectricity() {
+  revalidatePath("/fees/electricity");
+  revalidateFees();
+}
+
+/** Owners set the rate per unit; blank stops billing electricity. */
+export async function saveElectricityRate(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, ELECTRICITY_RATE_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(electricityRateSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const unitRate = parsed.data.unit_rate;
+  if (unitRate === null) {
+    const { error } = await supabase.from("electricity_rates").delete().eq("hostel_id", hostelId);
+    if (error) return failure("saveElectricityRate", error, values);
+  } else {
+    const { data: updated, error } = await supabase
+      .from("electricity_rates")
+      .update({ unit_rate: unitRate })
+      .eq("hostel_id", hostelId)
+      .select("hostel_id");
+    if (error) return failure("saveElectricityRate", error, values);
+    if (!updated?.length) {
+      const { error: insertError } = await supabase
+        .from("electricity_rates")
+        .insert({ hostel_id: hostelId, unit_rate: unitRate });
+      if (insertError) return failure("saveElectricityRate", insertError, values);
+    }
+  }
+
+  revalidateElectricity();
+  return formSuccess(
+    unitRate === null
+      ? "Electricity is no longer billed. Readings already recorded stay on record."
+      : `Electricity is billed at ${formatPaise(unitRate)} a unit.`,
+  );
+}
+
+/** Owners and staff record a room's reading; each occupant's share becomes a charge. */
+export async function recordMeterReading(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, METER_FIELDS);
+  try {
+    await requireRole(["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(meterReadingSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("id", parsed.data.room_id)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+  if (!room) return formFailure(RULE_MESSAGES.room_not_found, values);
+
+  const { data, error } = await supabase.rpc("record_meter_reading", {
+    p_room_id: parsed.data.room_id,
+    p_period_month: parsed.data.period_month,
+    p_opening: parsed.data.opening,
+    p_closing: parsed.data.closing,
+  });
+  if (error) return failure("recordMeterReading", error, values);
+
+  revalidateElectricity();
+  const result = data as { amount: number; shares: unknown[] };
+  return formSuccess(
+    result.amount === 0
+      ? "Reading recorded. No units were used, so nothing is charged."
+      : result.shares.length === 0
+        ? `Reading recorded: ${formatPaise(result.amount)}. Nobody held a bed in the room that month, so nothing is charged.`
+        : `Reading recorded: ${formatPaise(result.amount)}, split between ${plural(result.shares.length, "resident")}.`,
+  );
+}
+
+/** Owners void a mistaken reading and the charges it made. */
+export async function voidMeterReading(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, VOID_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(voidSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostelId = await activeHostelId();
+  if (!hostelId) return formFailure(NO_HOSTEL, values);
+
+  const supabase = await createClient();
+  const { data: reading } = await supabase
+    .from("meter_readings")
+    .select("id")
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+  if (!reading) return formFailure("This reading could not be found. Refresh the page.", values);
+
+  const { error } = await supabase.rpc("void_meter_reading", {
+    p_reading_id: parsed.data.id,
+    p_reason: parsed.data.void_reason,
+  });
+  if (error) return failure("voidMeterReading", error, values);
+
+  revalidateElectricity();
+  return formSuccess("Reading voided, with the charges it made. The month can be read again.");
 }
 
 // ---------------------------------------------------------------------------

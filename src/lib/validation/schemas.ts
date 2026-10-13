@@ -400,6 +400,36 @@ export const paymentSchema = z
     path: ["cheque_bank"],
   });
 
+/** Metered electricity (E13-T3): the rate per unit. Blank stops billing electricity. */
+export const electricityRateSchema = z.object({
+  unit_rate: optional(rupees("Rate per unit", { max: 1000 })),
+});
+
+/** A meter reading in units, to one decimal place. */
+const meterUnits = (label: string) =>
+  z.coerce
+    .number({ error: `${label} must be a number` })
+    .refine((value) => Number.isFinite(value) && value >= 0, {
+      error: `${label} cannot be negative`,
+    })
+    .refine((value) => value < 1_000_000_000, { error: `${label} is too large` })
+    .refine((value) => Math.abs(value * 10 - Math.round(value * 10)) < 1e-6, {
+      error: `${label} can have at most 1 decimal place`,
+    });
+
+/** A room's sub-meter for a month. */
+export const meterReadingSchema = z
+  .object({
+    room_id: uuid("Room"),
+    period_month: billingMonth,
+    opening: meterUnits("Opening reading"),
+    closing: meterUnits("Closing reading"),
+  })
+  .refine((reading) => reading.closing >= reading.opening, {
+    error: "The closing reading cannot be below the opening reading",
+    path: ["closing"],
+  });
+
 /** A pending cheque the bank has paid (E13-T11). */
 export const chequeClearSchema = z.object({
   id: uuid("Cheque"),

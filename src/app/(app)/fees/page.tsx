@@ -18,6 +18,7 @@ import {
   FEE_PAGE_SIZE,
   FEE_SORTS,
   getBilledMonths,
+  getElectricityRate,
   getFeeList,
   getFeeTotals,
   getLateFeeRule,
@@ -67,7 +68,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [list, totals, months, rooms, lateFees] = await Promise.all([
+  const [list, totals, months, rooms, lateFees, unitRate] = await Promise.all([
     getFeeList(supabase, hostel.id, filters),
     getFeeTotals(supabase, hostel.id, filters),
     getBilledMonths(supabase, hostel.id),
@@ -82,6 +83,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         .range(first, last),
     ),
     getLateFeeRule(supabase, hostel.id),
+    getElectricityRate(supabase, hostel.id),
   ]);
 
   const href = (changes: Record<string, string | null>) => {
@@ -115,6 +117,9 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <Link href="/fees/cheques" className={buttonClass({ variant: "secondary" })}>
               Cheques
             </Link>
+            <Link href="/fees/electricity" className={buttonClass({ variant: "secondary" })}>
+              Electricity
+            </Link>
             <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
               Rates
             </Link>
@@ -130,7 +135,10 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <h2 id="generate-heading" className="mb-4 text-base font-semibold text-slate-900">
             Generate monthly invoices
           </h2>
-          <GenerateInvoicesForm currentMonth={todayIst().slice(0, 7)} />
+          <GenerateInvoicesForm
+            currentMonth={todayIst().slice(0, 7)}
+            meteredElectricity={unitRate !== null}
+          />
           {lateFees?.active && (
             <div className="mt-5 border-t border-slate-200 pt-5">
               <p className="mb-3 text-sm text-slate-600">

@@ -505,6 +505,33 @@ export type Database = {
           },
         ];
       };
+      electricity_rates: {
+        Row: {
+          hostel_id: string;
+          unit_rate: number;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          hostel_id: string;
+          unit_rate: number;
+          updated_at?: string;
+        };
+        Update: {
+          hostel_id?: string;
+          unit_rate?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "electricity_rates_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: true;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       fee_head_rates: {
         Row: {
           amount: number;
@@ -961,6 +988,91 @@ export type Database = {
           },
         ];
       };
+      meter_readings: {
+        Row: {
+          amount: number;
+          closing: number;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          opening: number;
+          period_month: string;
+          recorded_by: string | null;
+          room_id: string;
+          unit_rate: number;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          closing: number;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          opening: number;
+          period_month: string;
+          recorded_by?: string | null;
+          room_id: string;
+          unit_rate: number;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount?: number;
+          closing?: number;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          opening?: number;
+          period_month?: string;
+          recorded_by?: string | null;
+          room_id?: string;
+          unit_rate?: number;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meter_readings_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meter_readings_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meter_readings_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "meter_readings_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "meter_readings_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       payments: {
         Row: {
           amount: number;
@@ -1110,6 +1222,7 @@ export type Database = {
           id: string;
           invoice_id: string | null;
           kind: string;
+          meter_reading_id: string | null;
           resident_id: string;
           status: string;
           updated_at: string;
@@ -1130,6 +1243,7 @@ export type Database = {
           id?: string;
           invoice_id?: string | null;
           kind?: string;
+          meter_reading_id?: string | null;
           resident_id: string;
           status?: string;
           updated_at?: string;
@@ -1149,6 +1263,7 @@ export type Database = {
           id?: string;
           invoice_id?: string | null;
           kind?: string;
+          meter_reading_id?: string | null;
           resident_id?: string;
           status?: string;
           updated_at?: string;
@@ -1204,6 +1319,13 @@ export type Database = {
             columns: ["hostel_id", "invoice_id"];
             isOneToOne: false;
             referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_charges_meter_reading_fkey";
+            columns: ["hostel_id", "meter_reading_id"];
+            isOneToOne: false;
+            referencedRelation: "meter_readings";
             referencedColumns: ["hostel_id", "id"];
           },
           {
@@ -1942,6 +2064,13 @@ export type Database = {
         Args: { p_due_day?: number; p_hostel_id: string; p_period_month: string };
         Returns: Json;
       };
+      missing_meter_readings: {
+        Args: { p_hostel_id: string; p_period_month: string };
+        Returns: {
+          room_id: string;
+          room_number: string;
+        }[];
+      };
       occupancy_trend: {
         Args: { p_from: string; p_granularity?: string; p_hostel_id: string; p_to: string };
         Returns: {
@@ -1981,6 +2110,10 @@ export type Database = {
           p_resident_id: string;
         };
         Returns: string;
+      };
+      record_meter_reading: {
+        Args: { p_closing: number; p_opening: number; p_period_month: string; p_room_id: string };
+        Returns: Json;
       };
       record_payment: {
         Args: {
@@ -2047,6 +2180,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      void_meter_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: undefined };
     };
     Enums: {
       [_ in never]: never;

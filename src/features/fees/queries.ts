@@ -797,3 +797,119 @@ export async function getSettlementPreview(
     net: Number(p.net ?? 0),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Electricity (E13-T3)
+// ---------------------------------------------------------------------------
+
+/** Paise per unit, or null when the hostel does not bill electricity. */
+export async function getElectricityRate(supabase: Supabase, hostelId: string) {
+  const { data, error } = await supabase
+    .from("electricity_rates")
+    .select("unit_rate")
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.unit_rate ?? null;
+}
+
+export interface MeterShare {
+  residentName: string;
+  amount: number;
+  status: "pending" | "invoiced" | "void";
+}
+
+export interface MeterRoom {
+  roomId: string;
+  roomNumber: string;
+  /** The closing units of the room's latest earlier reading: this month's opening. */
+  previousClosing: number | null;
+  /** Someone held a bed in it this month and it has no reading. */
+  missing: boolean;
+  reading: {
+    id: string;
+    opening: number;
+    closing: number;
+    unitRate: number;
+    amount: number;
+    recordedAt: string;
+    shares: MeterShare[];
+  } | null;
+}
+
+/** Every room with its reading for `month` (YYYY-MM-01) and what it was split into. */
+export async function getMeterSheet(
+  supabase: Supabase,
+  hostelId: string,
+  month: string,
+): Promise<MeterRoom[]> {
+  const [rooms, readings, earlier, missing] = await Promise.all([
+    fetchAllPages((first, last) =>
+      supabase
+        .from("room_inventory")
+        .select("id, room_number")
+        .eq("hostel_id", hostelId)
+        .order("floor")
+        .order("room_sort")
+        .order("id")
+        .range(first, last),
+    ),
+    fetchAllPages((first, last) =>
+      supabase
+        .from("meter_readings")
+        .select(
+          "id, room_id, opening, closing, unit_rate, amount, created_at, resident_charges(amount, status, residents!resident_charges_resident_fkey(full_name))",
+        )
+        .eq("hostel_id", hostelId)
+        .eq("period_month", month)
+        .is("voided_at", null)
+        .order("id")
+        .range(first, last),
+    ),
+    fetchAllPages((first, last) =>
+      supabase
+        .from("meter_readings")
+        .select("room_id, closing")
+        .eq("hostel_id", hostelId)
+        .lt("period_month", month)
+        .is("voided_at", null)
+        .order("period_month", { ascending: false })
+        .order("id")
+        .range(first, last),
+    ),
+    supabase.rpc("missing_meter_readings", { p_hostel_id: hostelId, p_period_month: month }),
+  ]);
+  if (missing.error) throw missing.error;
+
+  const previous = new Map<string, number>();
+  for (const row of earlier) {
+    if (!previous.has(row.room_id)) previous.set(row.room_id, Number(row.closing));
+  }
+  const byRoom = new Map(readings.map((reading) => [reading.room_id, reading]));
+  const missingRooms = new Set((missing.data ?? []).map((room) => room.room_id));
+
+  return rooms.map((room) => {
+    const reading = byRoom.get(room.id!);
+    return {
+      roomId: room.id!,
+      roomNumber: room.room_number ?? "",
+      previousClosing: previous.get(room.id!) ?? null,
+      missing: missingRooms.has(room.id!),
+      reading: reading
+        ? {
+            id: reading.id,
+            opening: Number(reading.opening),
+            closing: Number(reading.closing),
+            unitRate: reading.unit_rate,
+            amount: reading.amount,
+            recordedAt: reading.created_at,
+            shares: reading.resident_charges.map((charge) => ({
+              residentName: charge.residents?.full_name ?? "",
+              amount: charge.amount,
+              status: charge.status as MeterShare["status"],
+            })),
+          }
+        : null,
+    };
+  });
+}
