@@ -65,7 +65,15 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Reports" description="What came in, how, and what is still owed." />
+      <PageHeader
+        title="Reports"
+        description="What came in, how, and what is still owed."
+        actions={
+          <Link href="/reports/complaints" className={buttonClass({ variant: "secondary" })}>
+            Complaint reports
+          </Link>
+        }
+      />
 
       <section aria-labelledby="collections-heading" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -13,7 +13,7 @@ function badRequest(message: string) {
 
 /**
  * CSV exports (E13-T12): `?kind=collections&from=YYYY-MM-DD&to=YYYY-MM-DD`
- * or `?kind=register&month=YYYY-MM`. The database builds the whole file in
+ * `?kind=complaints&from=...&to=...` (E15-T11) or `?kind=register&month=YYYY-MM`. The database builds the whole file in
  * one call, so it is never cut at the API's row limit.
  */
 export async function GET(request: NextRequest) {
@@ -38,6 +38,18 @@ export async function GET(request: NextRequest) {
       p_to: to,
     });
     filename = `collections-${from}-to-${to}.csv`;
+  } else if (kind === "complaints") {
+    const from = params.get("from") ?? "";
+    const to = params.get("to") ?? "";
+    if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) {
+      return badRequest("Choose a start date on or before the end date.");
+    }
+    result = await supabase.rpc("complaints_csv", {
+      p_hostel_id: active.id,
+      p_from: from,
+      p_to: to,
+    });
+    filename = `complaints-${from}-to-${to}.csv`;
   } else if (kind === "register") {
     const month = params.get("month") ?? "";
     if (!MONTH.test(month)) return badRequest("Choose a month.");
