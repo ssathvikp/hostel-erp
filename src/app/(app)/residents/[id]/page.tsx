@@ -10,9 +10,20 @@ import { AllocationHistory } from "@/features/allocations/components/AllocationH
 import { StayActions } from "@/features/allocations/components/StayActions";
 import { VACATE_REASON_LABELS } from "@/features/allocations/options";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
+import { FeeExemptionToggle } from "@/features/fees/components/FeeHeadForms";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
-import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
+import { ResidentCharges } from "@/features/fees/components/ResidentCharges";
+import { ResidentMoneyPanel } from "@/features/fees/components/ResidentMoneyPanel";
+import {
+  getFeeHeads,
+  getResidentBalance,
+  getResidentCharges,
+  getResidentDiscounts,
+  getResidentExemptions,
+  getResidentInvoices,
+  getResidentMoney,
+} from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
 import {
@@ -76,7 +87,7 @@ export default async function ResidentPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ registered?: string; updated?: string }>;
 }) {
-  const { hostel } = await requireActiveHostel();
+  const { user, hostel } = await requireActiveHostel();
   const { id } = await params;
   const { registered, updated } = await searchParams;
   if (!uuid("Resident").safeParse(id).success) notFound();
@@ -89,6 +100,11 @@ export default async function ResidentPage({
     events,
     balance,
     invoices,
+    heads,
+    exemptions,
+    charges,
+    discounts,
+    money,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -103,7 +119,13 @@ export default async function ResidentPage({
     getAllocationEvents(supabase, hostel.id, { residentId: id }),
     getResidentBalance(supabase, hostel.id, id),
     getResidentInvoices(supabase, hostel.id, id),
+    getFeeHeads(supabase, hostel.id),
+    getResidentExemptions(supabase, hostel.id, id),
+    getResidentCharges(supabase, hostel.id, id),
+    getResidentDiscounts(supabase, hostel.id, id),
+    getResidentMoney(supabase, hostel.id, id),
   ]);
+  const monthlyHeads = heads.filter((head) => head.billing === "monthly" && head.active);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
   if (!resident) notFound();
@@ -120,12 +142,12 @@ export default async function ResidentPage({
   const allocatable = status === "active" || status === "notice";
   // Oldest first, so the payment dialog preselects the longest-owed month.
   const payable = invoices
-    .filter((invoice) => invoice.balance > 0)
+    .filter((invoice) => invoice.balance - invoice.pendingCheques > 0)
     .reverse()
     .map((invoice) => ({
       id: invoice.id,
       label: formatMonth(invoice.periodMonth),
-      balance: invoice.balance,
+      balance: invoice.balance - invoice.pendingCheques,
     }));
 
   return (
@@ -314,8 +336,49 @@ export default async function ResidentPage({
         <AllocationHistory events={events} show="bed" caption="Allocation activity log" />
       </Card>
 
+      <Card title="Credit and deposit" id="money-heading">
+        <ResidentMoneyPanel
+          residentId={resident.id}
+          money={money}
+          isOwner={user.role === "owner"}
+          canSettle={!current && history.length > 0}
+        />
+      </Card>
+
       <Card title="Fees" id="fees-heading">
         <ResidentFees balance={balance} invoices={invoices} />
+        {monthlyHeads.length > 0 && (
+          <div className="mt-6 border-t border-slate-200 pt-5">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Monthly charges</h3>
+            <ul className="divide-y divide-slate-100 text-sm">
+              {monthlyHeads.map((head) => {
+                const exempt = exemptions.has(head.id);
+                return (
+                  <li key={head.id} className="flex items-center justify-between gap-3 py-2">
+                    <span>
+                      {head.name}{" "}
+                      <Badge tone={exempt ? "neutral" : "success"}>
+                        {exempt ? "Excused" : "Billed"}
+                      </Badge>
+                    </span>
+                    {user.role === "owner" && (
+                      <FeeExemptionToggle residentId={resident.id} head={head} exempt={exempt} />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        <div className="mt-6 border-t border-slate-200 pt-5">
+          <ResidentCharges
+            resident={{ id: resident.id, name: resident.full_name }}
+            charges={charges}
+            discounts={discounts}
+            heads={heads}
+            isOwner={user.role === "owner"}
+          />
+        </div>
       </Card>
     </div>
   );

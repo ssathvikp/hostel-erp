@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { ApplyLateFeesButton } from "@/features/fees/components/ChargeForms";
 import { FeeFilters } from "@/features/fees/components/FeeFilters";
 import { GenerateInvoicesForm } from "@/features/fees/components/GenerateInvoicesForm";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
@@ -17,8 +18,10 @@ import {
   FEE_PAGE_SIZE,
   FEE_SORTS,
   getBilledMonths,
+  getElectricityRate,
   getFeeList,
   getFeeTotals,
+  getLateFeeRule,
   type FeeListFilters,
   type FeeSort,
 } from "@/features/fees/queries";
@@ -65,7 +68,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [list, totals, months, rooms] = await Promise.all([
+  const [list, totals, months, rooms, lateFees, unitRate] = await Promise.all([
     getFeeList(supabase, hostel.id, filters),
     getFeeTotals(supabase, hostel.id, filters),
     getBilledMonths(supabase, hostel.id),
@@ -79,6 +82,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         .order("id")
         .range(first, last),
     ),
+    getLateFeeRule(supabase, hostel.id),
+    getElectricityRate(supabase, hostel.id),
   ]);
 
   const href = (changes: Record<string, string | null>) => {
@@ -108,9 +113,17 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees"
         description="Invoices, payments and what is still due."
         actions={
-          <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
-            Rates
-          </Link>
+          <>
+            <Link href="/fees/cheques" className={buttonClass({ variant: "secondary" })}>
+              Cheques
+            </Link>
+            <Link href="/fees/electricity" className={buttonClass({ variant: "secondary" })}>
+              Electricity
+            </Link>
+            <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
+              Rates
+            </Link>
+          </>
         }
       />
 
@@ -122,7 +135,19 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           <h2 id="generate-heading" className="mb-4 text-base font-semibold text-slate-900">
             Generate monthly invoices
           </h2>
-          <GenerateInvoicesForm currentMonth={todayIst().slice(0, 7)} />
+          <GenerateInvoicesForm
+            currentMonth={todayIst().slice(0, 7)}
+            meteredElectricity={unitRate !== null}
+          />
+          {lateFees?.active && (
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <p className="mb-3 text-sm text-slate-600">
+                Late fees are applied every night. Apply them now to see today&apos;s on the
+                residents who owe them.
+              </p>
+              <ApplyLateFeesButton />
+            </div>
+          )}
         </section>
       )}
 
@@ -251,14 +276,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                       </Td>
                       <Td>
                         <div className="flex justify-end gap-2">
-                          {row.balance > 0 && (
+                          {row.balance - row.pendingCheques > 0 && (
                             <PaymentDialog
                               residentName={row.residentName}
                               invoices={[
                                 {
                                   id: row.id,
                                   label: formatMonth(row.periodMonth),
-                                  balance: row.balance,
+                                  balance: row.balance - row.pendingCheques,
                                 },
                               ]}
                               triggerLabel="Record"

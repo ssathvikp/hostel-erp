@@ -90,14 +90,11 @@ test("signup → hostel → room → resident → bed → invoice → payment", 
 
   // 4. Set the rent for that room's sharing type.
   await page.goto("/settings/fees");
-  await inMain(page)
-    .getByLabel(/^Sharing type/)
-    .selectOption("single");
-  await inMain(page)
-    .getByLabel(/^Monthly rent/)
-    .fill("9000");
-  await inMain(page).getByRole("button", { name: "Save rate" }).click();
-  await expect(inMain(page).getByText("Rate saved.")).toBeVisible();
+  const setRate = inMain(page).getByRole("region", { name: "Set a rate" });
+  await setRate.getByLabel(/^Sharing type/).selectOption("single");
+  await setRate.getByLabel(/^Monthly rent/).fill("9000");
+  await setRate.getByRole("button", { name: "Save rate" }).click();
+  await expect(setRate.getByText("Rate saved.")).toBeVisible();
 
   // 5. Register a resident.
   await page.goto("/residents/new");

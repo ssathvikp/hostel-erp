@@ -1,7 +1,8 @@
 /**
  * Seeds the local database with a demo hostel (E9-T6): an owner and a staff
  * member, 40 beds over three floors, 25 residents, live allocations, rates,
- * three months of invoices and a realistic mix of payments.
+ * three months of invoices and a realistic mix of payments, plus a mess
+ * charge, metered electricity, deposits, late fees and a pending cheque.
  *
  * Idempotent: every step looks for what it would create first, so running
  * it again adds nothing. Test suites never depend on it.
@@ -332,6 +333,175 @@ async function ensureBilling(hostelId: string, owner: SupabaseClient) {
 }
 
 // ---------------------------------------------------------------------------
+// Fees beyond rent (EP-13): mess, electricity, late fees, deposits, a cheque
+// ---------------------------------------------------------------------------
+
+/** A monthly mess charge and metered electricity, before anything is billed. */
+async function ensureFeeSetup(hostelId: string, owner: SupabaseClient) {
+  const existing = check(
+    await admin.from("fee_heads").select("id").eq("hostel_id", hostelId).eq("name", "Mess"),
+    "reading fee heads",
+  );
+  if (existing.length === 0) {
+    const [head] = check(
+      await owner
+        .from("fee_heads")
+        .insert({ hostel_id: hostelId, name: "Mess", billing: "monthly", pricing: "flat" })
+        .select("id"),
+      "adding the mess charge",
+    );
+    check(
+      await owner.rpc("set_fee_head_rate", {
+        p_fee_head_id: head.id,
+        p_amount: 250000,
+        p_effective_from: monthStart(-12),
+      }),
+      "pricing the mess charge",
+    );
+  }
+
+  const rate = check(
+    await admin.from("electricity_rates").select("hostel_id").eq("hostel_id", hostelId),
+    "reading the electricity rate",
+  );
+  if (rate.length === 0) {
+    check(
+      await owner.from("electricity_rates").insert({ hostel_id: hostelId, unit_rate: 900 }),
+      "setting the electricity rate",
+    );
+  }
+
+  const rule = check(
+    await admin.from("late_fee_rules").select("hostel_id").eq("hostel_id", hostelId),
+    "reading the late fee rule",
+  );
+  if (rule.length === 0) {
+    check(
+      await owner.from("late_fee_rules").insert({
+        hostel_id: hostelId,
+        grace_days: 5,
+        kind: "fixed",
+        amount: 20000,
+      }),
+      "setting the late fee rule",
+    );
+  }
+}
+
+/**
+ * Meter readings for the three months before this one, for every room that
+ * had someone in it. Each month's units follow on from the last.
+ */
+async function ensureMeterReadings(hostelId: string, owner: SupabaseClient) {
+  const rooms = check(
+    await admin
+      .from("rooms")
+      .select("id, room_number")
+      .eq("hostel_id", hostelId)
+      .order("room_number"),
+    "reading rooms",
+  );
+  for (const [i, room] of rooms.entries()) {
+    let closing = 1000 + i * 250;
+    for (const offset of [-3, -2, -1]) {
+      const month = monthStart(offset);
+      const [read] = check(
+        await admin
+          .from("meter_readings")
+          .select("closing")
+          .eq("room_id", room.id)
+          .eq("period_month", month)
+          .is("voided_at", null),
+        "reading meter readings",
+      );
+      if (read) {
+        closing = Number(read.closing);
+        continue;
+      }
+      const missing = check(
+        await owner.rpc("missing_meter_readings", { p_hostel_id: hostelId, p_period_month: month }),
+        "finding rooms to read",
+      );
+      if (!missing.some((row: { room_id: string }) => row.room_id === room.id)) continue;
+      const opening = closing;
+      closing = opening + 40 + ((i * 37 + offset * 11) % 90);
+      check(
+        await owner.rpc("record_meter_reading", {
+          p_room_id: room.id,
+          p_period_month: month,
+          p_opening: opening,
+          p_closing: closing,
+        }),
+        `reading room ${room.room_number}`,
+      );
+    }
+  }
+}
+
+/** Deposits for most residents, a pending cheque, and today's late fees. */
+async function ensureMoneyExtras(hostelId: string, owner: SupabaseClient) {
+  const residents = check(
+    await admin
+      .from("residents")
+      .select("id")
+      .eq("hostel_id", hostelId)
+      .eq("status", "active")
+      .order("full_name"),
+    "reading residents",
+  );
+  for (const [i, resident] of residents.entries()) {
+    if (i % 5 === 4) continue;
+    const held = check(
+      await admin.from("deposit_ledger").select("id").eq("resident_id", resident.id).limit(1),
+      "reading deposits",
+    );
+    if (held.length > 0) continue;
+    check(
+      await owner.rpc("record_deposit", {
+        p_resident_id: resident.id,
+        p_amount: 1000000,
+        p_paid_at: monthStart(-2),
+        p_mode: i % 2 === 0 ? "bank_transfer" : "upi",
+      }),
+      "recording a deposit",
+    );
+  }
+
+  const pending = check(
+    await admin.from("pending_cheques").select("id").eq("hostel_id", hostelId),
+    "reading pending cheques",
+  );
+  if (pending.length === 0) {
+    const [open] = check(
+      await admin
+        .from("invoice_balances")
+        .select("id, balance, pending_cheques")
+        .eq("hostel_id", hostelId)
+        .eq("period_month", monthStart(0))
+        .eq("status", "issued")
+        .gt("balance", 0)
+        .order("resident_name")
+        .limit(1),
+      "finding an invoice for a cheque",
+    );
+    if (open) {
+      check(
+        await owner.rpc("record_cheque", {
+          p_invoice_id: open.id!,
+          p_amount: open.balance! - open.pending_cheques!,
+          p_paid_at: today,
+          p_cheque_number: "004127",
+          p_bank: "Canara Bank",
+        }),
+        "recording a cheque",
+      );
+    }
+  }
+
+  check(await owner.rpc("apply_late_fees", { p_hostel_id: hostelId }), "applying late fees");
+}
+
+// ---------------------------------------------------------------------------
 
 const ownerId = await ensureUser(OWNER.email, OWNER.fullName);
 const hostelId = await ensureHostel(ownerId);
@@ -349,7 +519,10 @@ check(
   await ownerClient.auth.signInWithPassword({ email: OWNER.email, password: PASSWORD }),
   "signing in as the owner",
 );
+await ensureFeeSetup(hostelId, ownerClient);
+await ensureMeterReadings(hostelId, ownerClient);
 await ensureBilling(hostelId, ownerClient);
+await ensureMoneyExtras(hostelId, ownerClient);
 
 const [{ count: beds }, { count: residents }, { count: invoices }, { count: payments }] =
   await Promise.all(

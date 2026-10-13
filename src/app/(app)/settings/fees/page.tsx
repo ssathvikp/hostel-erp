@@ -2,24 +2,59 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import {
+  FeeHeadRateForm,
+  FeeHeadToggle,
+  NewFeeHeadForm,
+} from "@/features/fees/components/FeeHeadForms";
 import { RateForm } from "@/features/fees/components/RateForm";
-import { getRates } from "@/features/fees/queries";
+import { FEE_HEAD_BILLING_LABELS } from "@/features/fees/options";
+import { LateFeeRuleForm } from "@/features/fees/components/ChargeForms";
+import { DepositAmountForm } from "@/features/fees/components/MoneyForms";
+import {
+  getDepositAmounts,
+  getFeeHeads,
+  getLateFeeRule,
+  getRates,
+  type FeeHead,
+} from "@/features/fees/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { formatPaise, shiftMonth } from "@/lib/money";
+import { formatPaise, paiseToInput, shiftMonth } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
+import { SHARING_TYPES } from "@/types";
 
 export const metadata: Metadata = { title: "Fee settings" };
 
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
 const formatDay = (value: string) => day.format(new Date(value));
 
-/** Monthly rent per sharing type, with effective dates (E7-T2). */
+/** What a charge costs today: one amount, or one per sharing type. */
+function currentPrice(head: FeeHead): string {
+  if (head.current.length === 0) return "No rate set";
+  return head.current
+    .map((rate) =>
+      rate.sharingType
+        ? `${SHARING_TYPE_LABELS[rate.sharingType]} ${formatPaise(rate.amount)}`
+        : formatPaise(rate.amount),
+    )
+    .join(" · ");
+}
+
+/**
+ * Monthly rent per sharing type, with effective dates (E7-T2), and every
+ * other charge the hostel makes (E13-T1).
+ */
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const { history, summaries } = await getRates(supabase, hostel.id);
+  const [{ history, summaries }, heads, lateFees, deposits] = await Promise.all([
+    getRates(supabase, hostel.id),
+    getFeeHeads(supabase, hostel.id),
+    getLateFeeRule(supabase, hostel.id),
+    getDepositAmounts(supabase, hostel.id),
+  ]);
   const isOwner = user.role === "owner";
 
   // Sharing types with rooms but no rate today would go unbilled.
@@ -110,6 +145,127 @@ export default async function FeeSettingsPage() {
       ) : (
         <Alert tone="info">Only the hostel owner can change rates.</Alert>
       )}
+
+      <section
+        aria-labelledby="other-charges"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="other-charges" className="text-base font-semibold text-slate-900">
+          Other charges
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          Mess, maintenance, Wi-Fi and anything else besides rent. Monthly charges are added to
+          every invoice, for the nights held, unless a resident is excused on their profile.
+        </p>
+        {heads.length === 0 ? (
+          <p className="text-sm text-slate-600">No other charges yet.</p>
+        ) : (
+          <Table caption="Charges">
+            <THead>
+              <tr>
+                <Th>Charge</Th>
+                <Th>Billed</Th>
+                <Th>Today</Th>
+                <Th>Status</Th>
+                {isOwner && (
+                  <Th>
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                )}
+              </tr>
+            </THead>
+            <TBody>
+              {heads.map((head) => (
+                <Tr key={head.id}>
+                  <Td className="font-medium">{head.name}</Td>
+                  <Td>{FEE_HEAD_BILLING_LABELS[head.billing]}</Td>
+                  <Td className="whitespace-normal">
+                    {head.current.length === 0 ? (
+                      <Badge tone="warning">No rate set</Badge>
+                    ) : (
+                      currentPrice(head)
+                    )}
+                  </Td>
+                  <Td>
+                    <Badge tone={head.active ? "success" : "neutral"}>
+                      {head.active ? "Billed" : "Stopped"}
+                    </Badge>
+                  </Td>
+                  {isOwner && (
+                    <Td className="text-right">
+                      <FeeHeadToggle head={head} />
+                    </Td>
+                  )}
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        )}
+        {isOwner && (
+          <div className="mt-6 space-y-6 border-t border-slate-200 pt-6">
+            <NewFeeHeadForm />
+            {heads.length > 0 && (
+              <FeeHeadRateForm
+                heads={heads.map(({ id, name }) => ({ id, name }))}
+                defaultFrom={shiftMonth(todayIst(), 0)}
+              />
+            )}
+          </div>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="deposits"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="deposits" className="text-base font-semibold text-slate-900">
+          Security deposits
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          Asked for when a resident first gets a bed, by the room&apos;s sharing type. Deposits are
+          held for the resident and never counted as rent.
+        </p>
+        {Object.keys(deposits).length === 0 ? (
+          <p className="mb-4 text-sm text-slate-600">No deposits are asked for.</p>
+        ) : (
+          <ul className="mb-4 space-y-1 text-sm">
+            {SHARING_TYPES.filter((type) => deposits[type] !== undefined).map((type) => (
+              <li key={type}>
+                {SHARING_TYPE_LABELS[type]}:{" "}
+                <span className="font-medium tabular-nums">{formatPaise(deposits[type]!)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {isOwner && <DepositAmountForm />}
+      </section>
+
+      <section
+        aria-labelledby="late-fees"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="late-fees" className="text-base font-semibold text-slate-900">
+          Late fees
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          {lateFees?.active
+            ? `${lateFees.kind === "fixed" ? formatPaise(lateFees.amount) : `${formatPaise(lateFees.amount)} a day, up to ${formatPaise(lateFees.cap ?? 0)},`} once an invoice is ${lateFees.graceDays} ${lateFees.graceDays === 1 ? "day" : "days"} past its due date.`
+            : "No late fees are charged."}
+        </p>
+        {isOwner && (
+          <LateFeeRuleForm
+            rule={
+              lateFees && {
+                graceDays: lateFees.graceDays,
+                kind: lateFees.kind,
+                amount: paiseToInput(lateFees.amount),
+                cap: lateFees.cap === null ? "" : paiseToInput(lateFees.cap),
+                active: lateFees.active,
+              }
+            }
+          />
+        )}
+      </section>
 
       {history.length > 0 && (
         <section aria-labelledby="rate-history">

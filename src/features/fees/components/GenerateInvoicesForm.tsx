@@ -2,16 +2,24 @@
 
 import { useActionState } from "react";
 
-import { Alert, Button, Input } from "@/components/ui";
+import { Alert, Button, Checkbox, Input } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
 import { generateInvoices } from "../actions";
 
 /**
  * Bills every resident who held a bed in a month (E7-T3). Safe to run again:
- * residents who already have an invoice for the month are skipped.
+ * residents who already have an invoice for the month are skipped. With
+ * metered electricity (E13-T3), last month's missing readings stop it unless
+ * the owner chooses to go ahead without them.
  */
-export function GenerateInvoicesForm({ currentMonth }: { currentMonth: string }) {
+export function GenerateInvoicesForm({
+  currentMonth,
+  meteredElectricity = false,
+}: {
+  currentMonth: string;
+  meteredElectricity?: boolean;
+}) {
   const [state, action, pending] = useActionState(generateInvoices, initialFormState);
 
   return (
@@ -47,6 +55,15 @@ export function GenerateInvoicesForm({ currentMonth }: { currentMonth: string })
           Generate invoices
         </Button>
       </div>
+      {meteredElectricity && (
+        <Checkbox
+          id="generate-skip-electricity"
+          name="skip_electricity"
+          label="Generate without the missing readings"
+          hint="Electricity for rooms not yet read is billed on a later invoice, once recorded."
+          defaultChecked={state.values?.skip_electricity === "on"}
+        />
+      )}
       <p className="text-xs text-slate-500">
         Everyone who held a bed in the month is billed once. A full month costs the monthly rent;
         part of a month (arriving, leaving or moving beds) costs the rent for the nights held,
