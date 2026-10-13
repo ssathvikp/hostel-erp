@@ -12,5 +12,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: "Residents", href: "/residents", available: true },
   { label: "Occupancy", href: "/occupancy", available: true },
   { label: "Fees", href: "/fees", available: true },
+  { label: "Reports", href: "/reports", available: true },
   { label: "Settings", href: "/settings", available: true },
 ];

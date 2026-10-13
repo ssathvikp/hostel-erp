@@ -2019,6 +2019,14 @@ export type Database = {
         Args: { p_charge?: number; p_payment_id: string; p_reason: string };
         Returns: string;
       };
+      collections_csv: {
+        Args: { p_from: string; p_hostel_id: string; p_to: string };
+        Returns: string;
+      };
+      collections_report: {
+        Args: { p_from: string; p_hostel_id: string; p_to: string };
+        Returns: Json;
+      };
       create_rooms_bulk: {
         Args: {
           p_capacity: number;
@@ -2050,6 +2058,8 @@ export type Database = {
         Args: { p_amount: number; p_reason: string; p_resident_id: string };
         Returns: string;
       };
+      dues_ageing: { Args: { p_hostel_id: string }; Returns: Json };
+      fee_register_csv: { Args: { p_hostel_id: string; p_month: string }; Returns: string };
       fee_status_totals: {
         Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
         Returns: {
