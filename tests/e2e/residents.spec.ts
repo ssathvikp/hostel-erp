@@ -120,7 +120,7 @@ test("residents are found by name, phone and status, and edited", async ({ page 
   await expect(page).toHaveURL(/q=meena/);
   await expect(inMain(page).getByText("1 resident found")).toBeVisible();
 
-  await page.getByLabel("Search", { exact: true }).fill(suresh.phone.slice(-5));
+  await page.getByLabel("Search", { exact: true }).fill(suresh.phone!.slice(-5));
   await page.getByLabel("Search", { exact: true }).press("Enter");
   await expect(inMain(page).getByRole("link", { name: "Suresh Babu" })).toBeVisible();
 

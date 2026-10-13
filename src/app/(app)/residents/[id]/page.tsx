@@ -12,6 +12,7 @@ import { VACATE_REASON_LABELS } from "@/features/allocations/options";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { ComplaintTable } from "@/features/complaints/components/ComplaintTable";
 import { getOpenComplaints } from "@/features/complaints/queries";
+import { EraseResidentDialog } from "@/features/data-protection/components/DataForms";
 import { FeeExemptionToggle } from "@/features/fees/components/FeeHeadForms";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
@@ -87,11 +88,11 @@ export default async function ResidentPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ registered?: string; updated?: string }>;
+  searchParams: Promise<{ registered?: string; updated?: string; erased?: string }>;
 }) {
   const { user, hostel } = await requireActiveHostel();
   const { id } = await params;
-  const { registered, updated } = await searchParams;
+  const { registered, updated, erased } = await searchParams;
   if (!uuid("Resident").safeParse(id).success) notFound();
 
   const supabase = await createClient();
@@ -142,6 +143,7 @@ export default async function ResidentPage({
       (allocation.end_date === null || allocation.end_date >= today),
   );
   const status = resident.status as ResidentStatus;
+  const isErased = resident.erased_at !== null;
   const bedOptions = vacantBeds.map((bed) => ({ value: bed.id, label: bed.label }));
   const allocatable = status === "active" || status === "notice";
   // Oldest first, so the payment dialog preselects the longest-owed month.
@@ -172,128 +174,142 @@ export default async function ResidentPage({
               </span>
             }
             actions={
-              <Link
-                href={`/residents/${resident.id}/edit`}
-                className={buttonClass({ variant: "secondary" })}
-              >
-                Edit details
-              </Link>
+              !isErased && (
+                <Link
+                  href={`/residents/${resident.id}/edit`}
+                  className={buttonClass({ variant: "secondary" })}
+                >
+                  Edit details
+                </Link>
+              )
             }
           />
         </div>
         {registered && <Alert tone="success">Resident registered.</Alert>}
         {updated && <Alert tone="success">Resident details saved.</Alert>}
+        {erased && <Alert tone="success">The resident&apos;s personal data has been erased.</Alert>}
+        {isErased && !erased && (
+          <Alert tone="info">
+            This resident&apos;s personal data was erased on{" "}
+            {moment.format(new Date(resident.erased_at!))}. Their stays and payments are kept as the
+            law requires.
+          </Alert>
+        )}
       </div>
 
-      <Card title="Actions" id="actions-heading">
-        <div className="space-y-5">
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Bed</h3>
-            {current ? (
-              <StayActions
-                stay={{
-                  allocationId: current.id,
-                  residentId: resident.id,
-                  residentName: resident.full_name,
-                  bedLabel: current.beds?.bed_label ?? "",
-                  startDate: current.start_date,
-                }}
-                bedOptions={bedOptions}
-                feeSummary={
-                  <>
-                    <BalanceSentence balance={balance} />
-                    <p className="mt-1">
-                      Rent for the new bed follows its sharing type unless you set an override. This
-                      month&apos;s invoice, if already issued, is not changed; void and generate it
-                      again to charge each bed for its nights.
-                    </p>
-                  </>
-                }
+      {!isErased && (
+        <Card title="Actions" id="actions-heading">
+          <div className="space-y-5">
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Bed</h3>
+              {current ? (
+                <StayActions
+                  stay={{
+                    allocationId: current.id,
+                    residentId: resident.id,
+                    residentName: resident.full_name,
+                    bedLabel: current.beds?.bed_label ?? "",
+                    startDate: current.start_date,
+                  }}
+                  bedOptions={bedOptions}
+                  feeSummary={
+                    <>
+                      <BalanceSentence balance={balance} />
+                      <p className="mt-1">
+                        Rent for the new bed follows its sharing type unless you set an override.
+                        This month&apos;s invoice, if already issued, is not changed; void and
+                        generate it again to charge each bed for its nights.
+                      </p>
+                    </>
+                  }
+                />
+              ) : allocatable ? (
+                <AllocateDialog
+                  title={`Allocate a bed to ${resident.full_name}`}
+                  fixed={{ name: "resident_id", value: resident.id }}
+                  choice={{
+                    name: "bed_id",
+                    label: "Bed",
+                    placeholder: "Choose a vacant bed",
+                    options: bedOptions,
+                    emptyMessage:
+                      "There are no vacant beds. Free a bed, or add rooms, before allocating.",
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-slate-600">
+                  {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the
+                  resident active first.
+                </p>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Fees</h3>
+              {payable.length > 0 ? (
+                <PaymentDialog residentName={resident.full_name} invoices={payable} />
+              ) : (
+                <p className="text-sm text-slate-600">Nothing is due.</p>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
+              <ResidentStatusControl
+                resident={{ id: resident.id, name: resident.full_name, status }}
               />
-            ) : allocatable ? (
-              <AllocateDialog
-                title={`Allocate a bed to ${resident.full_name}`}
-                fixed={{ name: "resident_id", value: resident.id }}
-                choice={{
-                  name: "bed_id",
-                  label: "Bed",
-                  placeholder: "Choose a vacant bed",
-                  options: bedOptions,
-                  emptyMessage:
-                    "There are no vacant beds. Free a bed, or add rooms, before allocating.",
-                }}
-              />
-            ) : (
-              <p className="text-sm text-slate-600">
-                {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the resident
-                active first.
-              </p>
-            )}
+            </div>
           </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Fees</h3>
-            {payable.length > 0 ? (
-              <PaymentDialog residentName={resident.full_name} invoices={payable} />
-            ) : (
-              <p className="text-sm text-slate-600">Nothing is due.</p>
-            )}
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
-            <ResidentStatusControl
-              resident={{ id: resident.id, name: resident.full_name, status }}
+        </Card>
+      )}
+
+      {!isErased && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card title="Personal and contact" id="personal-heading">
+            <Details
+              items={[
+                ["Mobile", resident.phone],
+                ["Alternate", resident.alt_phone],
+                ["Email", resident.email],
+                ["Gender", GENDER_LABELS[resident.gender as Gender]],
+                ["Date of birth", formatDay(resident.dob)],
+                ["Permanent address", resident.permanent_address],
+                ["Guardian", resident.guardian_name],
+                ["Guardian mobile", resident.guardian_phone],
+                ["Joined", formatDay(resident.joining_date)],
+                ["Notes", resident.notes],
+              ]}
             />
-          </div>
+          </Card>
+
+          <Card title="KYC" id="kyc-heading">
+            <Details
+              items={[
+                [
+                  "ID proof",
+                  `${ID_PROOF_LABELS[resident.id_proof_type as IdProofType]} ending ${resident.id_proof_last4}`,
+                ],
+                [
+                  "Copy on file",
+                  resident.id_proof_path ? (
+                    <a
+                      href={`/residents/${resident.id}/id-proof`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-brand-700 underline"
+                    >
+                      View ID proof
+                    </a>
+                  ) : (
+                    "No copy uploaded"
+                  ),
+                ],
+              ]}
+            />
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <IdProofUpload residentId={resident.id} hasFile={Boolean(resident.id_proof_path)} />
+            </div>
+          </Card>
         </div>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Personal and contact" id="personal-heading">
-          <Details
-            items={[
-              ["Mobile", resident.phone],
-              ["Alternate", resident.alt_phone],
-              ["Email", resident.email],
-              ["Gender", GENDER_LABELS[resident.gender as Gender]],
-              ["Date of birth", formatDay(resident.dob)],
-              ["Permanent address", resident.permanent_address],
-              ["Guardian", resident.guardian_name],
-              ["Guardian mobile", resident.guardian_phone],
-              ["Joined", formatDay(resident.joining_date)],
-              ["Notes", resident.notes],
-            ]}
-          />
-        </Card>
-
-        <Card title="KYC" id="kyc-heading">
-          <Details
-            items={[
-              [
-                "ID proof",
-                `${ID_PROOF_LABELS[resident.id_proof_type as IdProofType]} ending ${resident.id_proof_last4}`,
-              ],
-              [
-                "Copy on file",
-                resident.id_proof_path ? (
-                  <a
-                    href={`/residents/${resident.id}/id-proof`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-brand-700 underline"
-                  >
-                    View ID proof
-                  </a>
-                ) : (
-                  "No copy uploaded"
-                ),
-              ],
-            ]}
-          />
-          <div className="mt-5 border-t border-slate-200 pt-5">
-            <IdProofUpload residentId={resident.id} hasFile={Boolean(resident.id_proof_path)} />
-          </div>
-        </Card>
-      </div>
+      )}
 
       <Card title="Room and bed" id="stay-heading">
         {current ? (
@@ -404,6 +420,22 @@ export default async function ResidentPage({
           Raise a complaint for {resident.full_name}
         </Link>
       </Card>
+
+      {user.role === "owner" && status === "vacated" && !current && !isErased && (
+        <section
+          aria-labelledby="erase-heading"
+          className="rounded-lg border border-red-200 bg-white p-5 sm:p-6"
+        >
+          <h2 id="erase-heading" className="text-base font-semibold text-red-800">
+            Erase personal data
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-slate-600">
+            When a former resident asks to be forgotten (DPDP Act 2023), erase their personal data.
+            Financial records stay.
+          </p>
+          <EraseResidentDialog residentId={resident.id} name={resident.full_name} />
+        </section>
+      )}
     </div>
   );
 }

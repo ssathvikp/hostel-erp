@@ -25,13 +25,24 @@ export default async function EditResidentPage({ params }: { params: Promise<{ i
     .eq("hostel_id", hostel.id)
     .maybeSingle();
   if (error) throw error;
-  if (!resident) notFound();
+  // An erased resident has nothing left to edit (E10-T10).
+  if (!resident || resident.gender === null) notFound();
 
   return (
     <div className="max-w-3xl">
       <PageHeader title={`Edit ${resident.full_name}`} />
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
-        <ResidentForm resident={resident} />
+        <ResidentForm
+          resident={{
+            ...resident,
+            gender: resident.gender,
+            dob: resident.dob!,
+            id_proof_type: resident.id_proof_type!,
+            id_proof_last4: resident.id_proof_last4!,
+            phone: resident.phone!,
+            permanent_address: resident.permanent_address!,
+          }}
+        />
       </div>
     </div>
   );
