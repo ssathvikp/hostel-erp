@@ -10,7 +10,9 @@
 -- The link carries a random token; only its SHA-256 hash is stored. It stops
 -- working when the job is reassigned or closed, or a new link replaces it.
 -- Every job-link function takes the token and does nothing for a token that
--- is unknown, replaced or expired.
+-- is unknown, replaced or expired. The worker's page is served by the app,
+-- which calls these functions with the service role; signed-out visitors
+-- cannot call them directly, so the app can rate-limit every request.
 --
 -- Costs: labour, materials and the vendor's charge are recorded on the
 -- complaint. When the resident pays, the total becomes a pending charge
@@ -257,8 +259,7 @@ as $$
 $$;
 
 -- Everything a worker needs about their job, or null for a dead token.
--- Callable without signing in.
-create or replace function public.job_view(p_token text)
+create or replace function private.job_view(p_token text)
 returns jsonb
 language plpgsql
 security definer
@@ -315,7 +316,7 @@ $$;
 
 -- What a worker does from their link: accept, decline (with a reason),
 -- on_the_way, start, or done (with a note and their charge).
-create or replace function public.job_act(
+create or replace function private.job_act(
   p_token text,
   p_action text,
   p_note text default null,
@@ -379,7 +380,7 @@ $$;
 
 -- Records a completion photo the server uploaded for a worker. The path
 -- must sit in the job's own folder.
-create or replace function public.job_add_attachment(p_token text, p_path text)
+create or replace function private.job_add_attachment(p_token text, p_path text)
 returns uuid
 language plpgsql
 security definer
@@ -400,6 +401,39 @@ begin
     (select w.name from public.workers w where w.id = link.worker_id) || ' (job link)'
   );
 end;
+$$;
+
+-- The app's entry points for the job page. Service role only.
+create or replace function public.job_view(p_token text)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.job_view(p_token);
+$$;
+
+create or replace function public.job_act(
+  p_token text,
+  p_action text,
+  p_note text default null,
+  p_charge integer default null
+)
+returns text
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.job_act(p_token, p_action, p_note, p_charge);
+$$;
+
+create or replace function public.job_add_attachment(p_token text, p_path text)
+returns uuid
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.job_add_attachment(p_token, p_path);
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -685,6 +719,9 @@ revoke all on function private.complaint_attachments_limit(),
   private.hash_token(text),
   private.create_job_link(uuid),
   private.job_link(text),
+  private.job_view(text),
+  private.job_act(text, text, text, integer),
+  private.job_add_attachment(text, text),
   private.set_complaint_costs(uuid, integer, integer, integer, text, uuid),
   private.record_vendor_payout(uuid, integer, date, text, text) from public;
 grant execute on function private.add_complaint_attachment(uuid, text, text, text, text),
@@ -704,7 +741,13 @@ grant execute on function public.add_complaint_attachment(uuid, text, text),
   public.create_job_link(uuid),
   public.set_complaint_costs(uuid, integer, integer, integer, text, uuid),
   public.record_vendor_payout(uuid, integer, date, text, text) to authenticated;
--- The job link works without signing in.
+-- The job page is served by the app with the service role.
+revoke execute on function public.job_view(text),
+  public.job_act(text, text, text, integer),
+  public.job_add_attachment(text, text) from anon, authenticated;
+grant execute on function private.job_view(text),
+  private.job_act(text, text, text, integer),
+  private.job_add_attachment(text, text) to service_role;
 grant execute on function public.job_view(text),
   public.job_act(text, text, text, integer),
-  public.job_add_attachment(text, text) to anon, authenticated;
+  public.job_add_attachment(text, text) to service_role;

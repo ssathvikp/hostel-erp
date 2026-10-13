@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { anonClient, createUserFactory, type TestUser } from "../support/supabase";
+import { adminClient, anonClient, createUserFactory, type TestUser } from "../support/supabase";
 
 /**
  * Tenant isolation for complaints, their history, files, workers, costs and
@@ -172,18 +172,34 @@ describe("job links", () => {
     expect(error?.code).toBe(PERMISSION_DENIED);
   });
 
+  it("cannot be called by signed-out visitors or members directly", async () => {
+    for (const client of [anonClient(), ownerA.client]) {
+      expect((await client.rpc("job_view", { p_token: token })).error?.code).toBe(
+        PERMISSION_DENIED,
+      );
+      expect(
+        (await client.rpc("job_act", { p_token: token, p_action: "accept" })).error?.code,
+      ).toBe(PERMISSION_DENIED);
+      expect(
+        (await client.rpc("job_add_attachment", { p_token: token, p_path: "x/y/z.jpg" })).error
+          ?.code,
+      ).toBe(PERMISSION_DENIED);
+    }
+  });
+
   it("reach only their own job, and nothing with a guessed token", async () => {
-    const anon = anonClient();
-    const { data } = await anon.rpc("job_view", { p_token: token });
+    // The app calls the job functions with the service role.
+    const server = adminClient();
+    const { data } = await server.rpc("job_view", { p_token: token });
     expect(data).toMatchObject({ complaint_id: complaintA, title: "Tap leaking" });
     for (const guess of ["", "x", token.slice(0, -1), token.toUpperCase(), "0".repeat(48)]) {
-      expect((await anon.rpc("job_view", { p_token: guess })).data).toBeNull();
-      expect((await anon.rpc("job_act", { p_token: guess, p_action: "accept" })).error?.hint).toBe(
-        "job_link_dead",
-      );
+      expect((await server.rpc("job_view", { p_token: guess })).data).toBeNull();
+      expect(
+        (await server.rpc("job_act", { p_token: guess, p_action: "accept" })).error?.hint,
+      ).toBe("job_link_dead");
     }
     // The anonymous role reads nothing directly.
-    const { data: rows } = await anon.from("complaints").select("id");
+    const { data: rows } = await anonClient().from("complaints").select("id");
     expect(rows ?? []).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import { todayIst } from "@/lib/validation";
 
 import { connectToDatabase } from "../support/db";
 import { daysFromToday, feeFixtures, monthStart } from "../support/fees";
-import { anonClient, createUserFactory, type TestUser } from "../support/supabase";
+import { adminClient, anonClient, createUserFactory, type TestUser } from "../support/supabase";
 
 /**
  * Complaints (EP-15): lifecycle, routing, targets, job links, costs and
@@ -391,8 +391,11 @@ describe("job links", () => {
     const jobToken = created.data!;
     expect(jobToken).toMatch(/^[0-9a-f]{48}$/);
 
-    // Anyone with the link, signed in or not.
-    const anon = anonClient();
+    // The app serves the job page with the service role.
+    const anon = adminClient();
+    expect((await anonClient().rpc("job_view", { p_token: jobToken })).error?.code).toBe(
+      PERMISSION_DENIED,
+    );
     const { data: view } = await anon.rpc("job_view", { p_token: jobToken });
     expect(view).toMatchObject({
       number: 1,
@@ -460,7 +463,7 @@ describe("job links", () => {
     expect((await complaint(id!)).worker_id).toBe(first);
     const { data: jobToken } = await owner.client.rpc("create_job_link", { p_complaint_id: id! });
 
-    const anon = anonClient();
+    const anon = adminClient();
     expect(
       (await anon.rpc("job_act", { p_token: jobToken!, p_action: "decline" })).error?.hint,
     ).toBe("reason_required");
@@ -485,7 +488,7 @@ describe("job links", () => {
     await owner.client.rpc("assign_complaint", { p_complaint_id: id!, p_worker_id: vendor });
     const { data: jobToken } = await owner.client.rpc("create_job_link", { p_complaint_id: id! });
 
-    const anon = anonClient();
+    const anon = adminClient();
     const elsewhere = await anon.rpc("job_add_attachment", {
       p_token: jobToken!,
       p_path: `${hostelId}/${other}/x.jpg`,
