@@ -444,6 +444,29 @@ export async function getWorkers(supabase: Supabase, hostelId: string): Promise<
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
 }
 
+/** The owner's workers who do not serve this hostel yet, to add them to it. */
+export async function getOtherWorkers(
+  supabase: Supabase,
+  ownerId: string,
+  hostelId: string,
+): Promise<{ id: string; name: string; trades: Trade[] }[]> {
+  const [{ data, error }, { data: here, error: hereError }] = await Promise.all([
+    supabase
+      .from("workers")
+      .select("id, name, trades")
+      .eq("owner_id", ownerId)
+      .eq("active", true)
+      .order("name"),
+    supabase.from("worker_hostels").select("worker_id").eq("hostel_id", hostelId),
+  ]);
+  if (error) throw error;
+  if (hereError) throw hereError;
+  const serving = new Set((here ?? []).map((row) => row.worker_id));
+  return (data ?? [])
+    .filter((worker) => !serving.has(worker.id))
+    .map((worker) => ({ id: worker.id, name: worker.name, trades: worker.trades as Trade[] }));
+}
+
 export interface TargetRow {
   priority: ComplaintPriority;
   respondMinutes: number;
@@ -508,4 +531,82 @@ export async function getSchedules(supabase: Supabase, hostelId: string): Promis
     priority: row.priority as ComplaintPriority,
     active: row.active,
   }));
+}
+
+export interface ComplaintReport {
+  total: number;
+  open: number;
+  overdue: number;
+  avgResponseHours: number | null;
+  avgResolutionHours: number | null;
+  byCategory: {
+    category: string;
+    count: number;
+    open: number;
+    avg_response_hours: number | null;
+    avg_resolution_hours: number | null;
+  }[];
+  byFloor: { floor: number; count: number }[];
+  byRoom: { room_id: string; room_number: string; count: number }[];
+  repeatRooms: { room_id: string; room_number: string; category: string; count: number }[];
+  workers: {
+    name: string;
+    kind: WorkerKind;
+    jobs_done: number;
+    open: number;
+    avg_resolution_hours: number | null;
+    declines: number;
+  }[];
+  spend: {
+    total: number;
+    chargedToResidents: number;
+    paidToWorkers: number;
+    byCategory: { category: string; amount: number }[];
+    byMonth: { month: string; amount: number }[];
+  };
+  scheduled: { total: number; done: number; overdue: number };
+}
+
+/**
+ * Complaints raised in a range (E15-T11), computed in the database in one
+ * call so nothing is cut at the API's row limit.
+ */
+export async function getComplaintReport(
+  supabase: Supabase,
+  hostelId: string,
+  from: string,
+  to: string,
+): Promise<ComplaintReport> {
+  const { data, error } = await supabase.rpc("complaints_report", {
+    p_hostel_id: hostelId,
+    p_from: from,
+    p_to: to,
+  });
+  if (error) throw error;
+  // The shape is fixed by private.complaints_report.
+  const raw = data as Record<string, unknown> & {
+    spend: Record<string, unknown>;
+    scheduled: ComplaintReport["scheduled"];
+  };
+  const number = (value: unknown) => (value == null ? null : Number(value));
+  return {
+    total: Number(raw.total),
+    open: Number(raw.open),
+    overdue: Number(raw.overdue),
+    avgResponseHours: number(raw.avg_response_hours),
+    avgResolutionHours: number(raw.avg_resolution_hours),
+    byCategory: raw.by_category as ComplaintReport["byCategory"],
+    byFloor: raw.by_floor as ComplaintReport["byFloor"],
+    byRoom: raw.by_room as ComplaintReport["byRoom"],
+    repeatRooms: raw.repeat_rooms as ComplaintReport["repeatRooms"],
+    workers: raw.workers as ComplaintReport["workers"],
+    spend: {
+      total: Number(raw.spend.total),
+      chargedToResidents: Number(raw.spend.charged_to_residents),
+      paidToWorkers: Number(raw.spend.paid_to_workers),
+      byCategory: raw.spend.by_category as ComplaintReport["spend"]["byCategory"],
+      byMonth: raw.spend.by_month as ComplaintReport["spend"]["byMonth"],
+    },
+    scheduled: raw.scheduled,
+  };
 }

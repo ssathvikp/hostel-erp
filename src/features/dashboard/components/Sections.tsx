@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { getComplaintCounts } from "@/features/complaints/queries";
 import { getHostelOccupancy, occupancyPercent } from "@/features/occupancy/queries";
 import { formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +12,7 @@ import {
   getRecentActivity,
 } from "../queries";
 import type { DashboardRange } from "../range";
-import { ActivityPanel, OverduePanel, Panel } from "./Panels";
+import { ActivityPanel, ComplaintsPanel, OverduePanel, Panel } from "./Panels";
 import { TrendChart } from "./TrendChart";
 
 const day = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -156,14 +157,18 @@ export async function TrendSection({
 
 export async function WorkQueueSection({ hostelId, today }: { hostelId: string; today: string }) {
   const supabase = await createClient();
-  const [activity, overdue] = await Promise.all([
+  const [activity, overdue, complaints] = await Promise.all([
     getRecentActivity(supabase, hostelId),
     getOverdueResidents(supabase, hostelId),
+    getComplaintCounts(supabase, hostelId),
   ]);
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <ActivityPanel items={activity} now={new Date()} />
-      <OverduePanel residents={overdue.residents} total={overdue.total} today={today} />
+    <div className="space-y-6">
+      <ComplaintsPanel counts={complaints} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ActivityPanel items={activity} now={new Date()} />
+        <OverduePanel residents={overdue.residents} total={overdue.total} today={today} />
+      </div>
     </div>
   );
 }

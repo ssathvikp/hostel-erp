@@ -10,6 +10,8 @@ import { AllocationHistory } from "@/features/allocations/components/AllocationH
 import { StayActions } from "@/features/allocations/components/StayActions";
 import { VACATE_REASON_LABELS } from "@/features/allocations/options";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
+import { ComplaintTable } from "@/features/complaints/components/ComplaintTable";
+import { getOpenComplaints } from "@/features/complaints/queries";
 import { FeeExemptionToggle } from "@/features/fees/components/FeeHeadForms";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
@@ -105,6 +107,7 @@ export default async function ResidentPage({
     charges,
     discounts,
     money,
+    complaints,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -124,6 +127,7 @@ export default async function ResidentPage({
     getResidentCharges(supabase, hostel.id, id),
     getResidentDiscounts(supabase, hostel.id, id),
     getResidentMoney(supabase, hostel.id, id),
+    getOpenComplaints(supabase, hostel.id, { residentId: id }),
   ]);
   const monthlyHeads = heads.filter((head) => head.billing === "monthly" && head.active);
   if (error) throw error;
@@ -379,6 +383,26 @@ export default async function ResidentPage({
             isOwner={user.role === "owner"}
           />
         </div>
+      </Card>
+
+      <Card title="Open complaints" id="complaints-heading">
+        {complaints.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            Nothing reported by {resident.full_name} is open.
+          </p>
+        ) : (
+          <ComplaintTable
+            rows={complaints}
+            caption={`Open complaints from ${resident.full_name}`}
+            compact
+          />
+        )}
+        <Link
+          href={`/complaints/new?resident=${resident.id}`}
+          className={buttonClass({ variant: "secondary", size: "sm", className: "mt-4" })}
+        >
+          Raise a complaint for {resident.full_name}
+        </Link>
       </Card>
     </div>
   );
