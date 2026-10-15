@@ -6,11 +6,15 @@ import type { NextConfig } from "next";
  * forms posting elsewhere, keep full URLs (which can hold search text such
  * as names or phone numbers) from leaking to other sites, and switch off
  * browser features the app never uses.
+ *
+ * form-action also covers where a submitted form may redirect: checkout
+ * sends the owner on to Razorpay's hosted page (EP-14).
  */
 const SECURITY_HEADERS = [
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+    value:
+      "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://rzp.io https://*.razorpay.com; object-src 'none'",
   },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },

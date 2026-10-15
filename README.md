@@ -4,7 +4,11 @@
 
 Multi-tenant hostel and PG (paying-guest) management ERP. MVP v0.1 covers
 hostel onboarding, room and bed inventory, residents, bed allocation, fees
-and a basic dashboard.
+and a basic dashboard; the backlog epics since add the fee structure and
+online rent, complaints, the platform admin area and subscription billing.
+
+**New here?** [docs/REPOSITORY_GUIDE.md](docs/REPOSITORY_GUIDE.md) explains the
+whole repository and keeps a dated log of each working session.
 
 ## Prerequisites
 

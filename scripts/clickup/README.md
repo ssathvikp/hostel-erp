@@ -68,6 +68,8 @@ Revisit when scheduling EP-10 to EP-12. Reconsider data import and DPDP specific
 
 ## Open actions
 
+- [ ] Mark as complete in ClickUp (built on branch `claude/brave-curie-vjarkk` on 2026-10-15; ClickUp could not be reached from that session): E10-T7, E13-T10, E14-T1 to E14-T12, E15-T3, E15-T4, E15-T5. See `docs/REPOSITORY_GUIDE.md`, section 12.
+
 - [ ] Rotate the ClickUp API token, because it was shared in a chat message, then update `.env.local`
 - [ ] Add statuses in the HOSTEL ERP space: Backlog, In Progress, Blocked, In Review. The ClickUp API cannot set statuses, so this is a manual step
 - [ ] Confirm the Backlog, In Progress, Blocked and In Review statuses exist before Phase 7 status updates are attempted
