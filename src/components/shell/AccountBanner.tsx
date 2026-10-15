@@ -52,8 +52,10 @@ export function AccountBanner({
   }[tone];
 
   return (
-    <div
-      role={tone === "critical" ? "alert" : "status"}
+    // A labelled region, not a live one: it is part of every page, so
+    // announcing it on each navigation would only be noise.
+    <section
+      aria-label="Account status"
       className={cn(
         "mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm print:hidden",
         styles,
@@ -70,6 +72,6 @@ export function AccountBanner({
       ) : (
         <span className="font-medium">Ask the owner to sort out billing.</span>
       )}
-    </div>
+    </section>
   );
 }
