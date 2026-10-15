@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { Alert, Button, Input, Textarea } from "@/components/ui";
 import { paiseToInput } from "@/lib/money";
+import { shrinkInputFiles } from "@/lib/images/shrink";
 import { initialFormState } from "@/lib/validation/result";
 import type { ComplaintStatus } from "@/types";
 
@@ -151,6 +152,7 @@ export function JobPhotoUpload({ token }: { token: string }) {
         type="file"
         label="Add a photo of the finished work"
         accept="image/jpeg,image/png,image/webp"
+        onChange={(event) => void shrinkInputFiles(event.currentTarget)}
         capture="environment"
         hint="JPG, PNG or WebP, up to 5 MB."
         error={state.fieldErrors.file?.[0]}

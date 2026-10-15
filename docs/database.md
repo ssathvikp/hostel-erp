@@ -261,3 +261,20 @@ security invoker and derive everything at read time.
 - `gateway_payments`, `gateway_refunds` and `gateway_settlements` keep what
   the gateway reported, separately from the hostel's own money records, so
   reconciliation can compare the two.
+
+## Resident complaints (E15-T3, T4)
+
+`supabase/migrations/20261016120000_resident_complaints.sql`;
+[resident-complaints.md](resident-complaints.md) has the flow and its
+security.
+
+- Residents never reach the database: the server calls the `resident_*`
+  functions with the service role, and each checks its token itself.
+- One-time codes and session tokens are stored only as SHA-256 hashes. Room
+  tokens (to reprint the QR code) and status tokens (to put the link in
+  later SMS) are stored as issued; room tokens are readable by members of
+  the hostel, status tokens only by the service role.
+- `private.actor_name()` reads `complaints.actor` first, so history names
+  the resident ("Kiran Rao (resident)") although they have no profile.
+- `sms_outbox` is filled by triggers and functions and emptied by the app's
+  delivery job; it never holds a one-time code.

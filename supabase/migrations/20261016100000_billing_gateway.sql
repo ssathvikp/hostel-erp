@@ -895,7 +895,6 @@ as $$
 declare
   gateway_sub text := p_data ->> 'subscription_id';
   s public.subscriptions;
-  plan public.plans;
   settings public.billing_settings;
   period_start timestamptz := (p_data ->> 'current_start')::timestamptz;
   period_end timestamptz := (p_data ->> 'current_end')::timestamptz;

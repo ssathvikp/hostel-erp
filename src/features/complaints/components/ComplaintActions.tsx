@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { Alert, Button, Checkbox, Input, Modal, Select, Textarea } from "@/components/ui";
 import { paiseToInput } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
+import { shrinkInputFiles } from "@/lib/images/shrink";
 import { initialFormState, type FormState } from "@/lib/validation/result";
 import { COMPLAINT_NEXT_STATUSES, type ComplaintPriority, type ComplaintStatus } from "@/types";
 
@@ -258,6 +259,7 @@ export function UploadForm({ id }: { id: string }) {
         type="file"
         label="Add a photo or video"
         accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+        onChange={(event) => void shrinkInputFiles(event.currentTarget)}
         hint="Up to 5 photos (5 MB each) and 1 video (20 MB)."
         error={state.fieldErrors.file?.[0]}
       />

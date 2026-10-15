@@ -9,6 +9,10 @@ import { AllocationHistory } from "@/features/allocations/components/AllocationH
 import { getAllocationEvents, getUnallocatedResidents } from "@/features/allocations/queries";
 import { ComplaintTable } from "@/features/complaints/components/ComplaintTable";
 import { getOpenComplaints } from "@/features/complaints/queries";
+import {
+  MakeRoomCode,
+  RegenerateRoomCode,
+} from "@/features/resident-complaints/components/StaffForms";
 import { BedStatusControl } from "@/features/rooms/components/BedStatusControl";
 import { RoomDangerZone } from "@/features/rooms/components/RoomDangerZone";
 import {
@@ -18,6 +22,8 @@ import {
   SHARING_TYPE_LABELS,
 } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { siteUrl } from "@/lib/payments/config";
+import { qrSvg } from "@/lib/qr";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 import type { BedStatus, ManualBedStatus, SharingType, ViewRow } from "@/types";
@@ -62,6 +68,7 @@ export default async function RoomPage({
     residents,
     events,
     complaints,
+    { data: roomCode, error: roomCodeError },
   ] = await Promise.all([
     supabase
       .from("rooms")
@@ -83,8 +90,15 @@ export default async function RoomPage({
     getUnallocatedResidents(supabase, hostel.id),
     getAllocationEvents(supabase, hostel.id, { roomId: id }),
     getOpenComplaints(supabase, hostel.id, { roomId: id }),
+    supabase
+      .from("room_report_tokens")
+      .select("token")
+      .eq("room_id", id)
+      .is("revoked_at", null)
+      .maybeSingle(),
   ]);
   if (error) throw error;
+  if (roomCodeError) throw roomCodeError;
   if (bedsError) throw bedsError;
   if (occupantsError) throw occupantsError;
   if (!room) notFound();
@@ -94,6 +108,11 @@ export default async function RoomPage({
   const rows = (beds ?? []) as BedRow[];
   const occupantByBed = new Map((occupants ?? []).map((o) => [o.bed_label, o]));
   const residentOptions = residents.map((r) => ({ value: r.id, label: r.label }));
+  // Residents report problems from this code (E15-T3).
+  const reportUrl = roomCode ? `${siteUrl()}/r/${roomCode.token}` : null;
+  const reportQr = reportUrl
+    ? await qrSvg(reportUrl, { label: `QR code to report a problem in room ${room.room_number}` })
+    : null;
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -236,6 +255,44 @@ export default async function RoomPage({
               caption={`Open complaints in room ${room.room_number}`}
               compact
             />
+          )}
+        </section>
+      )}
+
+      {!archived && (
+        <section aria-labelledby="qr-heading" className="space-y-3">
+          <h2 id="qr-heading" className="text-base font-semibold text-slate-900">
+            Residents report problems
+          </h2>
+          {reportUrl && reportQr ? (
+            <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-start">
+              <div
+                className="size-36 shrink-0 [&_svg]:size-full"
+                // Inline SVG made on the server by the qrcode library.
+                dangerouslySetInnerHTML={{ __html: reportQr }}
+              />
+              <div className="space-y-2 text-sm text-slate-700">
+                <p>
+                  Residents of this room scan this code to report a problem. They confirm who they
+                  are with a code sent to their mobile number.
+                </p>
+                <p className="font-mono text-xs break-all">{reportUrl}</p>
+                <div className="flex flex-wrap items-start gap-2">
+                  <Link
+                    href={`/rooms/${room.id}/qr`}
+                    className={buttonClass({ variant: "secondary", size: "sm" })}
+                  >
+                    Print code
+                  </Link>
+                  {isOwner && <RegenerateRoomCode roomId={room.id} />}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm text-slate-700">
+              <p>Make a QR code for this room so residents can report problems themselves.</p>
+              <MakeRoomCode roomId={room.id} />
+            </div>
           )}
         </section>
       )}

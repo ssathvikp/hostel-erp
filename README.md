@@ -57,7 +57,9 @@ to run again). It prints the demo owner and staff logins.
 | `RAZORPAY_WEBHOOK_SECRET`       | server only   | Verifies subscription webhooks (`docs/billing.md`)             |
 | `PAYMENT_KEYS_ENCRYPTION_KEY`   | server only   | Encrypts owners' own gateway keys (`docs/online-payments.md`)  |
 | `NEXT_PUBLIC_SITE_URL`          | browser       | Public URL for payment links, QR codes and emails              |
-| `SMS_PROVIDER` and `SMS_*`      | server only   | Resident OTP texts (`docs/resident-complaints.md`); optional   |
+| `SMS_PROVIDER`, `MSG91_*`       | server only   | Resident SMS (`docs/resident-complaints.md`); `log` locally    |
+| `RESEND_API_KEY`, `EMAIL_FROM`  | server only   | Sends queued platform emails; optional                         |
+| `CRON_SECRET`                   | server only   | Protects `/api/cron/outbox` (SMS and email delivery)           |
 | `LEGAL_*`                       | server only   | Business details on the legal pages; placeholders until set    |
 | `ENABLE_DIAGNOSTICS`            | tests only    | `1` turns on `/diagnostics/error`; never in prod               |
 
@@ -134,6 +136,15 @@ and each owner's admin page. See [docs/billing.md](docs/billing.md) and the
 pricing proposal in [docs/pricing.md](docs/pricing.md). Without Razorpay
 keys everything still runs; the billing page says online payment is not set
 up.
+
+## Online payments and resident complaints
+
+- Hostels connect their own Razorpay account to take rent online from a
+  link or QR code; the gateway's webhook records each payment once
+  ([docs/online-payments.md](docs/online-payments.md)).
+- Residents report problems from a QR code in their room, confirm who they
+  are with an SMS code, and follow the fix from a texted link
+  ([docs/resident-complaints.md](docs/resident-complaints.md)).
 
 ## Errors and logging
 

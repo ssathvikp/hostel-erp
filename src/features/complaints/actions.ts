@@ -2,6 +2,7 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 
 import { AuthorizationError } from "@/lib/auth/roles";
@@ -10,6 +11,7 @@ import { checkComplaintFile } from "@/lib/complaints/file-type";
 import { getHostelContext } from "@/lib/hostels/active";
 import { formatPaise } from "@/lib/money";
 import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
+import { deliverOutboxQuietly } from "@/lib/outbox/deliver";
 import { createClient } from "@/lib/supabase/server";
 import {
   complaintAssignSchema,
@@ -94,6 +96,9 @@ function revalidateComplaints(complaintId?: string) {
   revalidatePath("/complaints");
   if (complaintId) revalidatePath(`/complaints/${complaintId}`);
   revalidatePath("/dashboard");
+  // A change may have queued an SMS to the resident (E15-T4): send it now
+  // rather than waiting for the scheduled delivery.
+  after(deliverOutboxQuietly);
 }
 
 // ---------------------------------------------------------------------------

@@ -83,7 +83,7 @@ export default async function ComplaintPage({
   if (!uuid("Complaint").safeParse(id).success) notFound();
 
   const supabase = await createClient();
-  const [complaint, workers, residents] = await Promise.all([
+  const [complaint, workers, residents, { data: residentView }] = await Promise.all([
     getComplaint(supabase, hostel.id, id),
     getWorkers(supabase, hostel.id),
     fetchAllPages((first, last) =>
@@ -96,6 +96,13 @@ export default async function ComplaintPage({
         .order("id")
         .range(first, last),
     ),
+    // What the resident said about the fix (E15-T4).
+    supabase
+      .from("complaints")
+      .select("source, resident_confirmed_at, resident_rating, resident_feedback")
+      .eq("id", id)
+      .eq("hostel_id", hostel.id)
+      .maybeSingle(),
   ]);
   if (!complaint) notFound();
 
@@ -163,7 +170,25 @@ export default async function ComplaintPage({
                 {complaint.raisedByName && (
                   <span className="block text-xs text-slate-500">by {complaint.raisedByName}</span>
                 )}
+                {residentView?.source === "resident" && (
+                  <span className="block text-xs text-slate-500">from the room&apos;s QR code</span>
+                )}
               </Fact>
+              {residentView?.resident_confirmed_at && (
+                <Fact label="Resident confirmed the fix">
+                  {at.format(new Date(residentView.resident_confirmed_at))}
+                  {residentView.resident_rating && (
+                    <span className="block text-xs text-slate-700">
+                      Rated {residentView.resident_rating} out of 5
+                    </span>
+                  )}
+                  {residentView.resident_feedback && (
+                    <span className="block text-xs text-slate-500">
+                      “{residentView.resident_feedback}”
+                    </span>
+                  )}
+                </Fact>
+              )}
               <Fact label="Respond by">
                 {complaint.respondedAt ? (
                   <>Responded {at.format(new Date(complaint.respondedAt))}</>

@@ -55,6 +55,9 @@ const generated = [
   ...(/^PAYMENT_KEYS_ENCRYPTION_KEY=\S+/m.test(existing)
     ? []
     : [`PAYMENT_KEYS_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`]),
+  // Resident complaints work locally without an SMS account: messages go to
+  // the server log (E15-T3).
+  ...(/^SMS_PROVIDER=\S*/m.test(existing) ? [] : ["SMS_PROVIDER=log"]),
   // Links, QR codes and emails point here.
   ...(/^NEXT_PUBLIC_SITE_URL=\S+/m.test(existing)
     ? []

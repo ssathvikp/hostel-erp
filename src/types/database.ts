@@ -835,12 +835,16 @@ export type Database = {
           raised_by: string | null;
           raised_by_name: string | null;
           resident_charge_id: string | null;
+          resident_confirmed_at: string | null;
+          resident_feedback: string | null;
           resident_id: string | null;
+          resident_rating: number | null;
           resolved_at: string | null;
           responded_at: string | null;
           room_id: string | null;
           schedule_id: string | null;
           share_resident_phone: boolean;
+          source: string;
           status: string;
           title: string;
           updated_at: string;
@@ -873,12 +877,16 @@ export type Database = {
           raised_by?: string | null;
           raised_by_name?: string | null;
           resident_charge_id?: string | null;
+          resident_confirmed_at?: string | null;
+          resident_feedback?: string | null;
           resident_id?: string | null;
+          resident_rating?: number | null;
           resolved_at?: string | null;
           responded_at?: string | null;
           room_id?: string | null;
           schedule_id?: string | null;
           share_resident_phone?: boolean;
+          source?: string;
           status?: string;
           title: string;
           updated_at?: string;
@@ -910,12 +918,16 @@ export type Database = {
           raised_by?: string | null;
           raised_by_name?: string | null;
           resident_charge_id?: string | null;
+          resident_confirmed_at?: string | null;
+          resident_feedback?: string | null;
           resident_id?: string | null;
+          resident_rating?: number | null;
           resolved_at?: string | null;
           responded_at?: string | null;
           room_id?: string | null;
           schedule_id?: string | null;
           share_resident_phone?: boolean;
+          source?: string;
           status?: string;
           title?: string;
           updated_at?: string;
@@ -1417,32 +1429,38 @@ export type Database = {
       };
       email_outbox: {
         Row: {
+          attempts: number;
           body: string;
           created_at: string;
           dedupe_key: string | null;
           id: string;
           kind: string;
+          last_error: string | null;
           sent_at: string | null;
           subject: string;
           to_email: string;
         };
         ComputedFields: never;
         Insert: {
+          attempts?: number;
           body: string;
           created_at?: string;
           dedupe_key?: string | null;
           id?: string;
           kind: string;
+          last_error?: string | null;
           sent_at?: string | null;
           subject: string;
           to_email: string;
         };
         Update: {
+          attempts?: number;
           body?: string;
           created_at?: string;
           dedupe_key?: string | null;
           id?: string;
           kind?: string;
+          last_error?: string | null;
           sent_at?: string | null;
           subject?: string;
           to_email?: string;
@@ -1842,6 +1860,8 @@ export type Database = {
           owner_id: string;
           phone: string;
           pincode: string | null;
+          resident_complaints_enabled: boolean;
+          resident_confirm_days: number;
           slug: string;
           state: string | null;
           status: string;
@@ -1862,6 +1882,8 @@ export type Database = {
           owner_id?: string;
           phone: string;
           pincode?: string | null;
+          resident_complaints_enabled?: boolean;
+          resident_confirm_days?: number;
           slug?: string;
           state?: string | null;
           status?: string;
@@ -1881,6 +1903,8 @@ export type Database = {
           owner_id?: string;
           phone?: string;
           pincode?: string | null;
+          resident_complaints_enabled?: boolean;
+          resident_confirm_days?: number;
           slug?: string;
           state?: string | null;
           status?: string;
@@ -2893,6 +2917,54 @@ export type Database = {
           },
         ];
       };
+      resident_codes: {
+        Row: {
+          attempts: number;
+          code_hash: string | null;
+          created_at: string;
+          expires_at: string;
+          hostel_id: string;
+          id: string;
+          phone: string;
+          resident_id: string | null;
+          room_id: string;
+          used_at: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          attempts?: number;
+          code_hash?: string | null;
+          created_at?: string;
+          expires_at: string;
+          hostel_id: string;
+          id?: string;
+          phone: string;
+          resident_id?: string | null;
+          room_id: string;
+          used_at?: string | null;
+        };
+        Update: {
+          attempts?: number;
+          code_hash?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          hostel_id?: string;
+          id?: string;
+          phone?: string;
+          resident_id?: string | null;
+          room_id?: string;
+          used_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "resident_codes_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       resident_credit: {
         Row: {
           amount: number;
@@ -3042,6 +3114,75 @@ export type Database = {
           },
         ];
       };
+      resident_sessions: {
+        Row: {
+          created_at: string;
+          expires_at: string;
+          hostel_id: string;
+          resident_id: string;
+          room_id: string;
+          token_hash: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          expires_at: string;
+          hostel_id: string;
+          resident_id: string;
+          room_id: string;
+          token_hash: string;
+        };
+        Update: {
+          created_at?: string;
+          expires_at?: string;
+          hostel_id?: string;
+          resident_id?: string;
+          room_id?: string;
+          token_hash?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "resident_sessions_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      resident_status_tokens: {
+        Row: {
+          created_at: string;
+          expires_at: string;
+          hostel_id: string;
+          resident_id: string;
+          token: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          expires_at: string;
+          hostel_id: string;
+          resident_id: string;
+          token: string;
+        };
+        Update: {
+          created_at?: string;
+          expires_at?: string;
+          hostel_id?: string;
+          resident_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "resident_status_tokens_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       residents: {
         Row: {
           alt_phone: string | null;
@@ -3146,6 +3287,66 @@ export type Database = {
           },
         ];
       };
+      room_report_tokens: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          hostel_id: string;
+          id: string;
+          revoked_at: string | null;
+          room_id: string;
+          token: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          hostel_id: string;
+          id?: string;
+          revoked_at?: string | null;
+          room_id: string;
+          token: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          hostel_id?: string;
+          id?: string;
+          revoked_at?: string | null;
+          room_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "room_report_tokens_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "room_report_tokens_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "room_report_tokens_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "room_report_tokens_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       rooms: {
         Row: {
           capacity: number;
@@ -3184,6 +3385,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rooms_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sms_outbox: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          dedupe_key: string | null;
+          hostel_id: string | null;
+          id: string;
+          kind: string;
+          last_error: string | null;
+          preview: string;
+          provider_id: string | null;
+          sent_at: string | null;
+          to_phone: string;
+          variables: string[];
+        };
+        ComputedFields: never;
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          dedupe_key?: string | null;
+          hostel_id?: string | null;
+          id?: string;
+          kind: string;
+          last_error?: string | null;
+          preview: string;
+          provider_id?: string | null;
+          sent_at?: string | null;
+          to_phone: string;
+          variables: string[];
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          dedupe_key?: string | null;
+          hostel_id?: string | null;
+          id?: string;
+          kind?: string;
+          last_error?: string | null;
+          preview?: string;
+          provider_id?: string | null;
+          sent_at?: string | null;
+          to_phone?: string;
+          variables?: string[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sms_outbox_hostel_id_fkey";
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
@@ -4388,6 +4643,33 @@ export type Database = {
         Returns: string;
       };
       request_account_closure: { Args: { p_reason?: string }; Returns: string };
+      resident_add_attachment: {
+        Args: { p_complaint_id: string; p_path: string; p_session: string };
+        Returns: string;
+      };
+      resident_form: { Args: { p_session: string }; Returns: Json };
+      resident_raise_complaint: {
+        Args: { p_category_id: string; p_description: string; p_session: string };
+        Returns: Json;
+      };
+      resident_request_code: { Args: { p_phone: string; p_token: string }; Returns: Json };
+      resident_respond: {
+        Args: {
+          p_comment: string;
+          p_complaint_id: string;
+          p_fixed: boolean;
+          p_rating: number;
+          p_token: string;
+        };
+        Returns: undefined;
+      };
+      resident_room: { Args: { p_token: string }; Returns: Json };
+      resident_status: { Args: { p_token: string }; Returns: Json };
+      resident_verify_code: {
+        Args: { p_code: string; p_phone: string; p_token: string };
+        Returns: string;
+      };
+      room_report_token: { Args: { p_regenerate?: boolean; p_room_id: string }; Returns: string };
       route_complaint: { Args: { p_complaint_id: string }; Returns: string };
       set_complaint_costs: {
         Args: {

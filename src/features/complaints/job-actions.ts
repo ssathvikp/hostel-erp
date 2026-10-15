@@ -2,8 +2,10 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { checkComplaintFile } from "@/lib/complaints/file-type";
+import { deliverOutboxQuietly } from "@/lib/outbox/deliver";
 import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -65,6 +67,8 @@ export async function actOnJob(_previous: FormState, formData: FormData): Promis
 
   revalidatePath(`/job/${token}`);
   revalidatePath("/complaints", "layout");
+  // The worker's step may have queued an SMS to the resident (E15-T4).
+  after(deliverOutboxQuietly);
   return formSuccess(SUCCESS[parsed.data.action]);
 }
 
