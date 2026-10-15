@@ -73,6 +73,26 @@ describe("schema guards", () => {
     expect(offenders.map((o) => o.fn)).toEqual([]);
   });
 
+  it("puts every tenant table behind read-only mode (E14-T9)", async () => {
+    // Account-level tables stay writable on purpose: the owner's data rights
+    // (data_requests), staff accounts (profiles) and the admin audit log.
+    const offenders = await sql<{ table: string }[]>`
+      select c.table_name as table
+      from information_schema.columns c
+      join information_schema.tables t using (table_schema, table_name)
+      where c.table_schema = 'public'
+        and c.column_name = 'hostel_id'
+        and t.table_type = 'BASE TABLE'
+        and c.table_name not in ('profiles', 'data_requests', 'admin_audit_log')
+        and not exists (
+          select 1 from pg_trigger g
+          where g.tgrelid = format('public.%I', c.table_name)::regclass
+            and g.tgname = c.table_name || '_require_account_can_write'
+        )
+      order by 1`;
+    expect(offenders.map((o) => o.table)).toEqual([]);
+  });
+
   it("does not expose the private schema to anon", async () => {
     const [row] = await sql<{ usable: boolean }[]>`
       select has_schema_privilege('anon', 'private', 'usage') as usable`;

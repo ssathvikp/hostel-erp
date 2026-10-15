@@ -216,3 +216,32 @@ security invoker and derive everything at read time.
   the range), billed (issued invoices for months starting in the range), and
   outstanding and overdue as of today across all months, so it matches the
   fee list.
+
+## Subscription billing (EP-14)
+
+`supabase/migrations/20261016090000_plans_subscriptions.sql` and
+`20261016100000_billing_gateway.sql`; the full picture is in
+[billing.md](billing.md).
+
+- **Account-level, not tenant-level.** `subscriptions` has one row per owner
+  (created with their first hostel); `plans`, `billing_settings`,
+  `coupons` and `platform_invoices` belong to the platform. None carries
+  `hostel_id`.
+- **Written only by functions.** Signed-in users may read their own
+  subscription, history, billing details and tax invoices; every status or
+  plan change goes through a billing function, which sets `billing.source`
+  so the `subscriptions_log` trigger records who caused it.
+- **Access is derived.** `private.account_can_write(owner)` answers from the
+  status and its dates at read time. `private.require_account_can_write()`
+  is attached to every tenant table as `<table>_require_account_can_write`
+  and refuses signed-in writers with hint `account_read_only`; service-role
+  and scheduled-job writes pass. **Every new table with `hostel_id` gets
+  this trigger** (the schema guard checks).
+- **Limits are triggers.** Beds (per statement), hostels and staff are
+  checked against the account's plan for every writer, with hints
+  `plan_limit_beds`, `plan_limit_hostels` and `plan_limit_staff`.
+- **Gateway functions are service-role only.** `billing_apply_gateway_event`
+  and the other `billing_*` functions the app calls after talking to
+  Razorpay are not executable by `authenticated` or `anon`.
+- **Tax documents are immutable** and keep plain owner and subscription ids
+  (no foreign keys), because GST records outlive a closed account.
