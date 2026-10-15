@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
-import { Alert, Button, Input } from "@/components/ui";
+import { Alert, Button, Checkbox, Input } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
 import { signUp } from "../actions";
@@ -53,6 +54,23 @@ export function SignupForm() {
         required
         hint="At least 8 characters, with letters and numbers."
         error={state.fieldErrors.password?.[0]}
+      />
+      <Checkbox
+        id="terms"
+        required
+        label={
+          <>
+            I agree to the{" "}
+            <Link href="/legal/terms" target="_blank" className="text-brand-700 underline">
+              terms of service
+            </Link>{" "}
+            and{" "}
+            <Link href="/legal/privacy" target="_blank" className="text-brand-700 underline">
+              privacy policy
+            </Link>
+          </>
+        }
+        error={state.fieldErrors.terms?.[0]}
       />
 
       <Button type="submit" loading={pending} className="w-full">

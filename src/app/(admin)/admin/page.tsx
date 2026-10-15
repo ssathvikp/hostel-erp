@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { getRevenueMetrics } from "@/features/admin/billing-queries";
 import { getPlatformMetrics } from "@/features/admin/queries";
 import { requirePlatformAdmin } from "@/lib/auth/admin";
 import { formatMonth, formatPaise } from "@/lib/money";
@@ -23,18 +24,59 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
 
 /**
  * How the platform is doing (E10-T8): sign-ups, activation and usage across
- * every hostel, as aggregates with no customer names. Revenue joins this
- * once subscriptions exist (EP-14).
+ * every hostel, as aggregates with no customer names, and Hostel ERP's own
+ * subscription revenue (E14-T12).
  */
 export default async function AdminOverviewPage() {
   await requirePlatformAdmin();
   const supabase = await createClient();
-  const metrics = await getPlatformMetrics(supabase);
+  const [metrics, revenue] = await Promise.all([
+    getPlatformMetrics(supabase),
+    getRevenueMetrics(supabase),
+  ]);
   const occupancy = metrics.beds ? Math.round((100 * metrics.occupied_beds) / metrics.beds) : 0;
 
   return (
     <div className="space-y-8">
       <PageHeader title="Platform overview" description="Every hostel on Hostel ERP, in total." />
+
+      <section aria-labelledby="revenue-heading" className="space-y-3">
+        <h2 id="revenue-heading" className="text-base font-semibold text-slate-900">
+          Subscription revenue
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Tile
+            label="MRR"
+            value={formatPaise(revenue.mrr)}
+            note={`ARR ${formatPaise(revenue.arr)} · excluding GST`}
+          />
+          <Tile
+            label="Paying accounts"
+            value={String(revenue.paying)}
+            note={`${revenue.by_status.trialing} trialing · ${revenue.complimentary} complimentary`}
+          />
+          <Tile
+            label="Trial to paid"
+            value={revenue.trial_conversion == null ? "—" : `${revenue.trial_conversion}%`}
+            note={`Of ${revenue.trials_finished_90_days} trials ended in 90 days`}
+          />
+          <Tile
+            label="Monthly churn"
+            value={revenue.monthly_churn == null ? "—" : `${revenue.monthly_churn}%`}
+            note={`${revenue.churned_30_days} left in the last 30 days`}
+          />
+          <Tile
+            label="Failed payments"
+            value={String(revenue.past_due.count)}
+            note={`${formatPaise(revenue.past_due.amount)} awaiting recovery, GST included`}
+          />
+          <Tile
+            label="Read-only"
+            value={String(revenue.by_status.read_only)}
+            note={`${revenue.by_status.cancelled} cancelled`}
+          />
+        </div>
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile label="Owners" value={String(metrics.owners)} />
@@ -112,8 +154,8 @@ export default async function AdminOverviewPage() {
             </TBody>
           </Table>
           <p className="text-xs text-slate-500">
-            Money hostels bill their residents, not revenue for Hostel ERP. Subscription revenue
-            arrives with EP-14.
+            Money hostels bill their residents, not revenue for Hostel ERP. Subscription revenue is
+            above.
           </p>
         </section>
       </div>

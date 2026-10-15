@@ -31,6 +31,7 @@ test("an owner signs up, confirms by email, signs out and signs back in", async 
   await page.getByLabel("Your name").fill("Lakshmi Menon");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel(/I agree to the terms of service/).check();
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page.getByRole("main").getByRole("status")).toContainText("Check your email");
@@ -78,6 +79,7 @@ test("signup validation errors appear next to their fields", async ({ page }) =>
   await expect(page.getByText("Your name is required")).toBeVisible();
   await expect(page.getByText("Enter a valid email address")).toBeVisible();
   await expect(page.getByText("Use at least 8 characters")).toBeVisible();
+  await expect(page.getByText("Agree to the terms of service to create an account")).toBeVisible();
   await expect(page.getByLabel("Email")).toHaveValue("not-an-email");
 });
 

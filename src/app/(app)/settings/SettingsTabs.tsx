@@ -13,12 +13,16 @@ const TABS = [
   { href: "/settings/complaints", label: "Complaints" },
 ] as const;
 
-export function SettingsTabs() {
+/** Billing is the owner's alone (E14-T8). */
+const OWNER_TABS = [{ href: "/settings/billing", label: "Billing" }] as const;
+
+export function SettingsTabs({ isOwner }: { isOwner: boolean }) {
   const pathname = usePathname();
+  const tabs = isOwner ? [...TABS, ...OWNER_TABS] : TABS;
   return (
     <nav aria-label="Settings sections" className="mb-6 border-b border-slate-200">
-      <ul className="-mb-px flex gap-6">
-        {TABS.map((tab) => {
+      <ul className="-mb-px flex flex-wrap gap-x-6">
+        {tabs.map((tab) => {
           const active = pathname.startsWith(tab.href);
           return (
             <li key={tab.href}>

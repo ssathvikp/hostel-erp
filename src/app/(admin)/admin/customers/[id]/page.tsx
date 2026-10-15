@@ -4,9 +4,17 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { getAccountsBilling, getAdminPlans } from "@/features/admin/billing-queries";
 import { SupportActionButton } from "@/features/admin/components/AdminForms";
+import {
+  ComplimentaryButton,
+  CorrectPlanButton,
+  ExtendTrialButton,
+} from "@/features/admin/components/BillingAdminForms";
 import { HostelStatusBadge } from "@/features/admin/components/SearchBar";
 import { AUDIT_ACTION_LABELS, getAccount } from "@/features/admin/queries";
+import { SOURCE_LABELS, STATUS_LABELS, STATUS_TONES } from "@/features/billing/options";
+import { formatPaise } from "@/lib/money";
 import { requirePlatformAdmin } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
@@ -21,8 +29,9 @@ const at = new Intl.DateTimeFormat("en-IN", {
 
 /**
  * One owner account (E10-T4, E10-T9): who they are, their hostels, support
- * actions that never touch a password, and what admins have done for them.
- * Opening this page is itself recorded.
+ * actions that never touch a password, their plan with manual adjustments
+ * (E10-T7), and what admins have done for them. Opening this page is itself
+ * recorded.
  */
 export default async function OwnerPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePlatformAdmin();
@@ -31,6 +40,12 @@ export default async function OwnerPage({ params }: { params: Promise<{ id: stri
   const supabase = await createClient();
   const account = await getAccount(supabase, id);
   if (!account) notFound();
+  const [billingById, plans] = await Promise.all([
+    getAccountsBilling(supabase, [account.id]),
+    getAdminPlans(supabase),
+  ]);
+  const billing = billingById[account.id];
+  const activePlans = plans.filter((plan) => plan.is_active);
 
   return (
     <div className="space-y-8">
@@ -88,6 +103,110 @@ export default async function OwnerPage({ params }: { params: Promise<{ id: stri
           To change an owner&apos;s email address, they change it themselves; Supabase confirms both
           the old and the new address.
         </p>
+      </section>
+
+      <section aria-labelledby="billing-heading" className="space-y-3">
+        <h2 id="billing-heading" className="text-base font-semibold text-slate-900">
+          Plan and billing
+        </h2>
+        {!billing ? (
+          <p className="text-sm text-slate-600">
+            No subscription yet: the trial starts with the owner&apos;s first hostel.
+          </p>
+        ) : (
+          <>
+            <dl className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-slate-500">Plan</dt>
+                <dd>
+                  {billing.plan_name}{" "}
+                  <Badge tone={STATUS_TONES[billing.status]}>{STATUS_LABELS[billing.status]}</Badge>
+                  {billing.complimentary && (
+                    <span className="ml-1">
+                      <Badge tone="info">Complimentary</Badge>
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Price</dt>
+                <dd>
+                  {billing.amount > 0
+                    ? `${formatPaise(billing.amount)} / ${billing.billing_interval === "month" ? "month" : "year"} + GST`
+                    : "Free"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">
+                  {billing.status === "trialing" ? "Trial ends" : "Next billing"}
+                </dt>
+                <dd>
+                  {(() => {
+                    const date =
+                      billing.status === "trialing"
+                        ? billing.trial_ends_at
+                        : billing.next_billing_at;
+                    return date ? at.format(new Date(date)) : "—";
+                  })()}
+                  {billing.cancel_at_period_end && billing.current_period_end && (
+                    <span className="block text-xs text-slate-500">
+                      Ends {at.format(new Date(billing.current_period_end))}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Can work</dt>
+                <dd>
+                  {billing.can_write ? (
+                    <Badge tone="success">Yes</Badge>
+                  ) : (
+                    <Badge tone="danger">Read-only</Badge>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Usage</dt>
+                <dd className="tabular-nums">
+                  {billing.usage.beds} beds · {billing.usage.hostels} hostels ·{" "}
+                  {billing.usage.staff} staff
+                </dd>
+              </div>
+              <div className="sm:col-span-3">
+                <dt className="text-slate-500">Gateway subscription</dt>
+                <dd className="font-mono text-xs">{billing.gateway_subscription_id ?? "None"}</dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap items-start gap-3">
+              <ExtendTrialButton accountId={account.id} />
+              <ComplimentaryButton accountId={account.id} plans={activePlans} />
+              <CorrectPlanButton
+                accountId={account.id}
+                plans={activePlans}
+                current={{ plan: billing.plan_code, interval: billing.billing_interval }}
+              />
+            </div>
+            {billing.history.length > 0 && (
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white text-sm">
+                {billing.history.map((event, index) => (
+                  <li key={`${event.created_at}-${index}`} className="px-4 py-2">
+                    <span className="font-medium">
+                      {event.from_status && event.from_status !== event.to_status
+                        ? `${STATUS_LABELS[event.from_status]} → ${STATUS_LABELS[event.to_status]}`
+                        : STATUS_LABELS[event.to_status]}
+                    </span>
+                    {event.plan && ` · ${event.plan}`}
+                    {event.reason && <span className="text-slate-600"> · {event.reason}</span>}
+                    <span className="block text-xs text-slate-500">
+                      {SOURCE_LABELS[event.source] ?? event.source},{" "}
+                      {at.format(new Date(event.created_at))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </section>
 
       <section aria-labelledby="hostels-heading" className="space-y-3">

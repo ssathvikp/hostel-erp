@@ -64,6 +64,8 @@ export const signupSchema = z.object({
   full_name: requiredText("Your name", 120),
   email,
   password: newPassword,
+  // The checkbox posts "on" only when ticked (E14-T11).
+  terms: z.literal("on", { error: "Agree to the terms of service to create an account" }),
 });
 
 export const loginSchema = z.object({

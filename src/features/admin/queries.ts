@@ -192,4 +192,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   create_announcement: "Created announcement",
   end_announcement: "Ended announcement",
   complete_closure: "Completed account closure",
+  billing_adjustment: "Adjusted billing",
+  save_plan: "Saved plan",
+  save_coupon: "Saved coupon",
+  save_billing_settings: "Saved billing settings",
 };

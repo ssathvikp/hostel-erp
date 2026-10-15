@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 
+import { requireUser } from "@/lib/auth/session";
+
 import { SettingsTabs } from "./SettingsTabs";
 
-export default function SettingsLayout({ children }: { children: ReactNode }) {
+export default async function SettingsLayout({ children }: { children: ReactNode }) {
+  const user = await requireUser();
   return (
     <>
-      <SettingsTabs />
+      <SettingsTabs isOwner={user.role === "owner"} />
       {children}
     </>
   );

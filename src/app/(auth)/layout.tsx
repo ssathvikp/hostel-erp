@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { LegalFooter } from "@/components/shell/LegalFooter";
+
 /** Centred card layout shared by sign-in, sign-up and password pages. */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +16,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <main className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         {children}
       </main>
+      <LegalFooter className="pt-6" />
     </div>
   );
 }

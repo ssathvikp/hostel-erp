@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { AccountBanner } from "@/components/shell/AccountBanner";
 import { Announcements } from "@/components/shell/Announcement";
 import { AppShell } from "@/components/shell/AppShell";
 import { getCurrentAnnouncements } from "@/features/announcements/queries";
+import { getAccountState } from "@/features/billing/queries";
 import { requireUser } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
 import { createClient } from "@/lib/supabase/server";
@@ -14,10 +16,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
   // Platform admins belong to no hostel; their area is separate (E10-T2).
   if (user.role === "platform_admin") redirect("/admin");
+  const supabase = await createClient();
   const [{ active, hostels, draft }, announcements] = await Promise.all([
     getHostelContext(),
-    createClient().then(getCurrentAnnouncements),
+    getCurrentAnnouncements(supabase),
   ]);
+  // Trial days left, a failed payment or read-only mode (E14-T3, T9).
+  const account = active ? await getAccountState(supabase, active.id) : null;
 
   return (
     <AppShell
@@ -29,6 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         canAddHostel: user.role === "owner",
       }}
     >
+      <AccountBanner state={account} isOwner={user.role === "owner"} />
       <Announcements items={announcements} />
       {children}
     </AppShell>

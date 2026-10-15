@@ -88,14 +88,30 @@ describe("assertRole", () => {
 });
 
 describe("authentication schemas", () => {
-  const signup = { full_name: " Asha Rao ", email: " Asha@Example.COM ", password: "hostel2026" };
+  const signup = {
+    full_name: " Asha Rao ",
+    email: " Asha@Example.COM ",
+    password: "hostel2026",
+    terms: "on",
+  };
 
   it("accepts a valid signup and normalises name and email", () => {
     expect(signupSchema.parse(signup)).toEqual({
       full_name: "Asha Rao",
       email: "asha@example.com",
       password: "hostel2026",
+      terms: "on",
     });
+  });
+
+  it("requires the terms to be accepted (E14-T11)", () => {
+    const result = validate(signupSchema, { ...signup, terms: undefined });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fieldErrors.terms).toEqual([
+        "Agree to the terms of service to create an account",
+      ]);
+    }
   });
 
   it.each([

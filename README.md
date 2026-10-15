@@ -53,6 +53,12 @@ to run again). It prints the demo owner and staff logins.
 | `ID_PROOF_HMAC_KEY`             | server only   | Keys the hash of resident ID numbers; never change it once set |
 | `SUPABASE_DB_URL`               | local tests   | Direct Postgres connection for schema tests                    |
 | `CLICKUP_API_TOKEN`             | local scripts | Only for `scripts/clickup/sync-plan.ps1`                       |
+| `RAZORPAY_KEY_ID` / `_SECRET`   | server only   | Hostel ERP's Razorpay account; optional until it exists        |
+| `RAZORPAY_WEBHOOK_SECRET`       | server only   | Verifies subscription webhooks (`docs/billing.md`)             |
+| `PAYMENT_KEYS_ENCRYPTION_KEY`   | server only   | Encrypts owners' own gateway keys (`docs/online-payments.md`)  |
+| `NEXT_PUBLIC_SITE_URL`          | browser       | Public URL for payment links, QR codes and emails              |
+| `SMS_PROVIDER` and `SMS_*`      | server only   | Resident OTP texts (`docs/resident-complaints.md`); optional   |
+| `LEGAL_*`                       | server only   | Business details on the legal pages; placeholders until set    |
 | `ENABLE_DIAGNOSTICS`            | tests only    | `1` turns on `/diagnostics/error`; never in prod               |
 
 The app refuses to build or start when a required variable is missing.
@@ -118,6 +124,16 @@ changed) lands in the mail catcher at <http://localhost:54324>.
   away from app routes. Pages and server actions check again on their own:
   `requireUser()` for pages and layouts, `requireRole([...])` first thing in
   every server action (`src/lib/auth/session.ts`).
+
+## Billing
+
+Owners get a 14-day trial with their first hostel, then pay for a plan
+through Razorpay; unpaid accounts become read-only, never deleted. Plans,
+coupons, GST settings and account corrections are under `/admin/billing`
+and each owner's admin page. See [docs/billing.md](docs/billing.md) and the
+pricing proposal in [docs/pricing.md](docs/pricing.md). Without Razorpay
+keys everything still runs; the billing page says online payment is not set
+up.
 
 ## Errors and logging
 

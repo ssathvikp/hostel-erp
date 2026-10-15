@@ -4,6 +4,7 @@ import type { AuthError } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
 import { safeNextPath } from "@/lib/auth/redirect";
+import { TERMS_VERSION } from "@/lib/legal";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -35,10 +36,11 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
 
   const { full_name, email, password } = parsed.data;
   const supabase = await createClient();
+  // The database records which terms version was accepted (E14-T11).
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name } },
+    options: { data: { full_name, terms_version: TERMS_VERSION } },
   });
 
   if (error) {

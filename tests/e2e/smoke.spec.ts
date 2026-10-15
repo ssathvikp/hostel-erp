@@ -60,6 +60,7 @@ test("signup → hostel → room → resident → bed → invoice → payment", 
     await page.getByLabel("Your name").fill("Smoke Owner");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel(/I agree to the terms of service/).check();
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(inMain(page).getByRole("status")).toContainText("Check your email");
     const link = confirmLink((await waitForEmail(email, "Confirm your Hostel ERP account")).html);

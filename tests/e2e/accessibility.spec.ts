@@ -34,7 +34,15 @@ async function expectNoViolations(page: Page, path: string, prepare?: () => Prom
 }
 
 test("signed-out screens", async ({ page }) => {
-  for (const path of ["/login", "/signup", "/forgot-password"]) {
+  for (const path of [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/legal/terms",
+    "/legal/privacy",
+    "/legal/refunds",
+    "/legal/contact",
+  ]) {
     await expectNoViolations(page, path);
   }
 });

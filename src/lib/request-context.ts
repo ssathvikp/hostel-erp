@@ -2,6 +2,7 @@ import "server-only";
 
 import { headers } from "next/headers";
 
+import { accountRuleMessage } from "./billing/messages";
 import { describeError, logger, REQUEST_ID_HEADER } from "./logger";
 import { formFailure, type FormState } from "./validation";
 
@@ -31,12 +32,18 @@ export async function logUnexpected(action: string, error: unknown): Promise<voi
   });
 }
 
-/** Logs the failure and returns the generic message for the form. */
+/**
+ * Logs the failure and returns the generic message for the form. Account
+ * rules (read-only mode, plan limits) are explained instead: they are
+ * expected, and the user can act on them.
+ */
 export async function unexpectedFailure(
   action: string,
   error: unknown,
   values?: Record<string, string>,
 ): Promise<FormState> {
+  const accountMessage = accountRuleMessage(error);
+  if (accountMessage) return formFailure(accountMessage, values);
   await logUnexpected(action, error);
   return formFailure(UNEXPECTED_MESSAGE, values);
 }
