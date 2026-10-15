@@ -337,9 +337,14 @@ SMS and confirm the fix` (E15-T3, T4, T5): room QR codes and a print
    ClickUp mirror's status notes.
 
 **Results at the end of the session.** Lint, typecheck, format and schema
-lint clean; 170 unit tests and 400 database tests pass; the browser tests
-for every new feature pass on desktop and mobile, as do the existing fee,
-complaint, room, auth, admin and accessibility suites.
+lint clean; 170 unit tests and 400 database tests pass; the full browser
+suite (116 tests, desktop and mobile, with accessibility scans) passes. The
+full run caught one regression of this session, fixed before the end: the
+new trial banner was a live `role="status"` region that collided with
+page-level messages, so it is now a plain region labelled "Billing notice".
+A dashboard date-range test and some fee tests time out occasionally under
+heavy machine load and pass on re-run; that predates this session (it also
+failed once on PR 15's CI run).
 
 **Placeholders left for you** (nothing secret is committed; see section 9):
 Razorpay keys for Hostel ERP's own billing; the encryption key and site URL

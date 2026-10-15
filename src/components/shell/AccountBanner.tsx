@@ -55,7 +55,7 @@ export function AccountBanner({
     // A labelled region, not a live one: it is part of every page, so
     // announcing it on each navigation would only be noise.
     <section
-      aria-label="Account status"
+      aria-label="Billing notice"
       className={cn(
         "mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm print:hidden",
         styles,

@@ -88,7 +88,7 @@ test("an ended trial makes the account read-only for owner and staff, without lo
 
   await signIn(page, owner.email, TEST_PASSWORD);
   await page.goto("/rooms");
-  await expect(inMain(page).getByRole("region", { name: "Account status" })).toContainText(
+  await expect(inMain(page).getByRole("region", { name: "Billing notice" })).toContainText(
     "The free trial has ended, so this account is read-only",
   );
   await expect(inMain(page).getByRole("link", { name: "101", exact: true })).toBeVisible();
