@@ -1611,6 +1611,79 @@ export type Database = {
           },
         ];
       };
+      gateway_payments: {
+        Row: {
+          amount: number;
+          credit_id: string | null;
+          fee: number | null;
+          gateway_payment_id: string;
+          hostel_id: string;
+          id: string;
+          invoice_id: string | null;
+          method: string | null;
+          note: string | null;
+          payment_id: string | null;
+          payment_link_id: string | null;
+          received_at: string;
+          refunded_amount: number;
+          resident_id: string | null;
+          status: string;
+          tax: number | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          credit_id?: string | null;
+          fee?: number | null;
+          gateway_payment_id: string;
+          hostel_id: string;
+          id?: string;
+          invoice_id?: string | null;
+          method?: string | null;
+          note?: string | null;
+          payment_id?: string | null;
+          payment_link_id?: string | null;
+          received_at?: string;
+          refunded_amount?: number;
+          resident_id?: string | null;
+          status: string;
+          tax?: number | null;
+        };
+        Update: {
+          amount?: number;
+          credit_id?: string | null;
+          fee?: number | null;
+          gateway_payment_id?: string;
+          hostel_id?: string;
+          id?: string;
+          invoice_id?: string | null;
+          method?: string | null;
+          note?: string | null;
+          payment_id?: string | null;
+          payment_link_id?: string | null;
+          received_at?: string;
+          refunded_amount?: number;
+          resident_id?: string | null;
+          status?: string;
+          tax?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gateway_payments_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "gateway_payments_link_fkey";
+            columns: ["hostel_id", "payment_link_id"];
+            isOneToOne: false;
+            referencedRelation: "payment_links";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       gateway_plans: {
         Row: {
           amount: number;
@@ -1640,6 +1713,117 @@ export type Database = {
             columns: ["plan_id"];
             isOneToOne: false;
             referencedRelation: "plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      gateway_refunds: {
+        Row: {
+          amount: number;
+          created_at: string;
+          gateway_payment_id: string;
+          gateway_refund_id: string;
+          hostel_id: string;
+          mirrored: string;
+          note: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          created_at?: string;
+          gateway_payment_id: string;
+          gateway_refund_id: string;
+          hostel_id: string;
+          mirrored: string;
+          note?: string | null;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          gateway_payment_id?: string;
+          gateway_refund_id?: string;
+          hostel_id?: string;
+          mirrored?: string;
+          note?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gateway_refunds_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      gateway_settlements: {
+        Row: {
+          amount: number;
+          fees: number;
+          gateway_settlement_id: string;
+          hostel_id: string;
+          settled_at: string;
+          tax: number;
+          utr: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          fees?: number;
+          gateway_settlement_id: string;
+          hostel_id: string;
+          settled_at: string;
+          tax?: number;
+          utr?: string | null;
+        };
+        Update: {
+          amount?: number;
+          fees?: number;
+          gateway_settlement_id?: string;
+          hostel_id?: string;
+          settled_at?: string;
+          tax?: number;
+          utr?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gateway_settlements_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      gateway_webhook_events: {
+        Row: {
+          event_id: string;
+          event_type: string;
+          hostel_id: string;
+          received_at: string;
+          result: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          event_id: string;
+          event_type: string;
+          hostel_id: string;
+          received_at?: string;
+          result: string;
+        };
+        Update: {
+          event_id?: string;
+          event_type?: string;
+          hostel_id?: string;
+          received_at?: string;
+          result?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gateway_webhook_events_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
             referencedColumns: ["id"];
           },
         ];
@@ -2111,6 +2295,153 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      payment_gateway_accounts: {
+        Row: {
+          connected_at: string;
+          connected_by: string | null;
+          enabled: boolean;
+          hostel_id: string;
+          key_id: string;
+          key_secret_encrypted: string;
+          provider: string;
+          updated_at: string;
+          webhook_secret_encrypted: string;
+          webhook_token: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          connected_at?: string;
+          connected_by?: string | null;
+          enabled?: boolean;
+          hostel_id: string;
+          key_id: string;
+          key_secret_encrypted: string;
+          provider?: string;
+          updated_at?: string;
+          webhook_secret_encrypted: string;
+          webhook_token: string;
+        };
+        Update: {
+          connected_at?: string;
+          connected_by?: string | null;
+          enabled?: boolean;
+          hostel_id?: string;
+          key_id?: string;
+          key_secret_encrypted?: string;
+          provider?: string;
+          updated_at?: string;
+          webhook_secret_encrypted?: string;
+          webhook_token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_gateway_accounts_connected_by_fkey";
+            columns: ["connected_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_gateway_accounts_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: true;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payment_links: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string;
+          gateway_link_id: string;
+          gateway_payment_id: string | null;
+          hostel_id: string;
+          id: string;
+          invoice_id: string;
+          paid_at: string | null;
+          resident_id: string;
+          short_url: string;
+          status: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at: string;
+          gateway_link_id: string;
+          gateway_payment_id?: string | null;
+          hostel_id: string;
+          id?: string;
+          invoice_id: string;
+          paid_at?: string | null;
+          resident_id: string;
+          short_url: string;
+          status?: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string;
+          gateway_link_id?: string;
+          gateway_payment_id?: string | null;
+          hostel_id?: string;
+          id?: string;
+          invoice_id?: string;
+          paid_at?: string | null;
+          resident_id?: string;
+          short_url?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_links_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_links_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_links_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "payment_links_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "payment_links_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "payment_links_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
           },
         ];
       };
@@ -3860,6 +4191,16 @@ export type Database = {
         Returns: string;
       };
       cancel_account_closure: { Args: Record<PropertyKey, never>; Returns: undefined };
+      collect_gateway_event: {
+        Args: {
+          p_data: Json;
+          p_event_id: string;
+          p_event_type: string;
+          p_hostel_id: string;
+          p_kind: string;
+        };
+        Returns: string;
+      };
       collections_csv: {
         Args: { p_from: string; p_hostel_id: string; p_to: string };
         Returns: string;
@@ -3924,6 +4265,12 @@ export type Database = {
           paid: number;
         }[];
       };
+      gateway_account_for_webhook: { Args: { p_token: string }; Returns: Json };
+      gateway_keys: { Args: { p_hostel_id: string }; Returns: Json };
+      gateway_reconciliation: {
+        Args: { p_from: string; p_hostel_id: string; p_to: string };
+        Returns: Json;
+      };
       generate_invoices: {
         Args: { p_due_day?: number; p_hostel_id: string; p_period_month: string };
         Returns: Json;
@@ -3952,6 +4299,7 @@ export type Database = {
           total_beds: number;
         }[];
       };
+      prepare_payment_link: { Args: { p_invoice_id: string }; Returns: Json };
       raise_complaint: {
         Args: {
           p_area?: string;
@@ -4010,6 +4358,16 @@ export type Database = {
           p_reference?: string;
         };
         Returns: Json;
+      };
+      record_payment_link: {
+        Args: {
+          p_amount: number;
+          p_expires_at: string;
+          p_gateway_link_id: string;
+          p_invoice_id: string;
+          p_short_url: string;
+        };
+        Returns: string;
       };
       record_vendor_payout: {
         Args: {

@@ -51,6 +51,7 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   cheque: "Cheque",
   credit: "From credit",
   deposit: "From deposit",
+  online: "Online (gateway)",
 };
 
 export const PAYMENT_MODE_OPTIONS: readonly SelectOption[] = PAYMENT_MODES.map((mode) => ({

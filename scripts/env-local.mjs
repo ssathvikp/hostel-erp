@@ -46,9 +46,20 @@ for (const [name, value] of Object.entries(managed)) {
 // kept: regenerating it would make existing hashes unmatchable.
 const ID_PROOF_KEY = "ID_PROOF_HMAC_KEY";
 const existing = existsSync(ENV_FILE) ? readFileSync(ENV_FILE, "utf8") : "";
-const generated = /^ID_PROOF_HMAC_KEY=\S+/m.test(existing)
-  ? []
-  : [`${ID_PROOF_KEY}=${randomBytes(32).toString("hex")}`];
+const generated = [
+  ...(/^ID_PROOF_HMAC_KEY=\S+/m.test(existing)
+    ? []
+    : [`${ID_PROOF_KEY}=${randomBytes(32).toString("hex")}`]),
+  // Encrypts owners' own gateway keys (E13-T10); kept once generated, or
+  // connected gateways could no longer be read.
+  ...(/^PAYMENT_KEYS_ENCRYPTION_KEY=\S+/m.test(existing)
+    ? []
+    : [`PAYMENT_KEYS_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`]),
+  // Links, QR codes and emails point here.
+  ...(/^NEXT_PUBLIC_SITE_URL=\S+/m.test(existing)
+    ? []
+    : ["NEXT_PUBLIC_SITE_URL=http://localhost:3000"]),
+];
 
 const HEADER = "# Local Supabase, written by `npm run env:local`. Safe to regenerate.";
 

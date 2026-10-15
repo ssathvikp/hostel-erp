@@ -9,8 +9,11 @@ import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
 import { getInvoice } from "@/features/fees/queries";
+import { PaymentLinkPanel } from "@/features/online-payments/components/OnlinePaymentForms";
+import { getGatewayAccount, getLivePaymentLink } from "@/features/online-payments/queries";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatMonth, formatPaise } from "@/lib/money";
+import { qrSvg } from "@/lib/qr";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 
@@ -33,6 +36,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const month = formatMonth(invoice.periodMonth);
   const livePayments = invoice.payments.filter((payment) => !payment.voidedAt);
   const payable = invoice.balance - invoice.pendingCheques;
+
+  // Online payment (E13-T10): only when the hostel has a gateway switched on.
+  const [account, liveLink] = await Promise.all([
+    getGatewayAccount(supabase, hostel.id),
+    getLivePaymentLink(supabase, invoice.id),
+  ]);
+  const online = invoice.status !== "void" && payable > 0 && account?.enabled;
+  const linkView =
+    online && liveLink
+      ? {
+          shortUrl: liveLink.shortUrl,
+          amount: liveLink.amount,
+          expiresAt: liveLink.expiresAt,
+          qrSvg: await qrSvg(liveLink.shortUrl, { label: `QR code to pay ${invoice.number}` }),
+        }
+      : null;
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -105,6 +124,17 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <p className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           Voided: {invoice.voidReason}. It does not count towards any balance.
         </p>
+      )}
+
+      {online && (
+        <PaymentLinkPanel
+          invoiceId={invoice.id}
+          balance={payable}
+          residentName={invoice.residentName}
+          residentPhone={invoice.residentPhone}
+          hostelName={hostel.name}
+          link={linkView}
+        />
       )}
 
       <section aria-labelledby="resident-heading" className="text-sm text-slate-700">

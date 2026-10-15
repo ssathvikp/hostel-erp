@@ -142,6 +142,8 @@ export function createUserFactory() {
       // Complaints name charges, residents and rooms; money rows protect the
       // stays and people they name. Both go first.
       for (const table of [
+        "gateway_payments",
+        "payment_links",
         "vendor_payouts",
         "complaints",
         "maintenance_schedules",

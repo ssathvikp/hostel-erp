@@ -120,6 +120,9 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <Link href="/fees/electricity" className={buttonClass({ variant: "secondary" })}>
               Electricity
             </Link>
+            <Link href="/fees/online" className={buttonClass({ variant: "secondary" })}>
+              Online
+            </Link>
             <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
               Rates
             </Link>

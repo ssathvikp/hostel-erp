@@ -133,3 +133,105 @@ export function normaliseSubscriptionEvent(body: unknown): NormalisedSubscriptio
 export function isGatewayEventId(value: string | null): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{6,100}$/.test(value);
 }
+
+/** What the database needs to know about a rent payment event (E13-T10). */
+export type RentEventKind = "link_paid" | "payment_failed" | "refunded" | "settled";
+
+const RENT_EVENTS: Record<string, RentEventKind> = {
+  "payment_link.paid": "link_paid",
+  "payment.failed": "payment_failed",
+  "refund.processed": "refunded",
+  "settlement.processed": "settled",
+};
+
+export interface NormalisedRentEvent {
+  eventType: string;
+  kind: RentEventKind;
+  data: {
+    link_id?: string;
+    payment?: {
+      id: string;
+      amount: number;
+      fee: number | null;
+      tax: number | null;
+      method: string | null;
+      error?: string | null;
+    };
+    refund?: { id: string; payment_id: string; amount: number };
+    settlement?: {
+      id: string;
+      amount: number;
+      fees: number;
+      tax: number;
+      utr: string | null;
+      settled_at: string | null;
+    };
+  };
+}
+
+/**
+ * The rent event a webhook body from an owner's own Razorpay account
+ * describes, or null for anything the app does not act on.
+ */
+export function normaliseRentEvent(body: unknown): NormalisedRentEvent | null {
+  if (!body || typeof body !== "object") return null;
+  const event = (body as Json).event;
+  const payload = (body as Json).payload;
+  if (typeof event !== "string" || !payload || typeof payload !== "object") return null;
+  const kind = RENT_EVENTS[event];
+  if (!kind) return null;
+
+  const payment = entity(payload as Json, "payment");
+  const paymentData = () => {
+    const id = text(payment?.id);
+    const amount = paise(payment?.amount);
+    if (!id || amount === null) return null;
+    return {
+      id,
+      amount,
+      fee: paise(payment?.fee),
+      tax: paise(payment?.tax),
+      method: text(payment?.method),
+    };
+  };
+
+  if (kind === "link_paid") {
+    const link = entity(payload as Json, "payment_link");
+    const linkId = text(link?.id);
+    const paid = paymentData();
+    if (!linkId || !paid || payment?.status === "failed") return null;
+    return { eventType: event, kind, data: { link_id: linkId, payment: paid } };
+  }
+  if (kind === "payment_failed") {
+    const failed = paymentData();
+    if (!failed) return null;
+    const error = text(payment?.error_description) ?? text(payment?.error_reason);
+    return { eventType: event, kind, data: { payment: { ...failed, error } } };
+  }
+  if (kind === "refunded") {
+    const refund = entity(payload as Json, "refund");
+    const id = text(refund?.id);
+    const paymentId = text(refund?.payment_id);
+    const amount = paise(refund?.amount);
+    if (!id || !paymentId || !amount) return null;
+    return { eventType: event, kind, data: { refund: { id, payment_id: paymentId, amount } } };
+  }
+  const settlement = entity(payload as Json, "settlement");
+  const id = text(settlement?.id);
+  const amount = paise(settlement?.amount);
+  if (!id || amount === null) return null;
+  return {
+    eventType: event,
+    kind,
+    data: {
+      settlement: {
+        id,
+        amount,
+        fees: paise(settlement?.fees) ?? 0,
+        tax: paise(settlement?.tax) ?? 0,
+        utr: text(settlement?.utr),
+        settled_at: instant(settlement?.created_at),
+      },
+    },
+  };
+}

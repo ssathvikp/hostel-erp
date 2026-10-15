@@ -245,3 +245,19 @@ security invoker and derive everything at read time.
   Razorpay are not executable by `authenticated` or `anon`.
 - **Tax documents are immutable** and keep plain owner and subscription ids
   (no foreign keys), because GST records outlive a closed account.
+
+## Online rent collection (E13-T10)
+
+`supabase/migrations/20261016110000_online_rent_collection.sql`;
+[online-payments.md](online-payments.md) has the whole flow.
+
+- `payment_gateway_accounts` holds each hostel's own Razorpay keys,
+  encrypted by the app. Column grants leave the encrypted columns out of
+  every signed-in user's `select`; only service-role functions return them.
+- Payments with mode `online` and credit received `online` are written only
+  by `collect_gateway_event` (service role); a trigger refuses them from
+  signed-in users. Gateway payment ids and webhook event ids are unique, so
+  the webhook is idempotent.
+- `gateway_payments`, `gateway_refunds` and `gateway_settlements` keep what
+  the gateway reported, separately from the hostel's own money records, so
+  reconciliation can compare the two.

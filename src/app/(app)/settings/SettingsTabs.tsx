@@ -11,6 +11,7 @@ const TABS = [
   { href: "/settings/fees", label: "Fees" },
   { href: "/settings/workers", label: "Workers" },
   { href: "/settings/complaints", label: "Complaints" },
+  { href: "/settings/payments", label: "Online payments" },
 ] as const;
 
 /** Billing is the owner's alone (E14-T8). */

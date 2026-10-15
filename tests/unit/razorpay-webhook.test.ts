@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isGatewayEventId,
+  normaliseRentEvent,
   normaliseSubscriptionEvent,
   signRazorpayBody,
   verifyRazorpaySignature,
@@ -106,5 +107,95 @@ describe("event ids", () => {
     expect(isGatewayEventId("")).toBe(false);
     expect(isGatewayEventId(null)).toBe(false);
     expect(isGatewayEventId("x'; drop table")).toBe(false);
+  });
+});
+
+describe("rent events (E13-T10)", () => {
+  it("reads a paid payment link with the gateway fee", () => {
+    expect(
+      normaliseRentEvent({
+        event: "payment_link.paid",
+        payload: {
+          payment_link: { entity: { id: "plink_1", status: "paid" } },
+          payment: {
+            entity: {
+              id: "pay_9",
+              amount: 850000,
+              fee: 17000,
+              tax: 2594,
+              method: "upi",
+              status: "captured",
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      eventType: "payment_link.paid",
+      kind: "link_paid",
+      data: {
+        link_id: "plink_1",
+        payment: { id: "pay_9", amount: 850000, fee: 17000, tax: 2594, method: "upi" },
+      },
+    });
+  });
+
+  it("reads failures, refunds and settlements", () => {
+    expect(
+      normaliseRentEvent({
+        event: "payment.failed",
+        payload: {
+          payment: {
+            entity: { id: "pay_f", amount: 100, method: "card", error_description: "Declined" },
+          },
+        },
+      })?.data.payment,
+    ).toEqual({
+      id: "pay_f",
+      amount: 100,
+      fee: null,
+      tax: null,
+      method: "card",
+      error: "Declined",
+    });
+    expect(
+      normaliseRentEvent({
+        event: "refund.processed",
+        payload: { refund: { entity: { id: "rfnd_1", payment_id: "pay_9", amount: 5000 } } },
+      })?.data.refund,
+    ).toEqual({ id: "rfnd_1", payment_id: "pay_9", amount: 5000 });
+    expect(
+      normaliseRentEvent({
+        event: "settlement.processed",
+        payload: {
+          settlement: {
+            entity: {
+              id: "setl_1",
+              amount: 830406,
+              fees: 17000,
+              tax: 2594,
+              utr: "UTR1",
+              created_at: 1_790_000_000,
+            },
+          },
+        },
+      })?.data.settlement,
+    ).toEqual({
+      id: "setl_1",
+      amount: 830406,
+      fees: 17000,
+      tax: 2594,
+      utr: "UTR1",
+      settled_at: new Date(1_790_000_000_000).toISOString(),
+    });
+  });
+
+  it("ignores subscription events and incomplete bodies", () => {
+    expect(normaliseRentEvent(charged())).toBeNull();
+    expect(
+      normaliseRentEvent({
+        event: "payment_link.paid",
+        payload: { payment_link: { entity: { id: "plink_1" } } },
+      }),
+    ).toBeNull();
   });
 });

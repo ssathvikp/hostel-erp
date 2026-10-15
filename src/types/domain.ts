@@ -169,9 +169,10 @@ export const INVOICE_PAYMENT_MODES = [...PAYMENT_MODES, "cheque"] as const;
 export type InvoicePaymentMode = (typeof INVOICE_PAYMENT_MODES)[number];
 /**
  * Every mode a payment row can carry: also credit and deposit money applied
- * to an invoice by the database (E13-T7, E13-T4).
+ * to an invoice by the database (E13-T7, E13-T4), and money paid through the
+ * hostel's payment gateway, recorded only by its webhook (E13-T10).
  */
-export type PaymentMode = InvoicePaymentMode | "credit" | "deposit";
+export type PaymentMode = InvoicePaymentMode | "credit" | "deposit" | "online";
 
 // ---------------------------------------------------------------------------
 // Profile (EP-02) - id equals auth.users.id
