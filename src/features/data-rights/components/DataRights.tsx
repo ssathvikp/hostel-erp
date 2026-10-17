@@ -8,12 +8,6 @@ import { initialFormState } from "@/lib/validation/result";
 
 import { eraseResident, recordConsent } from "../actions";
 
-const moment = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Kolkata",
-});
-
 /**
  * Consent, a copy of the data, and erasure for one resident (DPDP Act,
  * 2023). Erasing is offered only once the resident has left and settled;
@@ -25,6 +19,11 @@ export function DataRights({
   erasable,
   blockers,
 }: {
+  /**
+   * consentAt and erasedAt arrive formatted by the server: formatting them
+   * here could differ from the server's output (am/pm, spacing) and break
+   * hydration.
+   */
   resident: { id: string; name: string; consentAt: string | null; erasedAt: string | null };
   isOwner: boolean;
   erasable: boolean;
@@ -42,8 +41,8 @@ export function DataRights({
   if (resident.erasedAt) {
     return (
       <p className="text-sm text-slate-700">
-        Personal details were erased on {moment.format(new Date(resident.erasedAt))}. Stays,
-        invoices and payments are kept under this pseudonym.
+        Personal details were erased on {resident.erasedAt}. Stays, invoices and payments are kept
+        under this pseudonym.
       </p>
     );
   }
@@ -57,8 +56,7 @@ export function DataRights({
         <h3 className="font-medium text-slate-700">Consent</h3>
         {resident.consentAt ? (
           <p className="mt-1 text-slate-600">
-            Agreed to their details being kept, recorded{" "}
-            {moment.format(new Date(resident.consentAt))}.
+            Agreed to their details being kept, recorded {resident.consentAt}.
           </p>
         ) : (
           <div className="mt-1 flex flex-wrap items-center gap-3">

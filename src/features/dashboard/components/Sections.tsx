@@ -57,7 +57,16 @@ const TILE_ROW = "grid grid-cols-2 gap-3 lg:grid-cols-4";
  * occupancy screen; collected and billed follow the range; outstanding and
  * overdue are what is owed today, matching the fee list.
  */
-export async function KpiSection({ hostelId, range }: { hostelId: string; range: DashboardRange }) {
+export async function KpiSection({
+  hostelId,
+  range,
+  canAddRooms,
+}: {
+  hostelId: string;
+  range: DashboardRange;
+  /** Only owners add rooms; staff are not sent to a page they can't use. */
+  canAddRooms: boolean;
+}) {
   const supabase = await createClient();
   const [occupancy, money, deposits] = await Promise.all([
     getHostelOccupancy(supabase, hostelId),
@@ -75,10 +84,16 @@ export async function KpiSection({ hostelId, range }: { hostelId: string; range:
         {occupancy.totalBeds === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
             No beds yet.{" "}
-            <Link href="/rooms/new" className="font-medium text-brand-700 underline">
-              Add your first room
-            </Link>{" "}
-            and occupancy will show here.
+            {canAddRooms ? (
+              <>
+                <Link href="/rooms/new" className="font-medium text-brand-700 underline">
+                  Add your first room
+                </Link>{" "}
+                and occupancy will show here.
+              </>
+            ) : (
+              "Occupancy will show here once the owner adds rooms."
+            )}
           </p>
         ) : (
           <div className={TILE_ROW}>

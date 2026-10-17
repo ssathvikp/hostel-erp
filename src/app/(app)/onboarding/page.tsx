@@ -30,9 +30,12 @@ export default async function OnboardingPage({
   const step = requested === "2" && draft ? 2 : 1;
 
   const supabase = await createClient();
-  const { data: details } = draft
+  const { data: details, error } = draft
     ? await supabase.from("hostels").select("*").eq("id", draft.id).single()
-    : { data: null };
+    : { data: null, error: null };
+  // Step 2 renders from the draft; without it, show the error page rather
+  // than crashing on a missing record.
+  if (error) throw error;
 
   const isFirstHostel = hostels.length === 0;
   const title = isFirstHostel ? "Set up your hostel" : "Add another hostel";

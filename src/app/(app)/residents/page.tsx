@@ -119,7 +119,8 @@ export default async function ResidentsPage({
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       const text = single(value);
-      if (text && key !== "page") next.set(key, text);
+      // One-off notices (such as "imported") don't follow the user around.
+      if (text && key !== "page" && key !== "imported") next.set(key, text);
     }
     if (page > 1) next.set("page", String(page));
     return next.size ? `/residents?${next}` : "/residents";

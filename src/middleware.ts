@@ -14,6 +14,7 @@ const PROTECTED_PREFIXES = [
   "/settings",
   "/suspended",
   "/admin",
+  "/diagnostics",
 ];
 
 /** Pages a signed-in user has no reason to see. */

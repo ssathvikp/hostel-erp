@@ -106,7 +106,8 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       const text = single(value);
-      if (text && !["page", "created", "archived", "deleted"].includes(key)) next.set(key, text);
+      if (text && !["page", "created", "archived", "deleted", "imported"].includes(key))
+        next.set(key, text);
     }
     if (page > 1) next.set("page", String(page));
     return next.size ? `/rooms?${next}` : "/rooms";

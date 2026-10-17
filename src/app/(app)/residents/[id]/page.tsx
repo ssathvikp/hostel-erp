@@ -366,8 +366,8 @@ export default async function ResidentPage({
           resident={{
             id: resident.id,
             name: resident.full_name,
-            consentAt: resident.consent_at,
-            erasedAt: resident.erased_at,
+            consentAt: resident.consent_at ? moment.format(new Date(resident.consent_at)) : null,
+            erasedAt: resident.erased_at ? moment.format(new Date(resident.erased_at)) : null,
           }}
           isOwner={user.role === "owner"}
           erasable={eraseBlockers.length === 0}

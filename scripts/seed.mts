@@ -23,7 +23,7 @@ if (!url || !serviceKey || !anonKey) {
   process.exit(1);
 }
 // Demo data must never reach a hosted project.
-if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(url)) {
   console.error(`Refusing to seed ${url}: the seed script only runs against local Supabase.`);
   process.exit(1);
 }

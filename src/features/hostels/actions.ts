@@ -145,20 +145,15 @@ export async function isHostelNameTaken(name: string): Promise<boolean> {
   const user = await requireRole(["owner"]).catch(() => null);
   if (!user) return false;
 
+  // Compared the way the unique index does (lower(btrim(name))). Done in
+  // code rather than with ilike, where * % _ in a name act as wildcards.
   const { draft } = await getHostelContext();
   const supabase = await createClient();
-  let query = supabase
-    .from("hostels")
-    .select("id")
-    .eq("owner_id", user.id)
-    .ilike(
-      "name",
-      trimmed.replace(/[\\%_]/g, (char) => `\\${char}`),
-    );
-  if (draft) query = query.neq("id", draft.id);
-
-  const { data } = await query.limit(1);
-  return (data ?? []).length > 0;
+  const { data } = await supabase.from("hostels").select("id, name").eq("owner_id", user.id);
+  const wanted = trimmed.toLowerCase();
+  return (data ?? []).some(
+    (hostel) => hostel.id !== draft?.id && hostel.name.trim().toLowerCase() === wanted,
+  );
 }
 
 // ---------------------------------------------------------------------------

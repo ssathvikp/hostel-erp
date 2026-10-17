@@ -47,21 +47,26 @@ if (account.role === "staff") {
   process.exit(1);
 }
 
-const { count } = await admin
+const { count, error: countError } = await admin
   .from("hostels")
   .select("id", { count: "exact", head: true })
   .eq("owner_id", account.user_id);
-if (count) {
+if (countError || count === null) {
+  console.error(`Could not check ${email}'s hostels: ${countError?.message ?? "no count"}`);
+  process.exit(1);
+}
+if (count > 0) {
   console.error(`${email} owns ${count} hostel(s). Use a separate address for the admin account.`);
   process.exit(1);
 }
 
-const { error: updateError } = await admin
+const { data: updated, error: updateError } = await admin
   .from("profiles")
   .update({ role: "platform_admin", hostel_id: null })
-  .eq("id", account.user_id);
-if (updateError) {
-  console.error(`Could not update ${email}: ${updateError.message}`);
+  .eq("id", account.user_id)
+  .select("id");
+if (updateError || !updated?.length) {
+  console.error(`Could not update ${email}: ${updateError?.message ?? "no profile row"}`);
   process.exit(1);
 }
 console.log(`${email} is now a platform admin. They sign in as usual and land on /admin.`);

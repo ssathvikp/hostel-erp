@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
 import { Select, Spinner, type SelectOption } from "@/components/ui";
+import { formatMonth } from "@/lib/money";
 
 import { DUE_STATUS_OPTIONS } from "../options";
 
@@ -38,6 +39,14 @@ export function FeeFilters({
     startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname));
   }
 
+  // A month in the URL with no invoices (an old link, or every invoice
+  // voided) still filters the list, so the dropdown must show it too.
+  const selectedMonth = params.get("month") ?? "";
+  const monthOptions =
+    selectedMonth && !months.some((month) => month.value === selectedMonth)
+      ? [{ value: selectedMonth, label: formatMonth(selectedMonth) }, ...months]
+      : months;
+
   return (
     <div
       role="search"
@@ -57,8 +66,8 @@ export function FeeFilters({
         id="fee-month"
         label="Month"
         placeholder="All months"
-        options={months}
-        value={params.get("month") ?? ""}
+        options={monthOptions}
+        value={selectedMonth}
         onChange={(event) => update("month", event.target.value)}
       />
       <Select

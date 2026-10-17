@@ -92,7 +92,11 @@ export const rupees = (
     .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, {
       error: `${label} can have at most 2 decimal places`,
     })
-    .transform(rupeesToPaise);
+    .transform(rupeesToPaise)
+    // A value like 0.000000001 passes the checks above but is 0 paise.
+    .refine((paise) => !positive || paise > 0, {
+      error: `${label} must be greater than zero`,
+    });
 
 /** Today's date as `YYYY-MM-DD` in India Standard Time. */
 export function todayIst(now: Date = new Date()): string {

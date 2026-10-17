@@ -372,3 +372,12 @@ describe("result helpers", () => {
     expect(ageOn("2000-10-06", "2026-10-06")).toBe(26);
   });
 });
+
+describe("rupee amounts that round to nothing", () => {
+  it("are refused rather than stored as 0 paise", async () => {
+    const { rupees } = await import("@/lib/validation");
+    expect(rupees("Amount").safeParse("0.000000001").success).toBe(false);
+    expect(rupees("Amount").safeParse("0.01").success).toBe(true);
+    expect(rupees("Amount", { positive: false }).safeParse("0").success).toBe(true);
+  });
+});

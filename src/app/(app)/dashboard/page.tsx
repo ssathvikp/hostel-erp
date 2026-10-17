@@ -53,7 +53,7 @@ export default async function DashboardPage({
 
       <div className="space-y-6">
         <Suspense key={`kpi-${rangeKey}`} fallback={<KpiSkeleton />}>
-          <KpiSection hostelId={hostel.id} range={range} />
+          <KpiSection hostelId={hostel.id} range={range} canAddRooms={user.role === "owner"} />
         </Suspense>
         <Suspense key={`trend-${rangeKey}`} fallback={<PanelSkeleton height="h-60" />}>
           <TrendSection hostelId={hostel.id} range={range} />

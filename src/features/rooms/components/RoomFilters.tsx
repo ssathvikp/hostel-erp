@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
 
 import { Input, Select, Spinner } from "@/components/ui";
 
@@ -26,6 +26,9 @@ export function RoomFilters({ floors }: { floors: readonly number[] }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  // Enter submits the search, and the blur that follows would ask for the
+  // same URL again while that navigation is still pending: skip it.
+  const lastRequested = useRef<string | null>(null);
 
   function update(name: string, value: string) {
     const next = new URLSearchParams(params);
@@ -33,8 +36,11 @@ export function RoomFilters({ floors }: { floors: readonly number[] }) {
     else next.delete(name);
     // A different filter means a different result set: start at page 1.
     next.delete("page");
-    for (const flash of ["created", "archived", "deleted"]) next.delete(flash);
-    startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname));
+    for (const flash of ["created", "archived", "deleted", "imported"]) next.delete(flash);
+    const url = next.size ? `${pathname}?${next}` : pathname;
+    if (pending && url === lastRequested.current) return;
+    lastRequested.current = url;
+    startTransition(() => router.replace(url));
   }
 
   const floorOptions = floors.map((floor) => ({ value: String(floor), label: floorLabel(floor) }));

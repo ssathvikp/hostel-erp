@@ -29,6 +29,8 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
   const [removeState, remove, removingNow] = useActionState(removeStaff, initialFormState);
 
   // Only the outcome of the last action taken is shown.
+  // Which row's button was pressed, so only that one shows it is busy.
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [last, setLast] = useState<"resend" | "revoke" | "remove" | null>(null);
   const state = { resend: resendState, revoke: revokeState, remove: removeState }[last ?? "resend"];
   const error = last ? state.formError : undefined;
@@ -63,17 +65,39 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
                 <div className="flex justify-end gap-2">
                   {row.status === "invited" && row.invitationId && (
                     <>
-                      <form action={resend} onSubmit={() => setLast("resend")}>
+                      <form
+                        action={resend}
+                        onSubmit={() => {
+                          setLast("resend");
+                          setBusyId(row.invitationId);
+                        }}
+                      >
                         <HostelField />
                         <input type="hidden" name="invitation_id" value={row.invitationId} />
-                        <Button type="submit" size="sm" variant="secondary" loading={resending}>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="secondary"
+                          loading={resending && busyId === row.invitationId}
+                        >
                           Resend<span className="sr-only"> invitation to {row.fullName}</span>
                         </Button>
                       </form>
-                      <form action={revoke} onSubmit={() => setLast("revoke")}>
+                      <form
+                        action={revoke}
+                        onSubmit={() => {
+                          setLast("revoke");
+                          setBusyId(row.invitationId);
+                        }}
+                      >
                         <HostelField />
                         <input type="hidden" name="invitation_id" value={row.invitationId} />
-                        <Button type="submit" size="sm" variant="ghost" loading={revoking}>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="ghost"
+                          loading={revoking && busyId === row.invitationId}
+                        >
                           Cancel<span className="sr-only"> invitation to {row.fullName}</span>
                         </Button>
                       </form>

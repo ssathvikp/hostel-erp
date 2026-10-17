@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
 
 import { Input, Select, Spinner, type SelectOption } from "@/components/ui";
 
@@ -22,13 +22,20 @@ export function ResidentFilters({ rooms }: { rooms: readonly SelectOption[] }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  // Enter submits the search, and the blur that follows would ask for the
+  // same URL again while that navigation is still pending: skip it.
+  const lastRequested = useRef<string | null>(null);
 
   function update(name: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(name, value);
     else next.delete(name);
     next.delete("page");
-    startTransition(() => router.replace(next.size ? `${pathname}?${next}` : pathname));
+    next.delete("imported");
+    const url = next.size ? `${pathname}?${next}` : pathname;
+    if (pending && url === lastRequested.current) return;
+    lastRequested.current = url;
+    startTransition(() => router.replace(url));
   }
 
   return (

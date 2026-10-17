@@ -124,3 +124,15 @@ describe("resident import", () => {
     expect(rows[0].errors).toEqual([]);
   });
 });
+
+describe("line numbers in import errors", () => {
+  it("match the spreadsheet after blank lines and multi-line cells", () => {
+    const { rows } = parseImport(
+      "rooms",
+      'room_number,floor,sharing_type,capacity\n\n101,1,double,2\n"10\n2",1,double,2\n103,x,single,1\n',
+    );
+    // Line 2 is blank; the second room spans lines 4-5; the bad row is line 6.
+    expect(rows.map((row) => row.line)).toEqual([3, 4, 6]);
+    expect(rows[2].errors[0]).toMatch(/^floor:/);
+  });
+});

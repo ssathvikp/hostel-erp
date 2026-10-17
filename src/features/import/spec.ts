@@ -4,7 +4,7 @@
  * import and the tests. Rows are validated with the same schemas as the
  * forms, so an imported record is exactly as clean as a typed one.
  */
-import { parseCsv } from "@/lib/csv";
+import { parseCsvRows } from "@/lib/csv";
 import { residentSchema, roomSchema, validate } from "@/lib/validation";
 import type { z } from "zod";
 
@@ -222,11 +222,11 @@ export interface ParsedImport<T> {
 export function parseImport(kind: "rooms", text: string): ParsedImport<RoomRow>;
 export function parseImport(kind: "residents", text: string): ParsedImport<ResidentRow>;
 export function parseImport(kind: ImportKind, text: string): ParsedImport<RoomRow | ResidentRow> {
-  const table = parseCsv(text);
+  const table = parseCsvRows(text);
   if (table.length === 0) return { fileErrors: ["The file is empty."], rows: [] };
 
   const columns = COLUMNS[kind];
-  const header = table[0].map(normaliseHeader);
+  const header = table[0].cells.map(normaliseHeader);
   const indexOf = new Map<string, number>();
   for (const column of columns) {
     const names = [column.key, column.label, ...(column.aliases ?? [])].map(normaliseHeader);
@@ -256,11 +256,10 @@ export function parseImport(kind: ImportKind, text: string): ParsedImport<RoomRo
 
   const schema = kind === "rooms" ? roomSchema : residentSchema;
   const seen = new Map<string, number>();
-  const rows = body.map((cells, i) => {
+  const rows = body.map(({ cells, line }) => {
     const raw: Record<string, string> = {};
     for (const [key, index] of indexOf) raw[key] = (cells[index] ?? "").trim();
     const result = validate(schema, normaliseRow(kind, raw));
-    const line = i + 2;
     if (!result.ok) {
       const errors = Object.entries(result.fieldErrors).map(
         ([key, messages]) => `${key}: ${messages[0]}`,

@@ -261,3 +261,72 @@ All eleven tests above fail when run without
 - **Tests:** new `tests/e2e/dialogs.spec.ts`: a failed overpayment, Cancel,
   reopen, and the dialog is clean with the balance as the amount. It
   failed before. The full browser suite passes.
+
+## 19. Import notice stuck to later links
+
+- **Problem:** after an import, "N rooms/residents were imported" reappeared
+  on every filter change and page link, because the `imported` parameter
+  was carried along.
+- **Change:** `rooms/page.tsx` and `residents/page.tsx` page links, and
+  `RoomFilters` and `ResidentFilters`, drop `imported`. The two filter bars
+  also skip a repeat request for the same URL while a navigation is still
+  pending: pressing Enter in search, then leaving the field, asked twice.
+
+## 20. Smaller correctness fixes
+
+- **Staff list:** each row's Resend/Cancel shows its own pending state
+  (all of them used to spin together).
+- **Import error line numbers:** `parseCsvRows` in `src/lib/csv.ts` records
+  the line each row starts on, so errors match the spreadsheet after blank
+  lines and cells spanning several lines. Test in `tests/unit/import.test.ts`.
+- **Amounts that round to nothing:** `rupees()` refuses a value like
+  `0.000000001`, which used to pass and become 0 paise (then a database
+  error). Test in `tests/unit/validation.test.ts`.
+- **Hostel name check:** compared in code the way the unique index does,
+  instead of `ilike`, where `*`, `%` and `_` in a name acted as wildcards.
+- **Dashboard for staff:** "No beds yet" no longer links staff to Add room,
+  which only owners can use.
+- **Fee month filter:** a month in the URL that has no issued invoices
+  still shows in the dropdown, instead of "All months" while the list is
+  filtered.
+- **Onboarding:** a failed read of the draft hostel shows the error page
+  instead of crashing on `details!`.
+- **Privacy section dates:** formatted on the server, so the browser can't
+  render them differently (a hydration mismatch).
+- **`/diagnostics`** is in the middleware's signed-in list (the layout
+  already required sign-in).
+- **Scripts:** the seed's local-only check is anchored, so
+  `http://localhost.example.com` is refused. `npm run admin:grant` stops if
+  it cannot count the account's hostels or no profile row was updated
+  (both used to report success). Checked by hand against the local stack.
+
+## 21. Other sites could sign a user out
+
+- **Problem:** `/auth/signout` is a GET, so any page could end someone's
+  session with an image tag.
+- **Change:** it ignores requests whose `Sec-Fetch-Site` is another site
+  and sends them to the dashboard.
+- **Tests:** new `tests/e2e/signout.spec.ts`.
+
+## Not changed: these need a product decision
+
+- **Staff can set a custom rent** (`rent_override`) when allocating. That
+  overrides the owner's rates. Should it be owner-only?
+- **Billing a past month uses the room's current sharing type.** A room
+  changed from double to triple mid-month bills everyone at the new rate.
+  Fixing it needs a history of room changes.
+- **A wrong allocation made today can only be closed tomorrow,** so it
+  always costs at least one night.
+- **A transfer drops a negotiated rent** unless it is entered again (the
+  screen says so).
+- **Printed invoice lines** show each stay's monthly rate and nights, not
+  the prorated amount per line.
+- **Other low-risk items noted in the review:**
+  - invoices inserted directly by an owner (not through Generate) skip its
+    checks;
+  - two hostels created at the same instant with clashing names can fail
+    instead of getting a new slug;
+  - users who recorded anything can't be deleted (deactivate them
+    instead);
+  - `secure_password_change` is off;
+  - two simultaneous ID-proof uploads can leave one unreferenced file.
