@@ -29,6 +29,14 @@ const STAFF_PATH = "/settings/staff";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
+const UNIQUE_VIOLATION = "23505";
+
+function alreadyInvited(values: Record<string, string>): FormState {
+  return formFailure(undefined, values, {
+    email: ["This person is already invited. Use Resend in the list below if they lost the email."],
+  });
+}
+
 function authorizationFailure(error: unknown, values?: Record<string, string>): FormState {
   if (error instanceof AuthorizationError) return formFailure(error.message, values);
   throw error;
@@ -50,6 +58,47 @@ async function accountByEmail(admin: Admin, email: string) {
   const { data, error } = await admin.rpc("account_by_email", { p_email: email });
   if (error) throw error;
   return data[0] ?? null;
+}
+
+/**
+ * Deletes an auth user created for an invitation, but only while no open
+ * invitation points at it. Two owners' clicks racing on the same address
+ * can be handed the same not-yet-confirmed user by Supabase, and deleting
+ * it would break the invitation that did succeed.
+ */
+async function discardUnusedUser(admin: Admin, userId: string): Promise<void> {
+  const { data, error } = await admin
+    .from("staff_invitations")
+    .select("id")
+    .eq("profile_id", userId)
+    .is("revoked_at", null)
+    .limit(1);
+  if (error || (data && data.length > 0)) return;
+  await admin.auth.admin.deleteUser(userId);
+}
+
+/**
+ * The account an invitation created, if it still exists and is still that
+ * invitation's: the same user, staff of this hostel. An email can outlive
+ * its invitation's account (deleted on resend, or never created) and later
+ * belong to someone else entirely, such as an owner who signed up on their
+ * own. That account must never be deleted or banned from here.
+ */
+async function invitedAccount(
+  admin: Admin,
+  invitation: { email: string; profile_id: string | null },
+  hostelId: string,
+) {
+  const account = await accountByEmail(admin, invitation.email);
+  if (!account) return { account: null, foreign: false } as const;
+  const ours =
+    invitation.profile_id !== null &&
+    account.user_id === invitation.profile_id &&
+    account.role === "staff" &&
+    account.hostel_id === hostelId;
+  return ours
+    ? ({ account, foreign: false } as const)
+    : ({ account: null, foreign: true } as const);
 }
 
 /**
@@ -84,7 +133,7 @@ async function sendInvite(
     .update({ role: "staff", hostel_id: input.hostelId, full_name: input.fullName })
     .eq("id", userId);
   if (profileError) {
-    await admin.auth.admin.deleteUser(userId);
+    await discardUnusedUser(admin, userId);
     return { error: profileError };
   }
   return { userId };
@@ -118,13 +167,7 @@ export async function inviteStaff(_previous: FormState, formData: FormData): Pro
     .is("revoked_at", null)
     .maybeSingle();
   if (openError) return unexpectedFailure("inviteStaff", openError, values);
-  if (open) {
-    return formFailure(undefined, values, {
-      email: [
-        "This person is already invited. Use Resend in the list below if they lost the email.",
-      ],
-    });
-  }
+  if (open) return alreadyInvited(values);
 
   const admin = createAdminClient();
   let account;
@@ -143,25 +186,35 @@ export async function inviteStaff(_previous: FormState, formData: FormData): Pro
         email: ["This email already has a Hostel ERP account. Staff need their own email address."],
       });
     }
-    const { error: profileError } = await admin
-      .from("profiles")
-      .update({ deactivated_at: null })
-      .eq("id", account.user_id);
-    if (profileError) return unexpectedFailure("inviteStaff", profileError, values);
+    // Record the invitation first: if a later step fails it is withdrawn
+    // again, so the list never shows "removed" for someone with access.
+    const { data: invitation, error: insertError } = await admin
+      .from("staff_invitations")
+      .insert({
+        hostel_id: hostel.id,
+        email,
+        full_name: fullName,
+        profile_id: account.user_id,
+        invited_by: user.id,
+        accepted_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (insertError) {
+      if (insertError.code === UNIQUE_VIOLATION) return alreadyInvited(values);
+      return unexpectedFailure("inviteStaff", insertError, values);
+    }
     const { error: banError } = await admin.auth.admin.updateUserById(account.user_id, {
       ban_duration: "none",
     });
-    if (banError) return unexpectedFailure("inviteStaff", banError, values);
-    const now = new Date().toISOString();
-    const { error: insertError } = await admin.from("staff_invitations").insert({
-      hostel_id: hostel.id,
-      email,
-      full_name: fullName,
-      profile_id: account.user_id,
-      invited_by: user.id,
-      accepted_at: now,
-    });
-    if (insertError) return unexpectedFailure("inviteStaff", insertError, values);
+    const { error: profileError } = banError
+      ? { error: null }
+      : await admin.from("profiles").update({ deactivated_at: null }).eq("id", account.user_id);
+    if (banError || profileError) {
+      await admin.auth.admin.updateUserById(account.user_id, { ban_duration: BAN_FOREVER });
+      await admin.from("staff_invitations").delete().eq("id", invitation.id);
+      return unexpectedFailure("inviteStaff", banError ?? profileError, values);
+    }
     revalidatePath(STAFF_PATH);
     return formSuccess(
       `${fullName} has access to ${hostel.name} again. They sign in with their existing password.`,
@@ -189,7 +242,9 @@ export async function inviteStaff(_previous: FormState, formData: FormData): Pro
     invited_by: user.id,
   });
   if (insertError) {
-    await admin.auth.admin.deleteUser(sent.userId);
+    await discardUnusedUser(admin, sent.userId);
+    // Another click invited the same address a moment earlier.
+    if (insertError.code === UNIQUE_VIOLATION) return alreadyInvited(values);
     return unexpectedFailure("inviteStaff", insertError, values);
   }
 
@@ -236,7 +291,15 @@ export async function resendInvitation(
     if (!invitation || invitation.hostel_id !== hostel.id) return formFailure(NOT_PENDING);
 
     const admin = createAdminClient();
-    const account = await accountByEmail(admin, invitation.email);
+    const { account, foreign } = await invitedAccount(admin, invitation, hostel.id);
+    if (foreign) {
+      // The address now belongs to an account this invitation did not make.
+      await withdraw(admin, invitation.id, user.id);
+      revalidatePath(STAFF_PATH);
+      return formFailure(
+        `${invitation.email} now has its own Hostel ERP account, so this invitation was cancelled. Invite them with a different email address.`,
+      );
+    }
     if (account?.email_confirmed) {
       return formFailure(
         `${invitation.full_name} already opened the invitation. They can choose a password with "Forgot password" on the sign-in page.`,
@@ -244,7 +307,10 @@ export async function resendInvitation(
     }
 
     // The old link can't be reissued, so the unused account is replaced.
-    if (account) await admin.auth.admin.deleteUser(account.user_id);
+    if (account) {
+      const { error: deleteError } = await admin.auth.admin.deleteUser(account.user_id);
+      if (deleteError) return unexpectedFailure("resendInvitation", deleteError);
+    }
     const sent = await sendInvite(admin, {
       email: invitation.email,
       fullName: invitation.full_name,
@@ -287,18 +353,18 @@ export async function revokeInvitation(
     if (!invitation || invitation.hostel_id !== hostel.id) return formFailure(NOT_PENDING);
 
     const admin = createAdminClient();
-    const account = await accountByEmail(admin, invitation.email);
+    // Only the account this invitation created is touched; an address that
+    // now belongs to someone else just has its invitation withdrawn.
+    const { account } = await invitedAccount(admin, invitation, hostel.id);
     if (account && !account.email_confirmed) {
       // Never used: the account has no history, so it goes entirely.
-      await admin.auth.admin.deleteUser(account.user_id);
+      const { error: deleteError } = await admin.auth.admin.deleteUser(account.user_id);
+      if (deleteError) return unexpectedFailure("revokeInvitation", deleteError);
     } else if (account) {
       const removed = await deactivate(admin, account.user_id);
       if (removed) return unexpectedFailure("revokeInvitation", removed);
     }
-    const { error } = await admin
-      .from("staff_invitations")
-      .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
-      .eq("id", invitation.id);
+    const error = await withdraw(admin, invitation.id, user.id);
     if (error) return unexpectedFailure("revokeInvitation", error);
   } catch (error) {
     return unexpectedFailure("revokeInvitation", error);
@@ -312,12 +378,27 @@ export async function revokeInvitation(
 // Remove a staff member
 // ---------------------------------------------------------------------------
 
-/** Ends membership now (database) and blocks new sign-ins (auth). */
+/** Marks an invitation withdrawn. Returns the error, if any. */
+async function withdraw(admin: Admin, invitationId: string, ownerId: string) {
+  const { error } = await admin
+    .from("staff_invitations")
+    .update({ revoked_at: new Date().toISOString(), revoked_by: ownerId })
+    .eq("id", invitationId)
+    .is("revoked_at", null);
+  return error;
+}
+
+/**
+ * Ends membership now (database) and blocks new sign-ins (auth). Safe to
+ * repeat: an earlier attempt that deactivated but failed to ban is
+ * finished by the next one, and the original removal time is kept.
+ */
 async function deactivate(admin: Admin, profileId: string): Promise<unknown> {
   const { error } = await admin
     .from("profiles")
     .update({ deactivated_at: new Date().toISOString() })
-    .eq("id", profileId);
+    .eq("id", profileId)
+    .is("deactivated_at", null);
   if (error) return error;
   const { error: banError } = await admin.auth.admin.updateUserById(profileId, {
     ban_duration: BAN_FOREVER,
@@ -350,7 +431,6 @@ export async function removeStaff(_previous: FormState, formData: FormData): Pro
   if (!staff || staff.hostel_id !== hostel.id) {
     return formFailure("This staff member could not be found. Refresh the page.");
   }
-  if (staff.deactivated_at) return formSuccess(`${staff.full_name} was already removed.`);
 
   const admin = createAdminClient();
   const failed = await deactivate(admin, staff.id);

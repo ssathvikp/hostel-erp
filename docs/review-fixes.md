@@ -61,3 +61,36 @@ Not changed, because they need a product decision, are listed at the end.
     the reminder send buttons pass the id directly.
 - **Tests:** new `tests/e2e/hostel-tabs.spec.ts` (fails without the check);
   the whole browser suite passes, so no form was missed.
+
+## 5. Cancelling or resending a staff invitation could hit the wrong account
+
+- **Problem:** Resend and Cancel looked up whichever account currently owned
+  the invited email and deleted or banned it. If the invitation's own
+  account had gone (for example a resend that failed half-way) and the same
+  address later signed up as an owner, Cancel banned that owner and Resend
+  could delete them. Other gaps in `src/features/staff/actions.ts`:
+  - failed `deleteUser` calls were ignored, so an invitation could show as
+    cancelled while its link still worked;
+  - two quick clicks on Invite could delete the account the first
+    invitation used;
+  - re-inviting a removed staff member reactivated them before recording
+    the invitation, so a failure left someone with access shown as
+    "removed";
+  - Remove stopped at "already removed", so a removal whose login ban had
+    failed could never be finished.
+- **Change:**
+  - `invitedAccount()` only returns the account when it is the
+    invitation's own: same user id, staff of this hostel. Otherwise
+    nothing is deleted or banned. Resend withdraws the invitation and
+    says the address now has its own account.
+  - Every `deleteUser` and `updateUserById` result is checked.
+  - `discardUnusedUser()` only deletes a newly created account that no
+    open invitation references. A duplicate invitation from a double click
+    shows "already invited".
+  - Re-invite records the invitation first, then lifts the ban and
+    reactivates, and undoes both if either step fails.
+  - Remove can be repeated safely, keeping the original removal time.
+- **Tests:** new e2e case in `tests/e2e/staff.spec.ts` deletes the
+  invitation's account and recreates the address as an independent owner.
+  Resend must not touch that owner. It failed before the change. The
+  existing invite, accept, remove, resend and cancel tests still pass.

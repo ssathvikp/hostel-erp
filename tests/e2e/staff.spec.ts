@@ -136,3 +136,55 @@ test("a pending invitation can be resent or cancelled", async ({ page }) => {
       .getByText("Removed"),
   ).toBeVisible();
 });
+
+test("cancelling an old invitation never touches an account it did not create", async ({
+  page,
+}) => {
+  const owner = await factory.createUser({ fullName: "Careful Owner" });
+  await factory.createHostel(owner.id);
+  const email = `reused-${randomUUID()}@example.com`;
+  invitedEmails.push(email);
+
+  await signIn(page, owner.email, TEST_PASSWORD);
+  await page.goto("/settings/staff");
+  await page.getByLabel(/^Name/).fill("Gone Away");
+  await page.getByLabel(/^Email/).fill(email);
+  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+  await expect(inMain(page).getByText(`Invitation sent to ${email}`)).toBeVisible();
+
+  // The invited account disappears (e.g. a resend that failed half-way) and
+  // the same address later signs up on its own as an owner of another hostel.
+  const admin = adminClient();
+  const { data: before } = await admin.rpc("account_by_email", { p_email: email });
+  await admin.auth.admin.deleteUser(before![0].user_id);
+  const { data: created } = await admin.auth.admin.createUser({
+    email,
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: { full_name: "Independent Owner" },
+  });
+  const independent = created.user!.id;
+
+  // Resend explains and withdraws the invitation instead of deleting them.
+  await page.reload();
+  await page.getByRole("button", { name: "Resend invitation to Gone Away" }).click();
+  await expect(
+    inMain(page).getByText("now has its own Hostel ERP account", { exact: false }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    inMain(page)
+      .getByRole("row", { name: /Gone Away/ })
+      .getByText("Removed"),
+  ).toBeVisible();
+
+  // The independent owner is untouched: not banned, not deactivated.
+  const { data: user } = await admin.auth.admin.getUserById(independent);
+  expect(user.user?.banned_until ?? null).toBeNull();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role, deactivated_at")
+    .eq("id", independent)
+    .single();
+  expect(profile).toEqual({ role: "owner", deactivated_at: null });
+});
