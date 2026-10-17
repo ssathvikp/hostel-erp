@@ -264,3 +264,24 @@ security invoker and derive everything at read time.
 - An automated provider implements `NotificationChannel`
   (`src/features/notifications/channels.ts`) and logs with channel `sms`
   or `email`; the screens do not change.
+
+## Platform admin, plans and trials (EP-10)
+
+- `profiles.role = 'platform_admin'` belongs to no hostel. Admins use
+  `/admin` only; `npm run admin:grant -- <email>` promotes an existing
+  account that owns no hostel and is nobody's staff.
+- `hostels.plan` is `trial`, `paid` or `free`; `trial_ends_at` is required
+  on a trial. Every new hostel starts on a 90-day trial (trigger). Users
+  cannot write these columns or `suspension_reason`.
+- Admin work goes through `admin_hostels()`, `admin_set_plan()` and
+  `admin_set_suspended()`: public security-invoker wrappers over
+  `SECURITY DEFINER` functions in `private` that call
+  `private.require_platform_admin()` first. They return hostel-level
+  counts only, never resident rows, and admins still read no tenant table.
+- **Suspension** sets `status = 'suspended'` with a reason. The membership
+  helpers skip suspended hostels, so nothing inside them can be read or
+  written; the owner still reads the hostel row (direct `owner_id` test)
+  and sees why. Restoring sets it back to `active`. Drafts cannot be
+  suspended.
+- Nothing is locked when a trial ends; the owner sees a banner from 14 days
+  before. What happens next is a business decision made in `/admin`.

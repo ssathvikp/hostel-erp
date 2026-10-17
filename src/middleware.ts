@@ -12,6 +12,8 @@ const PROTECTED_PREFIXES = [
   "/occupancy",
   "/fees",
   "/settings",
+  "/suspended",
+  "/admin",
 ];
 
 /** Pages a signed-in user has no reason to see. */

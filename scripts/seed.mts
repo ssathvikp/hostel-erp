@@ -31,6 +31,7 @@ if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
 const PASSWORD = "Demo-passw0rd";
 const OWNER = { email: "owner@demo.hostel-erp.test", fullName: "Lakshmi Narayanan" };
 const STAFF = { email: "warden@demo.hostel-erp.test", fullName: "Suresh Kumar" };
+const PLATFORM_ADMIN = { email: "admin@demo.hostel-erp.test", fullName: "Platform Admin" };
 const HOSTEL_NAME = "Sunrise Residency";
 
 const options = { auth: { autoRefreshToken: false, persistSession: false } } as const;
@@ -376,6 +377,16 @@ if (!wardenInvite) {
   );
 }
 
+// The operator console (/admin) for the people running Hostel ERP.
+const platformAdminId = await ensureUser(PLATFORM_ADMIN.email, PLATFORM_ADMIN.fullName);
+check(
+  await admin
+    .from("profiles")
+    .update({ role: "platform_admin", hostel_id: null })
+    .eq("id", platformAdminId),
+  "making the platform admin",
+);
+
 await ensureInventory(hostelId);
 await ensureResidents(hostelId, ownerId);
 
@@ -398,7 +409,8 @@ Seeded "${HOSTEL_NAME}": ${beds} beds, ${residents} residents, ${invoices} invoi
 
   Owner   ${OWNER.email}
   Staff   ${STAFF.email}
-  Password for both: ${PASSWORD}
+  Admin   ${PLATFORM_ADMIN.email}  (platform console at /admin)
+  Password for all: ${PASSWORD}
 
 Sign in at http://localhost:3000/login
 `);

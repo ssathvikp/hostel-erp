@@ -465,10 +465,13 @@ export type Database = {
           owner_id: string;
           phone: string;
           pincode: string | null;
+          plan: string;
           reminder_template: string | null;
           slug: string;
           state: string | null;
           status: string;
+          suspension_reason: string | null;
+          trial_ends_at: string | null;
           type: string;
           updated_at: string;
         };
@@ -486,10 +489,13 @@ export type Database = {
           owner_id?: string;
           phone: string;
           pincode?: string | null;
+          plan?: string;
           reminder_template?: string | null;
           slug?: string;
           state?: string | null;
           status?: string;
+          suspension_reason?: string | null;
+          trial_ends_at?: string | null;
           type: string;
           updated_at?: string;
         };
@@ -506,10 +512,13 @@ export type Database = {
           owner_id?: string;
           phone?: string;
           pincode?: string | null;
+          plan?: string;
           reminder_template?: string | null;
           slug?: string;
           state?: string | null;
           status?: string;
+          suspension_reason?: string | null;
+          trial_ends_at?: string | null;
           type?: string;
           updated_at?: string;
         };
@@ -1374,6 +1383,37 @@ export type Database = {
           role: string;
           user_id: string;
         }[];
+      };
+      admin_hostels: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          beds: number;
+          city: string;
+          collected_this_month: number;
+          created_at: string;
+          id: string;
+          invoices_this_month: number;
+          last_activity_at: string;
+          name: string;
+          occupied_beds: number;
+          owner_email: string;
+          owner_name: string;
+          plan: string;
+          residents: number;
+          rooms: number;
+          staff: number;
+          status: string;
+          suspension_reason: string;
+          trial_ends_at: string;
+        }[];
+      };
+      admin_set_plan: {
+        Args: { p_hostel_id: string; p_plan: string; p_trial_ends_at: string };
+        Returns: undefined;
+      };
+      admin_set_suspended: {
+        Args: { p_hostel_id: string; p_reason: string; p_suspend: boolean };
+        Returns: undefined;
       };
       allocate_bed: {
         Args: {

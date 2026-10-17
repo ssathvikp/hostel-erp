@@ -138,3 +138,27 @@ test("every signed-in screen with data on it", async ({ page }) => {
     await expectNoViolations(page, path);
   }
 });
+
+test("the platform admin console and a suspended hostel", async ({ page, browser }) => {
+  const platformAdmin = await factory.createUser({
+    fullName: "Ops Admin",
+    profile: { role: "platform_admin" },
+  });
+  const owner = await factory.createUser({ fullName: "Suspended Owner" });
+  const hostel = await factory.createHostel(owner.id, {
+    name: "Paused PG",
+    status: "suspended",
+    suspension_reason: "Subscription unpaid",
+  });
+
+  await signIn(page, platformAdmin.email, TEST_PASSWORD);
+  for (const path of ["/admin", `/admin/hostels/${hostel.id}`]) {
+    await expectNoViolations(page, path);
+  }
+
+  const ownerContext = await browser.newContext();
+  const ownerPage = await ownerContext.newPage();
+  await signIn(ownerPage, owner.email, TEST_PASSWORD);
+  await expectNoViolations(ownerPage, "/suspended");
+  await ownerContext.close();
+});

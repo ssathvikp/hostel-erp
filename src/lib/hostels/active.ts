@@ -14,6 +14,10 @@ export interface HostelSummary {
   id: Uuid;
   name: string;
   status: HostelStatus;
+  /** trial, paid or free (EP-10). */
+  plan: string;
+  trialEndsAt: string | null;
+  suspensionReason: string | null;
 }
 
 export interface HostelContext {
@@ -23,6 +27,8 @@ export interface HostelContext {
   hostels: HostelSummary[];
   /** The owner's unfinished onboarding, if one exists. */
   draft: HostelSummary | null;
+  /** The owner's hostels a platform admin has suspended (EP-10). */
+  suspended: HostelSummary[];
 }
 
 /**
@@ -33,32 +39,49 @@ export interface HostelContext {
  */
 export const getHostelContext = cache(async (): Promise<HostelContext> => {
   const user = await getSessionUser();
-  if (!user) return { active: null, hostels: [], draft: null };
+  if (!user) return { active: null, hostels: [], draft: null, suspended: [] };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("hostels")
-    .select("id, name, status")
+    .select("id, name, status, plan, trial_ends_at, suspension_reason")
     .order("created_at", { ascending: true });
   if (error) throw error;
 
-  const rows = (data ?? []) as HostelSummary[];
+  const rows: HostelSummary[] = (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    status: row.status as HostelStatus,
+    plan: row.plan,
+    trialEndsAt: row.trial_ends_at,
+    suspensionReason: row.suspension_reason,
+  }));
   const hostels = rows.filter((hostel) => hostel.status === "active");
   const draft = rows.find((hostel) => hostel.status === "draft") ?? null;
 
   const preferred = (await cookies()).get(ACTIVE_HOSTEL_COOKIE)?.value;
   const active = hostels.find((hostel) => hostel.id === preferred) ?? hostels[0] ?? null;
 
-  return { active, hostels, draft };
+  const suspended = rows.filter((hostel) => hostel.status === "suspended");
+
+  return { active, hostels, draft, suspended };
 });
 
 /**
  * For every page that works inside a hostel: returns the user and the active
- * hostel, or sends the user to finish onboarding when they have none yet.
+ * hostel. Without one, platform admins go to their console, owners whose
+ * only hostels are suspended (and staff, whose one hostel is unavailable)
+ * are told why, and everyone else finishes onboarding.
  */
 export async function requireActiveHostel() {
   const user = await requireUser();
+  if (user.role === "platform_admin") redirect("/admin");
   const context = await getHostelContext();
-  if (!context.active) redirect("/onboarding");
+  if (!context.active) {
+    if (user.role === "staff" || (context.suspended.length > 0 && !context.draft)) {
+      redirect("/suspended");
+    }
+    redirect("/onboarding");
+  }
   return { user, hostel: context.active, context };
 }

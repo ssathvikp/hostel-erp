@@ -30,7 +30,8 @@
     "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "db:seed": "node scripts/seed.mts",
     "env:local": "node scripts/env-local.mjs",
-    "staging:auth": "node scripts/staging/configure-auth.mts"
+    "staging:auth": "node scripts/staging/configure-auth.mts",
+    "admin:grant": "node --env-file=.env.local scripts/grant-admin.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
