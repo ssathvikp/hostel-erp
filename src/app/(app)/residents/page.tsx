@@ -214,7 +214,7 @@ export default async function ResidentsPage({
                           {resident.full_name}
                         </Link>
                       </Td>
-                      <Td>{resident.phone}</Td>
+                      <Td>{resident.phone || "—"}</Td>
                       <Td className={resident.bed_label ? undefined : "text-slate-500"}>
                         {resident.bed_label ?? "Not allocated"}
                       </Td>

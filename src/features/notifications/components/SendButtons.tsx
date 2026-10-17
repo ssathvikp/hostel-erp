@@ -19,7 +19,8 @@ export function SendButtons({
   subject,
   label = "WhatsApp",
 }: {
-  link: string;
+  /** Null when the resident has no mobile number: only copying is offered. */
+  link: string | null;
   message: string;
   send: Omit<ReminderSend, "channel" | "hostelId">;
   /** Who it is for, for accessible names, e.g. "reminder to Ravi". */
@@ -48,16 +49,18 @@ export function SendButtons({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <a
-        href={link}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => record("whatsapp", "WhatsApp opened and the reminder recorded.")}
-        className={buttonClass({ size: "sm" })}
-        aria-label={`Send ${subject} on WhatsApp`}
-      >
-        {label}
-      </a>
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => record("whatsapp", "WhatsApp opened and the reminder recorded.")}
+          className={buttonClass({ size: "sm" })}
+          aria-label={`Send ${subject} on WhatsApp`}
+        >
+          {label}
+        </a>
+      )}
       <Button size="sm" variant="secondary" onClick={copy} aria-label={`Copy ${subject}`}>
         Copy
       </Button>

@@ -51,7 +51,10 @@ export function receiptMessage(input: {
  * digits. Opens WhatsApp (app or web) with the message ready to send; the
  * person sending still presses send, so nothing goes out by itself.
  */
-export function whatsAppLink(phone: string, message: string): string {
-  const digits = phone.replace(/\D/g, "").slice(-10);
+export function whatsAppLink(phone: string | null | undefined, message: string): string | null {
+  const digits = (phone ?? "").replace(/\D/g, "").slice(-10);
+  // No number (an erased resident) gives no link: wa.me without one opens a
+  // contact picker, and the message could go to the wrong person.
+  if (!/^[6-9]\d{9}$/.test(digits)) return null;
   return `https://wa.me/91${digits}?text=${encodeURIComponent(message)}`;
 }

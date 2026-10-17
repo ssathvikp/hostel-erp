@@ -53,7 +53,7 @@ function Party({ invoice }: { invoice: InvoiceDetail }) {
       <dt className="text-slate-500">Resident</dt>
       <dd className="font-medium text-slate-900">{invoice.residentName}</dd>
       <dt className="text-slate-500">Mobile</dt>
-      <dd className="text-slate-900">{invoice.residentPhone}</dd>
+      <dd className="text-slate-900">{invoice.residentPhone || "—"}</dd>
       <dt className="text-slate-500">Room / bed</dt>
       <dd className="text-slate-900">{invoice.bedLabel ?? invoice.roomNumber ?? "—"}</dd>
       <dt className="text-slate-500">Period</dt>

@@ -220,12 +220,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                         >
                           {row.residentName}
                         </Link>
-                        <a
-                          href={`tel:+91${row.residentPhone}`}
-                          className="block text-xs text-slate-600 hover:underline"
-                        >
-                          {row.residentPhone}
-                        </a>
+                        {row.residentPhone && (
+                          <a
+                            href={`tel:+91${row.residentPhone}`}
+                            className="block text-xs text-slate-600 hover:underline"
+                          >
+                            {row.residentPhone}
+                          </a>
+                        )}
                         {row.residentEmail && (
                           <a
                             href={`mailto:${row.residentEmail}`}

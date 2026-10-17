@@ -188,3 +188,21 @@ Not changed, because they need a product decision, are listed at the end.
 
 All eleven tests above fail when run without
 `20261018090000_review_fixes.sql`, except the room-shrink case (see 10).
+
+## 14. Erased residents still showed call and WhatsApp links
+
+- **Problem:** after erasure a resident has no mobile number, but the fee
+  list, invoice page, reminders page and dashboard still rendered
+  `tel:+91` and `https://wa.me/91?...`. WhatsApp then opens a contact
+  picker, so a receipt could be sent to the wrong person and still be
+  logged as sent. The printed invoice showed an empty Mobile field and the
+  invoice page a stray "·".
+- **Change:**
+  - `whatsAppLink()` returns null without a valid 10-digit mobile.
+  - `SendButtons` then offers only Copy.
+  - The call links, the "·" separator and the printed Mobile field appear
+    only when there is a number; the reminders list says "No mobile
+    number", and the residents list and invoice show "—".
+- **Tests:** unit cases for `whatsAppLink`; new e2e case in
+  `tests/e2e/data-rights.spec.ts` (an erased resident's paid invoice has no
+  `tel:` or `wa.me` link, and Copy is still offered).

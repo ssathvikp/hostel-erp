@@ -49,6 +49,12 @@ describe("WhatsApp links", () => {
     );
   });
 
+  it("gives no link without a valid mobile number", () => {
+    for (const phone of [null, undefined, "", "12345", "0123456789"]) {
+      expect(whatsAppLink(phone, "x")).toBeNull();
+    }
+  });
+
   it("uses the last 10 digits of a number typed with a prefix", () => {
     expect(whatsAppLink("+91 98765-43210", "x")).toBe("https://wa.me/919876543210?text=x");
   });

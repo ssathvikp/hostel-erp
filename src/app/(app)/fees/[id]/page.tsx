@@ -124,8 +124,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           className="font-medium text-brand-700 hover:underline"
         >
           {invoice.residentName}
-        </Link>{" "}
-        · {invoice.residentPhone}
+        </Link>
+        {invoice.residentPhone && ` · ${invoice.residentPhone}`}
         {invoice.residentEmail && ` · ${invoice.residentEmail}`}
         {invoice.bedLabel && ` · Bed ${invoice.bedLabel}`}
       </section>

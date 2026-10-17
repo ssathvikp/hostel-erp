@@ -110,7 +110,9 @@ export default async function RemindersPage({
                       >
                         {row.name}
                       </Link>
-                      <span className="block text-xs text-slate-600">{row.phone}</span>
+                      <span className="block text-xs text-slate-600">
+                        {row.phone || "No mobile number"}
+                      </span>
                     </Td>
                     <Td className="text-right tabular-nums">
                       <span className="font-medium">{formatPaise(row.outstanding)}</span>

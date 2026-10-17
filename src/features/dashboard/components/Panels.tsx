@@ -161,12 +161,14 @@ export function OverduePanel({
                   >
                     {resident.name}
                   </Link>
-                  <a
-                    href={`tel:+91${resident.phone}`}
-                    className="block text-xs text-slate-500 hover:underline"
-                  >
-                    {resident.phone}
-                  </a>
+                  {resident.phone && (
+                    <a
+                      href={`tel:+91${resident.phone}`}
+                      className="block text-xs text-slate-500 hover:underline"
+                    >
+                      {resident.phone}
+                    </a>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-slate-900 tabular-nums">

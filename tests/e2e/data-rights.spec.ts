@@ -99,3 +99,43 @@ test("erasing waits until the resident has left, and staff cannot export or eras
   const response = await page.request.get(`/residents/${resident!.id}/export`);
   expect(response.status()).toBe(403);
 });
+
+test("an erased resident's old invoices show no phone links", async ({ page }) => {
+  const owner = await factory.createUser({ fullName: "History Owner" });
+  const hostel = await factory.createHostel(owner.id);
+  const { data: resident } = await admin
+    .from("residents")
+    .insert(residentRow(hostel.id, { status: "vacated" }))
+    .select("id")
+    .single();
+  const { data: invoice } = await admin
+    .from("invoices")
+    .insert({
+      hostel_id: hostel.id,
+      resident_id: resident!.id,
+      period_month: "2026-06-01",
+      amount: 500000,
+      due_date: "2026-06-05",
+      breakdown: [],
+    })
+    .select("id")
+    .single();
+  await admin.from("payments").insert({
+    hostel_id: hostel.id,
+    invoice_id: invoice!.id,
+    amount: 500000,
+    paid_at: "2026-06-03",
+    mode: "cash",
+    recorded_by: owner.id,
+  });
+  await owner.client.rpc("erase_resident", { p_resident_id: resident!.id, p_reason: "Asked" });
+
+  await signIn(page, owner.email, TEST_PASSWORD);
+  await page.goto("/fees");
+  await expect(inMain(page).getByRole("link", { name: /^Erased resident/ })).toBeVisible();
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+
+  await page.goto(`/fees/${invoice!.id}`);
+  await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  await expect(inMain(page).getByRole("button", { name: /^Copy receipt/ })).toBeVisible();
+});
