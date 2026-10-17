@@ -7,6 +7,7 @@ import { Alert, Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { PAYMENT_MODE_OPTIONS } from "@/features/fees/options";
 import { formatPaise, paiseToInput } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 import type { DepositEntryKind } from "@/types";
 
@@ -30,6 +31,7 @@ export function DepositDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(recordDepositEntry, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const [kind, setKind] = useState<DepositEntryKind>(held > 0 ? "refund" : "collected");
   const today = todayIst();
   const formId = `deposit-${residentId}`;
@@ -77,9 +79,9 @@ export function DepositDialog({
           </>
         }
       >
-        <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+        <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
           <HostelField />
-          {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
           <input type="hidden" name="resident_id" value={residentId} />
           <Select
             id={`${formId}-kind`}
@@ -89,7 +91,7 @@ export function DepositDialog({
             value={kind}
             onChange={(event) => setKind(event.target.value as DepositEntryKind)}
             required
-            error={state.fieldErrors.kind?.[0]}
+            error={shown.fieldErrors.kind?.[0]}
           />
           <Input
             key={kind}
@@ -97,12 +99,14 @@ export function DepositDialog({
             name="amount"
             label="Amount (₹)"
             inputMode="decimal"
+            // A typed amount survives a failed submit only for the same kind.
             defaultValue={
-              state.values?.amount || (kind === "refund" && held > 0 ? paiseToInput(held) : "")
+              (shown.values?.kind === kind && shown.values?.amount) ||
+              (kind === "refund" && held > 0 ? paiseToInput(held) : "")
             }
             required
             hint={kind === "collected" ? undefined : `Up to ${formatPaise(held)}.`}
-            error={state.fieldErrors.amount?.[0]}
+            error={shown.fieldErrors.amount?.[0]}
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
@@ -111,9 +115,9 @@ export function DepositDialog({
               type="date"
               label="Date"
               max={today}
-              defaultValue={state.values?.entry_date || today}
+              defaultValue={shown.values?.entry_date || today}
               required
-              error={state.fieldErrors.entry_date?.[0]}
+              error={shown.fieldErrors.entry_date?.[0]}
             />
             {movesMoney && (
               <Select
@@ -122,9 +126,9 @@ export function DepositDialog({
                 label="Mode"
                 placeholder="Choose a mode"
                 options={PAYMENT_MODE_OPTIONS}
-                defaultValue={state.values?.mode ?? ""}
+                defaultValue={shown.values?.mode ?? ""}
                 required
-                error={state.fieldErrors.mode?.[0]}
+                error={shown.fieldErrors.mode?.[0]}
               />
             )}
           </div>
@@ -133,10 +137,10 @@ export function DepositDialog({
               id={`${formId}-reference`}
               name="reference"
               label="Reference"
-              defaultValue={state.values?.reference ?? ""}
+              defaultValue={shown.values?.reference ?? ""}
               hint="Optional. UPI transaction ID, cheque or receipt number."
               maxLength={100}
-              error={state.fieldErrors.reference?.[0]}
+              error={shown.fieldErrors.reference?.[0]}
             />
           )}
           <Textarea
@@ -145,14 +149,14 @@ export function DepositDialog({
             label={kind === "deduction" ? "Reason" : "Note"}
             rows={2}
             maxLength={500}
-            defaultValue={state.values?.reason ?? ""}
+            defaultValue={shown.values?.reason ?? ""}
             required={kind === "deduction"}
             hint={
               kind === "deduction"
                 ? "For example: broken cupboard, or last month's rent unpaid."
                 : "Optional."
             }
-            error={state.fieldErrors.reason?.[0]}
+            error={shown.fieldErrors.reason?.[0]}
           />
         </form>
       </Modal>

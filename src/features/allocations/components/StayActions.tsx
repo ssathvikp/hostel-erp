@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Checkbox, Input, Modal, Select, type SelectOption } from "@/components/ui";
 import { todayIst } from "@/lib/validation";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
 import { transferBed, vacateBed } from "../actions";
@@ -90,6 +91,7 @@ function VacateDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(vacateBed, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const formId = `vacate-${stay.allocationId}`;
   const today = todayIst();
 
@@ -129,9 +131,9 @@ function VacateDialog({
           </>
         }
       >
-        <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+        <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
           <HostelField />
-          {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
           {note && <Alert tone="info">{note}</Alert>}
           <input type="hidden" name="allocation_id" value={stay.allocationId} />
           <input type="hidden" name="resident_id" value={stay.residentId} />
@@ -142,9 +144,9 @@ function VacateDialog({
             label="Move-out date"
             min={earliest}
             max={today}
-            defaultValue={state.values?.move_out_date || today}
+            defaultValue={shown.values?.move_out_date || today}
             required
-            error={state.fieldErrors.move_out_date?.[0]}
+            error={shown.fieldErrors.move_out_date?.[0]}
           />
           <Select
             id={`${formId}-reason`}
@@ -152,16 +154,16 @@ function VacateDialog({
             label="Reason"
             placeholder="Choose a reason"
             options={VACATE_REASON_OPTIONS}
-            defaultValue={state.values?.vacate_reason ?? ""}
+            defaultValue={shown.values?.vacate_reason ?? ""}
             required
-            error={state.fieldErrors.vacate_reason?.[0]}
+            error={shown.fieldErrors.vacate_reason?.[0]}
           />
           <Checkbox
             id={`${formId}-mark`}
             name="mark_vacated"
             label="Also mark the resident as vacated"
             hint="They stay searchable, but are not billed or given a bed until reactivated."
-            defaultChecked={state.values ? state.values.mark_vacated === "on" : true}
+            defaultChecked={shown.values ? shown.values.mark_vacated === "on" : true}
           />
         </form>
       </Modal>
@@ -186,6 +188,7 @@ function TransferDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(transferBed, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const formId = `transfer-${stay.allocationId}`;
   const today = todayIst();
   const empty = bedOptions.length === 0;
@@ -228,9 +231,9 @@ function TransferDialog({
         {empty ? (
           <Alert tone="info">There are no vacant beds to move to.</Alert>
         ) : (
-          <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
             <HostelField />
-            {state.formError && <Alert tone="error">{state.formError}</Alert>}
+            {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
             <input type="hidden" name="allocation_id" value={stay.allocationId} />
             <input type="hidden" name="resident_id" value={stay.residentId} />
             <Select
@@ -239,9 +242,9 @@ function TransferDialog({
               label="New bed"
               placeholder="Choose a vacant bed"
               options={bedOptions}
-              defaultValue={state.values?.bed_id ?? ""}
+              defaultValue={shown.values?.bed_id ?? ""}
               required
-              error={state.fieldErrors.bed_id?.[0]}
+              error={shown.fieldErrors.bed_id?.[0]}
             />
             <Input
               id={`${formId}-date`}
@@ -250,18 +253,18 @@ function TransferDialog({
               label="First night in the new bed"
               min={earliest}
               max={today}
-              defaultValue={state.values?.move_date || today}
+              defaultValue={shown.values?.move_date || today}
               required
-              error={state.fieldErrors.move_date?.[0]}
+              error={shown.fieldErrors.move_date?.[0]}
             />
             <Input
               id={`${formId}-rent`}
               name="rent_override"
               label="Monthly rent override (₹)"
               inputMode="decimal"
-              defaultValue={state.values?.rent_override ?? ""}
+              defaultValue={shown.values?.rent_override ?? ""}
               hint="Optional. Leave blank to use the fee structure for the new room's sharing type."
-              error={state.fieldErrors.rent_override?.[0]}
+              error={shown.fieldErrors.rent_override?.[0]}
             />
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-medium">Before you confirm</p>

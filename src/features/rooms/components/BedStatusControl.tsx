@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select } from "@/components/ui";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 import type { ManualBedStatus } from "@/types";
 
@@ -21,6 +22,7 @@ export function BedStatusControl({
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(setBedStatus, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const [status, setStatus] = useState<string>(bed.status);
 
   // Close once the change is saved; the page re-renders with the new status.
@@ -64,9 +66,9 @@ export function BedStatusControl({
           </>
         }
       >
-        <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+        <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
           <HostelField />
-          {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
           <input type="hidden" name="bed_id" value={bed.id} />
           <Select
             id={`${formId}-status`}
@@ -75,7 +77,7 @@ export function BedStatusControl({
             options={MANUAL_BED_STATUS_OPTIONS}
             value={status}
             onChange={(event) => setStatus(event.currentTarget.value)}
-            error={state.fieldErrors.status?.[0]}
+            error={shown.fieldErrors.status?.[0]}
           />
           {status !== "available" && (
             <Input
@@ -83,9 +85,9 @@ export function BedStatusControl({
               name="status_reason"
               label="Reason"
               maxLength={200}
-              defaultValue={state.values?.status_reason ?? bed.reason ?? ""}
+              defaultValue={shown.values?.status_reason ?? bed.reason ?? ""}
               hint="Optional. For example: broken bed frame, held for a returning resident."
-              error={state.fieldErrors.status_reason?.[0]}
+              error={shown.fieldErrors.status_reason?.[0]}
             />
           )}
         </form>

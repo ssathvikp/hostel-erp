@@ -19,7 +19,14 @@ export function RoomDangerZone({ room }: { room: { id: string; number: string } 
   const [confirming, setConfirming] = useState<Pending>(null);
   const [archiveState, archive, archiving] = useActionState(archiveRoom, initialFormState);
   const [deleteState, remove, deleting] = useActionState(deleteRoom, initialFormState);
-  const error = archiveState.formError ?? deleteState.formError;
+  // Only the outcome of the last attempt is shown.
+  const [last, setLast] = useState<"archive" | "delete" | null>(null);
+  const error =
+    last === "archive"
+      ? archiveState.formError
+      : last === "delete"
+        ? deleteState.formError
+        : undefined;
 
   return (
     <section aria-labelledby="danger-heading" className="space-y-4">
@@ -52,7 +59,13 @@ export function RoomDangerZone({ room }: { room: { id: string; number: string } 
             <Button variant="secondary" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
-            <form action={archive} onSubmit={() => setConfirming(null)}>
+            <form
+              action={archive}
+              onSubmit={() => {
+                setLast("archive");
+                setConfirming(null);
+              }}
+            >
               <HostelField />
               <input type="hidden" name="room_id" value={room.id} />
               <Button type="submit" loading={archiving} className="w-full">
@@ -73,7 +86,13 @@ export function RoomDangerZone({ room }: { room: { id: string; number: string } 
             <Button variant="secondary" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
-            <form action={remove} onSubmit={() => setConfirming(null)}>
+            <form
+              action={remove}
+              onSubmit={() => {
+                setLast("delete");
+                setConfirming(null);
+              }}
+            >
               <HostelField />
               <input type="hidden" name="room_id" value={room.id} />
               <Button type="submit" variant="danger" loading={deleting} className="w-full">

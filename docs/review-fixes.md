@@ -240,3 +240,24 @@ All eleven tests above fail when run without
   (`getRates`).
 - **Tests:** `tests/integration/row-cap.test.ts` builds a 1,200-bed hostel:
   a plain read stops at 1,000, `fetchAll` returns all 1,200 exactly once.
+
+## 18. Dialogs reopened with the last error and typed values
+
+- **Problem:** dialogs use the native `<dialog>` element, which keeps its
+  content mounted, and `useActionState` keeps its last result. Cancelling
+  after a failed submit and reopening showed the old error and old values.
+  Switching invoice or deposit kind after an error kept the old typed
+  amount instead of the new balance.
+  - Affected: Allocate, Vacate, Transfer, Payment, Deposit, Void and Bed
+    status.
+  - Room archive/delete showed whichever error came first, not the latest.
+- **Change:**
+  - New `src/lib/hooks/useDialogState.ts`. Each opening remounts the form
+    with its defaults and hides results from earlier openings. Applied to
+    all seven dialogs.
+  - The payment and deposit amount keeps a typed value only for the same
+    invoice or kind.
+  - `RoomDangerZone` shows the error of the last attempt.
+- **Tests:** new `tests/e2e/dialogs.spec.ts`: a failed overpayment, Cancel,
+  reopen, and the dialog is clean with the balance as the amount. It
+  failed before. The full browser suite passes.

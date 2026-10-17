@@ -6,6 +6,7 @@ import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select } from "@/components/ui";
 import { formatPaise, paiseToInput } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
 import { recordPayment } from "../actions";
@@ -40,6 +41,7 @@ export function PaymentDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(recordPayment, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const [invoiceId, setInvoiceId] = useState(invoices[0]?.id ?? "");
   const today = todayIst();
   const formId = `payment-${invoices[0]?.id ?? "none"}`;
@@ -82,9 +84,9 @@ export function PaymentDialog({
           </>
         }
       >
-        <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+        <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
           <HostelField />
-          {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
           {invoices.length === 1 ? (
             <>
               <input type="hidden" name="invoice_id" value={selected.id} />
@@ -105,7 +107,7 @@ export function PaymentDialog({
               value={invoiceId}
               onChange={(event) => setInvoiceId(event.target.value)}
               required
-              error={state.fieldErrors.invoice_id?.[0]}
+              error={shown.fieldErrors.invoice_id?.[0]}
             />
           )}
           <Input
@@ -115,10 +117,14 @@ export function PaymentDialog({
             name="amount"
             label="Amount (₹)"
             inputMode="decimal"
-            defaultValue={state.values?.amount || paiseToInput(selected.balance)}
+            // A typed amount survives a failed submit only for the same invoice.
+            defaultValue={
+              (shown.values?.invoice_id === selected.id && shown.values?.amount) ||
+              paiseToInput(selected.balance)
+            }
             required
             hint={`Up to ${formatPaise(selected.balance)}.`}
-            error={state.fieldErrors.amount?.[0]}
+            error={shown.fieldErrors.amount?.[0]}
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
@@ -127,9 +133,9 @@ export function PaymentDialog({
               type="date"
               label="Received on"
               max={today}
-              defaultValue={state.values?.paid_at || today}
+              defaultValue={shown.values?.paid_at || today}
               required
-              error={state.fieldErrors.paid_at?.[0]}
+              error={shown.fieldErrors.paid_at?.[0]}
             />
             <Select
               id={`${formId}-mode`}
@@ -137,19 +143,19 @@ export function PaymentDialog({
               label="Mode"
               placeholder="Choose a mode"
               options={PAYMENT_MODE_OPTIONS}
-              defaultValue={state.values?.mode ?? ""}
+              defaultValue={shown.values?.mode ?? ""}
               required
-              error={state.fieldErrors.mode?.[0]}
+              error={shown.fieldErrors.mode?.[0]}
             />
           </div>
           <Input
             id={`${formId}-reference`}
             name="reference"
             label="Reference"
-            defaultValue={state.values?.reference ?? ""}
+            defaultValue={shown.values?.reference ?? ""}
             hint="Optional. UPI transaction ID, cheque or receipt number."
             maxLength={100}
-            error={state.fieldErrors.reference?.[0]}
+            error={shown.fieldErrors.reference?.[0]}
           />
         </form>
       </Modal>

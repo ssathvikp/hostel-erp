@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Modal, Textarea } from "@/components/ui";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
 import { voidDepositEntry } from "@/features/deposits/actions";
@@ -50,6 +51,7 @@ export function VoidDialog({
   const copy = COPY[kind];
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(copy.action, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const formId = `void-${kind}-${id}`;
 
   useEffect(() => {
@@ -87,9 +89,9 @@ export function VoidDialog({
           </>
         }
       >
-        <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+        <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
           <HostelField />
-          {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
           <input type="hidden" name="id" value={id} />
           <Textarea
             id={`${formId}-reason`}
@@ -97,9 +99,9 @@ export function VoidDialog({
             label="Reason"
             rows={3}
             maxLength={500}
-            defaultValue={state.values?.void_reason ?? ""}
+            defaultValue={shown.values?.void_reason ?? ""}
             required
-            error={state.fieldErrors.void_reason?.[0]}
+            error={shown.fieldErrors.void_reason?.[0]}
           />
         </form>
       </Modal>

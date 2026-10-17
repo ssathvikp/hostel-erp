@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select, type SelectOption } from "@/components/ui";
 import { todayIst } from "@/lib/validation";
+import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
 import { allocateBed } from "../actions";
@@ -40,6 +41,7 @@ export function AllocateModal({
   choice,
 }: AllocateModalProps) {
   const [state, action, pending] = useActionState(allocateBed, initialFormState);
+  const { shown, formKey } = useDialogState(state, open);
   const formId = `allocate-${fixed.value}`;
   const today = todayIst();
   const empty = choice.options.length === 0;
@@ -77,9 +79,9 @@ export function AllocateModal({
         {empty ? (
           <Alert tone="info">{choice.emptyMessage}</Alert>
         ) : (
-          <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <form key={formKey} id={formId} action={action} noValidate className="space-y-4">
             <HostelField />
-            {state.formError && <Alert tone="error">{state.formError}</Alert>}
+            {shown.formError && <Alert tone="error">{shown.formError}</Alert>}
             <input type="hidden" name={fixed.name} value={fixed.value} />
             <Select
               id={`${formId}-${choice.name}`}
@@ -87,9 +89,9 @@ export function AllocateModal({
               label={choice.label}
               placeholder={choice.placeholder}
               options={choice.options}
-              defaultValue={state.values?.[choice.name] ?? ""}
+              defaultValue={shown.values?.[choice.name] ?? ""}
               required
-              error={state.fieldErrors[choice.name]?.[0]}
+              error={shown.fieldErrors[choice.name]?.[0]}
             />
             <Input
               id={`${formId}-start`}
@@ -97,19 +99,19 @@ export function AllocateModal({
               type="date"
               label="First night in the bed"
               max={today}
-              defaultValue={state.values?.start_date || today}
+              defaultValue={shown.values?.start_date || today}
               required
               hint="Today or an earlier date. Beds cannot be booked ahead."
-              error={state.fieldErrors.start_date?.[0]}
+              error={shown.fieldErrors.start_date?.[0]}
             />
             <Input
               id={`${formId}-rent`}
               name="rent_override"
               label="Monthly rent override (₹)"
               inputMode="decimal"
-              defaultValue={state.values?.rent_override ?? ""}
+              defaultValue={shown.values?.rent_override ?? ""}
               hint="Optional. Leave blank to use the fee structure for this room's sharing type."
-              error={state.fieldErrors.rent_override?.[0]}
+              error={shown.fieldErrors.rent_override?.[0]}
             />
           </form>
         )}
