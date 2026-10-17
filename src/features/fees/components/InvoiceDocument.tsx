@@ -3,6 +3,7 @@ import { formatMonth, formatPaise } from "@/lib/money";
 
 import { DUE_STATUS_LABELS, PAYMENT_MODE_LABELS } from "../options";
 import type { InvoiceDetail, PaymentRow } from "../queries";
+import { receiptTotals } from "../receipt";
 
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
 const formatDay = (value: string) => day.format(new Date(value.slice(0, 10)));
@@ -218,6 +219,8 @@ export function ReceiptDocument({
   invoice: InvoiceDetail;
   payment: PaymentRow;
 }) {
+  // As of this payment, so an older receipt keeps showing what was left then.
+  const totals = receiptTotals(invoice.amount, invoice.payments, payment.id);
   return (
     <article className="space-y-6 text-slate-900">
       <Header
@@ -242,8 +245,8 @@ export function ReceiptDocument({
       <div className="flex justify-end">
         <dl className="w-full max-w-xs space-y-1 text-sm">
           <Money label="Invoice amount" value={invoice.amount} />
-          <Money label="Total paid to date" value={invoice.paid} />
-          <Money label="Balance due" value={invoice.balance} strong total />
+          <Money label="Total paid to date" value={totals.paidToDate} />
+          <Money label="Balance due" value={totals.balance} strong total />
         </dl>
       </div>
       {payment.recordedBy && (

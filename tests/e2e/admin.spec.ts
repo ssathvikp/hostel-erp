@@ -42,6 +42,9 @@ test("an admin extends a trial, suspends a hostel and restores it", async ({ pag
   await signIn(ownerPage, owner.email, TEST_PASSWORD);
   await ownerPage.goto("/dashboard");
   await expect(ownerPage.getByText("Your free trial ends in 5 days")).toBeVisible();
+  await ownerPage.emulateMedia({ media: "print" });
+  await expect(ownerPage.getByText("Your free trial ends in 5 days")).toBeHidden();
+  await ownerPage.emulateMedia({ media: "screen" });
   // Owners cannot open the console.
   const response = await ownerPage.goto("/admin");
   expect(response?.status()).toBe(404);

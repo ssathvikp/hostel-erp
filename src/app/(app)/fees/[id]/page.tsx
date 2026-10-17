@@ -9,6 +9,7 @@ import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
 import { getInvoice } from "@/features/fees/queries";
+import { receiptTotals } from "@/features/fees/receipt";
 import { SendButtons } from "@/features/notifications/components/SendButtons";
 import { receiptMessage, whatsAppLink } from "@/features/notifications/message";
 import { requireActiveHostel } from "@/lib/hostels/active";
@@ -34,19 +35,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const isOwner = user.role === "owner";
   const month = formatMonth(invoice.periodMonth);
   const livePayments = invoice.payments.filter((payment) => !payment.voidedAt);
-  // WhatsApp receipt text for each payment that still counts (EP-11).
+  // WhatsApp receipt text for each payment that still counts (EP-11), with
+  // the balance as it stood after that payment (receiptTotals), not today's.
   const receipts = new Map(
-    livePayments.map((payment) => [
-      payment.id,
-      receiptMessage({
+    livePayments.map((payment) => {
+      const { balance } = receiptTotals(invoice.amount, invoice.payments, payment.id);
+      const text = receiptMessage({
         name: invoice.residentName,
         hostel: hostel.name,
         amount: formatPaise(payment.amount),
         month,
         date: formatDay(payment.paidAt),
-        balance: invoice.balance > 0 ? formatPaise(invoice.balance) : null,
-      }),
-    ]),
+        balance: balance > 0 ? formatPaise(balance) : null,
+      });
+      return [payment.id, text] as const;
+    }),
   );
 
   return (

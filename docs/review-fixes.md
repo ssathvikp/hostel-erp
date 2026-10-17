@@ -206,3 +206,23 @@ All eleven tests above fail when run without
 - **Tests:** unit cases for `whatsAppLink`; new e2e case in
   `tests/e2e/data-rights.spec.ts` (an erased resident's paid invoice has no
   `tel:` or `wa.me` link, and Copy is still offered).
+
+## 15. Receipts for earlier payments showed today's totals
+
+- **Problem:** the receipt and its WhatsApp text used the invoice's current
+  paid and balance figures. For an ₹8,000 invoice paid in two parts, the
+  receipt for the first ₹4,000 said "₹8,000 paid, ₹0 due" and "Nothing more
+  is due".
+- **Change:** `src/features/fees/receipt.ts` (`receiptTotals`) adds up live
+  payments up to and including this one, ordered by date received and then
+  by when they were entered. The printed receipt (`InvoiceDocument.tsx`) and
+  the WhatsApp text (`fees/[id]/page.tsx`) both use it.
+- **Tests:** `tests/unit/receipt.test.ts`; `tests/e2e/fees.spec.ts` now
+  checks the first part payment's receipt shows ₹3,000 paid and ₹5,000 due
+  (it failed before).
+
+## 16. The trial banner printed on invoices and receipts
+
+- **Change:** `TrialBanner` is `print:hidden`.
+- **Tests:** `tests/e2e/admin.spec.ts` checks it disappears in print media
+  (it failed before).

@@ -150,6 +150,10 @@ test("an owner sets a rate, bills a month, collects it in parts and prints proof
   await payments.getByRole("link", { name: /Receipt for ₹3,000/ }).click();
   await expect(inMain(page).getByText("Payment receipt")).toBeVisible();
   await expect(inMain(page).getByText(/reference UTR998877/)).toBeVisible();
+  // The first of two part payments: totals as of that payment, not today.
+  const totals = inMain(page).locator("dl", { hasText: "Total paid to date" });
+  await expect(totals).toContainText("₹3,000");
+  await expect(totals).toContainText("₹5,000");
 
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeHidden();

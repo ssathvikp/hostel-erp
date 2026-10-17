@@ -25,7 +25,8 @@ export function TrialBanner({ trialEndsAt, today }: { trialEndsAt: string; today
             ? "Your free trial ends today"
             : `Your free trial ends in ${left} ${left === 1 ? "day" : "days"}`
       }
-      className="mb-6"
+      // Never on a printed invoice or receipt.
+      className="mb-6 print:hidden"
     >
       Contact Hostel ERP support to choose a plan and keep everything as it is.
     </Alert>
