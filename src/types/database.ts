@@ -465,6 +465,7 @@ export type Database = {
           owner_id: string;
           phone: string;
           pincode: string | null;
+          reminder_template: string | null;
           slug: string;
           state: string | null;
           status: string;
@@ -485,6 +486,7 @@ export type Database = {
           owner_id?: string;
           phone: string;
           pincode?: string | null;
+          reminder_template?: string | null;
           slug?: string;
           state?: string | null;
           status?: string;
@@ -504,6 +506,7 @@ export type Database = {
           owner_id?: string;
           phone?: string;
           pincode?: string | null;
+          reminder_template?: string | null;
           slug?: string;
           state?: string | null;
           status?: string;
@@ -741,6 +744,89 @@ export type Database = {
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reminder_log: {
+        Row: {
+          amount: number;
+          channel: string;
+          hostel_id: string;
+          id: string;
+          invoice_id: string | null;
+          kind: string;
+          resident_id: string;
+          sent_at: string;
+          sent_by: string;
+          sent_by_name: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          channel: string;
+          hostel_id: string;
+          id?: string;
+          invoice_id?: string | null;
+          kind: string;
+          resident_id: string;
+          sent_at?: string;
+          sent_by?: string;
+          sent_by_name?: string | null;
+        };
+        Update: {
+          amount?: number;
+          channel?: string;
+          hostel_id?: string;
+          id?: string;
+          invoice_id?: string | null;
+          kind?: string;
+          resident_id?: string;
+          sent_at?: string;
+          sent_by?: string;
+          sent_by_name?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reminder_log_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reminder_log_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "reminder_log_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "reminder_log_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "reminder_log_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "reminder_log_sent_by_fkey";
+            columns: ["sent_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1150,6 +1236,39 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
+      last_reminders: {
+        Row: {
+          channel: string | null;
+          hostel_id: string | null;
+          resident_id: string | null;
+          sent_at: string | null;
+          sent_by_name: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "reminder_log_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reminder_log_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "reminder_log_resident_fkey";
             columns: ["hostel_id", "resident_id"];
             isOneToOne: false;
             referencedRelation: "residents";

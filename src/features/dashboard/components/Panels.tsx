@@ -105,6 +105,12 @@ export function ActivityPanel({ items, now }: { items: readonly ActivityItem[]; 
 }
 
 /** Who owes money past its due date, and for how long (E8-T3). */
+const reminded = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Asia/Kolkata",
+});
+
 export function OverduePanel({
   residents,
   total,
@@ -120,12 +126,20 @@ export function OverduePanel({
       id="overdue-heading"
       action={
         total > 0 ? (
-          <Link
-            href="/fees?status=overdue"
-            className="text-sm font-medium text-brand-700 hover:underline"
-          >
-            View all {total}
-          </Link>
+          <span className="flex gap-4">
+            <Link
+              href="/fees/reminders"
+              className="text-sm font-medium text-brand-700 hover:underline"
+            >
+              Send reminders
+            </Link>
+            <Link
+              href="/fees?status=overdue"
+              className="text-sm font-medium text-brand-700 hover:underline"
+            >
+              View all {total}
+            </Link>
+          </span>
         ) : undefined
       }
     >
@@ -160,6 +174,11 @@ export function OverduePanel({
                   </p>
                   <p className="text-xs text-red-700">
                     {late} {late === 1 ? "day" : "days"} overdue
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {resident.lastRemindedAt
+                      ? `Reminded ${reminded.format(new Date(resident.lastRemindedAt))}`
+                      : "Not reminded yet"}
                   </p>
                 </div>
               </li>

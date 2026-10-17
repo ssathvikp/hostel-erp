@@ -247,3 +247,20 @@ security invoker and derive everything at read time.
   serialised on an advisory lock, like payments on an invoice.
 - Owners and staff record entries; only owners void, with a reason.
   `deposits_held_total(hostel)` gives the dashboard one number.
+
+## Reminders and receipts (EP-11, manual channel)
+
+- No messaging provider is connected yet. Fees → Send reminders lists
+  everyone who owes rent and opens WhatsApp (`wa.me` click-to-chat) with
+  the message ready, or copies it; the person still presses send.
+- `reminder_log` is append-only: every reminder (`kind = 'due'`) or
+  receipt (`'receipt'`) sent, the channel, the amount stated and who sent
+  it (`sent_by_name` snapshotted by trigger). Members insert their own rows
+  only; nothing is updated or deleted. `last_reminders` (security invoker)
+  gives the latest reminder per resident.
+- `hostels.reminder_template` holds the owner's wording with `{name}`,
+  `{hostel}`, `{amount}` and `{due_date}`; null uses the app default
+  (`src/features/notifications/message.ts`).
+- An automated provider implements `NotificationChannel`
+  (`src/features/notifications/channels.ts`) and logs with channel `sms`
+  or `email`; the screens do not change.

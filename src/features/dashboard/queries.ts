@@ -187,6 +187,8 @@ export interface OverdueResident {
   phone: string;
   overdue: number;
   oldestDueDate: string;
+  /** When they were last sent a fee reminder (EP-11), if ever. */
+  lastRemindedAt: string | null;
 }
 
 /** Residents with overdue money, largest amount first, and how many there are in all. */
@@ -210,16 +212,24 @@ export async function getOverdueResidents(
   if (error) throw error;
   if (!balances?.length) return { residents: [], total: 0 };
 
-  const { data: residents, error: residentsError } = await supabase
-    .from("residents")
-    .select("id, full_name, phone")
-    .eq("hostel_id", hostelId)
-    .in(
-      "id",
-      balances.map((row) => row.resident_id!),
-    );
+  const ids = balances.map((row) => row.resident_id!);
+  const [{ data: residents, error: residentsError }, { data: reminders, error: remindersError }] =
+    await Promise.all([
+      supabase
+        .from("residents")
+        .select("id, full_name, phone")
+        .eq("hostel_id", hostelId)
+        .in("id", ids),
+      supabase
+        .from("last_reminders")
+        .select("resident_id, sent_at")
+        .eq("hostel_id", hostelId)
+        .in("resident_id", ids),
+    ]);
   if (residentsError) throw residentsError;
+  if (remindersError) throw remindersError;
   const byId = new Map((residents ?? []).map((resident) => [resident.id, resident]));
+  const remindedAt = new Map((reminders ?? []).map((row) => [row.resident_id, row.sent_at]));
 
   return {
     residents: balances.map((row) => ({
@@ -228,6 +238,7 @@ export async function getOverdueResidents(
       phone: byId.get(row.resident_id!)?.phone ?? "",
       overdue: row.overdue ?? 0,
       oldestDueDate: row.oldest_overdue_due_date!,
+      lastRemindedAt: remindedAt.get(row.resident_id!) ?? null,
     })),
     total: count ?? balances.length,
   };

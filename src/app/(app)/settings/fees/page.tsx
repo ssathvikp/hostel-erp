@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { RateForm } from "@/features/fees/components/RateForm";
 import { getRates } from "@/features/fees/queries";
+import { ReminderTemplateForm } from "@/features/notifications/components/ReminderTemplateForm";
+import { getReminderTemplate } from "@/features/notifications/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatPaise, shiftMonth } from "@/lib/money";
@@ -19,7 +21,10 @@ const formatDay = (value: string) => day.format(new Date(value));
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const { history, summaries } = await getRates(supabase, hostel.id);
+  const [{ history, summaries }, reminderTemplate] = await Promise.all([
+    getRates(supabase, hostel.id),
+    getReminderTemplate(supabase, hostel.id),
+  ]);
   const isOwner = user.role === "owner";
 
   // Sharing types with rooms but no rate today would go unbilled.
@@ -109,6 +114,23 @@ export default async function FeeSettingsPage() {
         </section>
       ) : (
         <Alert tone="info">Only the hostel owner can change rates.</Alert>
+      )}
+
+      {isOwner && (
+        <section
+          id="reminder-message"
+          aria-labelledby="reminder-heading"
+          className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+        >
+          <h2 id="reminder-heading" className="text-base font-semibold text-slate-900">
+            Reminder message
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-slate-600">
+            The text sent from Fees → Send reminders. Each resident&apos;s name, amount and due date
+            are filled in.
+          </p>
+          <ReminderTemplateForm template={reminderTemplate} />
+        </section>
       )}
 
       {history.length > 0 && (

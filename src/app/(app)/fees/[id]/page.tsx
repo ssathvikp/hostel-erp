@@ -9,6 +9,8 @@ import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
 import { getInvoice } from "@/features/fees/queries";
+import { SendButtons } from "@/features/notifications/components/SendButtons";
+import { receiptMessage, whatsAppLink } from "@/features/notifications/message";
 import { requireActiveHostel } from "@/lib/hostels/active";
 import { formatMonth, formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -32,6 +34,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const isOwner = user.role === "owner";
   const month = formatMonth(invoice.periodMonth);
   const livePayments = invoice.payments.filter((payment) => !payment.voidedAt);
+  // WhatsApp receipt text for each payment that still counts (EP-11).
+  const receipts = new Map(
+    livePayments.map((payment) => [
+      payment.id,
+      receiptMessage({
+        name: invoice.residentName,
+        hostel: hostel.name,
+        amount: formatPaise(payment.amount),
+        month,
+        date: formatDay(payment.paidAt),
+        balance: invoice.balance > 0 ? formatPaise(invoice.balance) : null,
+      }),
+    ]),
+  );
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -160,6 +176,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         >
                           Receipt
                         </Link>
+                        <SendButtons
+                          message={receipts.get(payment.id)!}
+                          link={whatsAppLink(invoice.residentPhone, receipts.get(payment.id)!)}
+                          label="Send"
+                          subject={`receipt for ${formatPaise(payment.amount)} to ${invoice.residentName}`}
+                          send={{
+                            residentId: invoice.residentId,
+                            kind: "receipt",
+                            invoiceId: invoice.id,
+                            amount: payment.amount,
+                          }}
+                        />
                         {isOwner && (
                           <VoidDialog
                             kind="payment"
