@@ -26,6 +26,20 @@ export default async function LoginPage({
         </Alert>
       )}
 
+      {error === "invite_invalid" && (
+        <Alert tone="error" className="mb-4">
+          That invitation link has expired or was already used. If you already chose a password,
+          sign in below. Otherwise ask the hostel owner to send the invitation again.
+        </Alert>
+      )}
+
+      {error === "access_removed" && (
+        <Alert tone="info" className="mb-4">
+          You no longer have access to this hostel. Ask the hostel owner if you think this is a
+          mistake.
+        </Alert>
+      )}
+
       <LoginForm next={next ? safeNextPath(next) : undefined} />
 
       <p className="mt-6 text-center text-sm text-slate-600">

@@ -391,3 +391,17 @@ export const paymentSchema = z
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;
 export type PaymentInput = z.output<typeof paymentSchema>;
+
+// ---------------------------------------------------------------------------
+// Staff (EP-12)
+// ---------------------------------------------------------------------------
+
+export const staffInviteSchema = z.object({
+  full_name: requiredText("Name", 120),
+  email,
+});
+
+/** Accepting an invitation: the staff member chooses their own password. */
+export const acceptInvitationSchema = resetPasswordSchema;
+
+export type StaffInviteInput = z.output<typeof staffInviteSchema>;

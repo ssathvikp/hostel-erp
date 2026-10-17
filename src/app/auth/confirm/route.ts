@@ -6,7 +6,7 @@ import { safeNextPath } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/server";
 
 /** Only the link types our email templates send. */
-const HANDLED_TYPES: readonly EmailOtpType[] = ["email", "signup", "recovery"];
+const HANDLED_TYPES: readonly EmailOtpType[] = ["email", "signup", "recovery", "invite"];
 
 function isHandledType(value: string | null): value is EmailOtpType {
   return value !== null && (HANDLED_TYPES as readonly string[]).includes(value);
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (!error) redirect(safeNextPath(params.get("next")));
   }
 
-  redirect(
-    type === "recovery" ? "/forgot-password?error=link_invalid" : "/login?error=link_invalid",
-  );
+  if (type === "recovery") redirect("/forgot-password?error=link_invalid");
+  if (type === "invite") redirect("/login?error=invite_invalid");
+  redirect("/login?error=link_invalid");
 }

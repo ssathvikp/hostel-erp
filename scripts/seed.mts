@@ -340,6 +340,26 @@ check(
   await admin.from("profiles").update({ role: "staff", hostel_id: hostelId }).eq("id", staffId),
   "making the warden staff",
 );
+// Listed on the staff settings page like anyone invited through the app.
+const { data: wardenInvite } = await admin
+  .from("staff_invitations")
+  .select("id")
+  .eq("hostel_id", hostelId)
+  .eq("email", STAFF.email)
+  .maybeSingle();
+if (!wardenInvite) {
+  check(
+    await admin.from("staff_invitations").insert({
+      hostel_id: hostelId,
+      email: STAFF.email,
+      full_name: STAFF.fullName,
+      profile_id: staffId,
+      invited_by: ownerId,
+      accepted_at: new Date().toISOString(),
+    }),
+    "recording the warden's invitation",
+  );
+}
 
 await ensureInventory(hostelId);
 await ensureResidents(hostelId, ownerId);

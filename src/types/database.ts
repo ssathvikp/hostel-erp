@@ -605,6 +605,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string;
+          deactivated_at: string | null;
           full_name: string;
           hostel_id: string | null;
           id: string;
@@ -615,6 +616,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           created_at?: string;
+          deactivated_at?: string | null;
           full_name: string;
           hostel_id?: string | null;
           id: string;
@@ -624,6 +626,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          deactivated_at?: string | null;
           full_name?: string;
           hostel_id?: string | null;
           id?: string;
@@ -783,6 +786,81 @@ export type Database = {
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      staff_invitations: {
+        Row: {
+          accepted_at: string | null;
+          created_at: string;
+          email: string;
+          full_name: string;
+          hostel_id: string;
+          id: string;
+          invited_at: string;
+          invited_by: string;
+          profile_id: string | null;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          accepted_at?: string | null;
+          created_at?: string;
+          email: string;
+          full_name: string;
+          hostel_id: string;
+          id?: string;
+          invited_at?: string;
+          invited_by: string;
+          profile_id?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          created_at?: string;
+          email?: string;
+          full_name?: string;
+          hostel_id?: string;
+          id?: string;
+          invited_at?: string;
+          invited_by?: string;
+          profile_id?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_invitations_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_invitations_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_invitations_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_invitations_revoked_by_fkey";
+            columns: ["revoked_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1033,6 +1111,16 @@ export type Database = {
       };
     };
     Functions: {
+      account_by_email: {
+        Args: { p_email: string };
+        Returns: {
+          deactivated: boolean;
+          email_confirmed: boolean;
+          hostel_id: string;
+          role: string;
+          user_id: string;
+        }[];
+      };
       allocate_bed: {
         Args: {
           p_bed_id: string;

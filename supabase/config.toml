@@ -264,6 +264,10 @@ content_path = "./supabase/templates/confirmation.html"
 subject = "Reset your Hostel ERP password"
 content_path = "./supabase/templates/recovery.html"
 
+[auth.email.template.invite]
+subject = "You have been invited to Hostel ERP"
+content_path = "./supabase/templates/invite.html"
+
 [auth.email.notification.password_changed]
 enabled = true
 subject = "Your Hostel ERP password was changed"

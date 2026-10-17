@@ -213,3 +213,22 @@ security invoker and derive everything at read time.
   the range), billed (issued invoices for months starting in the range), and
   outstanding and overdue as of today across all months, so it matches the
   fee list.
+
+## Staff (EP-12)
+
+- **Invitations.** `staff_invitations` records who was invited to a hostel,
+  by whom, and when they accepted or were removed. Owners read their own
+  hostels' rows; only the service role writes them (the invite action needs
+  Supabase's admin invite API anyway). One open invitation per hostel and
+  email (partial unique index); emails are stored lower-case.
+- **Accounts.** Inviting creates the auth user with `inviteUserByEmail`; the
+  action then sets the new profile's `role = 'staff'` and `hostel_id` with
+  the service role. `handle_new_user` still never reads a role from user
+  metadata. An address that already has an account cannot be invited,
+  except a staff member removed from the same hostel, who is reactivated.
+- **Removal.** `profiles.deactivated_at` ends membership immediately:
+  `private.user_hostel_ids()` ignores deactivated profiles, so every RLS
+  policy stops matching. The action also bans the auth user so no new
+  session can start. The profile stays, so names on payments and history
+  remain. Re-inviting clears both.
+- `account_by_email(email)` is executable by the service role only.

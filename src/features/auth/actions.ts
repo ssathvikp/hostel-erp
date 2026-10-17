@@ -77,6 +77,14 @@ export async function signIn(_previous: FormState, formData: FormData): Promise<
         values,
       );
     }
+    // Auth checks the password before the ban, so only the account holder
+    // learns that their staff access was removed.
+    if (error.code === "user_banned") {
+      return formFailure(
+        "This account no longer has access. Ask the hostel owner if you think this is a mistake.",
+        values,
+      );
+    }
     // One message for unknown email and wrong password alike.
     return formFailure("Incorrect email or password.", values);
   }

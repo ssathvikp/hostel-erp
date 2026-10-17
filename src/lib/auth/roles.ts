@@ -37,8 +37,8 @@ function isProfileRole(value: string): value is ProfileRole {
 /**
  * Resolves the user behind a Supabase client. `getUser()` revalidates the
  * token with Supabase Auth (unlike `getSession()`), so the result is safe to
- * authorize on. A user without a readable, valid profile is treated as
- * signed out rather than given a default role.
+ * authorize on. A user without a readable, valid, active profile is
+ * treated as signed out rather than given a default role.
  */
 export async function loadSessionUser(
   client: SupabaseClient<Database>,
@@ -50,10 +50,12 @@ export async function loadSessionUser(
 
   const { data: profile } = await client
     .from("profiles")
-    .select("full_name, role, hostel_id")
+    .select("full_name, role, hostel_id, deactivated_at")
     .eq("id", user.id)
     .maybeSingle();
-  if (!profile || !isProfileRole(profile.role)) return null;
+  // A removed staff member keeps their login until it is cleared, but is
+  // treated as signed out everywhere: the database already ignores them.
+  if (!profile || !isProfileRole(profile.role) || profile.deactivated_at) return null;
 
   return {
     id: user.id,

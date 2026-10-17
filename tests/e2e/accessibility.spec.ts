@@ -48,6 +48,10 @@ test("every signed-in screen with data on it", async ({ page }) => {
   test.setTimeout(120_000);
   const owner = await factory.createUser({ fullName: "Kiran Das" });
   const hostel = await factory.createHostel(owner.id, { name: "Access PG" });
+  await factory.createUser({
+    fullName: "Access Warden",
+    profile: { role: "staff", hostel_id: hostel.id },
+  });
   const { data: room } = await admin
     .from("rooms")
     .insert({
@@ -120,6 +124,7 @@ test("every signed-in screen with data on it", async ({ page }) => {
     "/settings",
     "/settings/hostel",
     "/settings/fees",
+    "/settings/staff",
   ]) {
     await expectNoViolations(page, path);
   }

@@ -80,6 +80,7 @@ export function buildAuthConfig(env: Env, root: string) {
     .filter(Boolean);
   const confirmation = readTemplate(root, "auth.email.template.confirmation");
   const recovery = readTemplate(root, "auth.email.template.recovery");
+  const invite = readTemplate(root, "auth.email.template.invite");
   const passwordChanged = readTemplate(root, "auth.email.notification.password_changed");
 
   return {
@@ -120,6 +121,8 @@ export function buildAuthConfig(env: Env, root: string) {
     mailer_templates_confirmation_content: confirmation.content,
     mailer_subjects_recovery: recovery.subject,
     mailer_templates_recovery_content: recovery.content,
+    mailer_subjects_invite: invite.subject,
+    mailer_templates_invite_content: invite.content,
     mailer_notifications_password_changed_enabled: true,
     mailer_subjects_password_changed_notification: passwordChanged.subject,
     mailer_templates_password_changed_notification_content: passwordChanged.content,

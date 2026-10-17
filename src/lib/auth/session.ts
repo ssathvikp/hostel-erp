@@ -20,8 +20,14 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
  */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
-  return user;
+  if (user) return user;
+  // Signed in to Supabase but without an active profile (a removed staff
+  // member): the middleware would bounce /login straight back here, so
+  // clear the session first.
+  const {
+    data: { user: authUser },
+  } = await (await createClient()).auth.getUser();
+  redirect(authUser ? "/auth/signout?reason=access_removed" : "/login");
 }
 
 /**

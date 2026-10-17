@@ -44,6 +44,8 @@ describe("buildAuthConfig", () => {
       "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}",
     );
     expect(config.mailer_templates_recovery_content).toContain("type=recovery");
+    expect(config.mailer_subjects_invite).toBe("You have been invited to Hostel ERP");
+    expect(config.mailer_templates_invite_content).toContain("type=invite&amp;next=/welcome");
   });
 
   it("keeps sign-up confirmed by email, with the local password rules", () => {
