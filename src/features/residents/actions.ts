@@ -56,6 +56,8 @@ const UPDATE_FIELDS = [
 ] as const;
 
 const RULE_MESSAGES: Record<string, string> = {
+  resident_erased:
+    "This resident's details were erased at their request and can no longer be changed.",
   resident_status_transition:
     "That status change is not allowed from the resident's current status.",
   resident_has_allocation:

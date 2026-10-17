@@ -94,3 +94,97 @@ Not changed, because they need a product decision, are listed at the end.
   invitation's account and recreates the address as an independent owner.
   Resend must not touch that owner. It failed before the change. The
   existing invite, accept, remove, resend and cancel tests still pass.
+
+## 6. Voiding an invoice while a payment was being recorded
+
+- **Problem:** recording a payment takes a per-invoice lock; voiding the
+  invoice did not. If both happened at the same moment, each check missed
+  the other. The result was a void invoice with a live payment, money that
+  then disappeared from the resident's balance.
+- **Change:** `private.invoices_guard_update` takes the same lock first,
+  then checks for payments.
+- **Tests:** `tests/integration/review-fixes.test.ts` holds a payment
+  transaction open and voids in a second connection. The void now waits,
+  then is refused.
+
+## 7. A resident could be erased before their last stay was billed
+
+- **Problem:** "owes nothing" only looked at invoices already issued.
+  Someone who left on the 10th could be erased on the 12th. Generating
+  that month afterwards billed an erased person with no contact details.
+- **Change:**
+  - `erase_resident` refuses while any month in which the resident held
+    a priced bed has no issued invoice, saying which month to bill first.
+    Only months from the hostel's first billed month count, so stays from
+    before the hostel used billing don't block anyone.
+  - `generate_invoices` skips erased residents as a safety net.
+  - The erase screen explains: "Bill October 2026 first: generate that
+    month's invoices in Fees, collect what is due, then erase."
+- **Tests:** an erasure is refused until the last month is billed and
+  paid, then allowed; and billing never invoices an erased resident.
+
+## 8. Erased residents could still get new records
+
+- **Problem:** new deposit entries and reminder log rows could be added for
+  an erased resident. A deposit could point at another resident's stay, and
+  a reminder at another resident's invoice.
+- **Change:** one guard trigger per table refuses both (hints
+  `resident_erased` and `reference_other_resident`, each with a plain
+  message in the app). Residents' own actions also show a clear message
+  for `resident_erased`, where they used to show "Something went wrong".
+- **Tests:** two cases in `review-fixes.test.ts`.
+- **Found while testing:** my first version shared one trigger function
+  between the two tables. PostgreSQL rejects a column the table doesn't
+  have even in a branch that never runs. The tests caught it, and the
+  function is now split per table.
+
+## 9. Deposit totals overflowed above ₹2.15 crore
+
+- **Problem:** deposit sums were cast to 32-bit integers in four places:
+  the dashboard total, the per-resident held amount, the balances view and
+  the insert guard. Above ₹2,14,74,836 held, they all failed.
+- **Change:** all four use bigint now, and a single entry is capped at
+  ₹10 lakh, as the form already was.
+- **Tests:** 25 entries of ₹10 lakh (₹2.5 crore), then a refund, with no
+  error; an entry of ₹10 lakh + 1 paisa is refused.
+
+## 10. Allocating a bed at the same moment as changing its room or resident
+
+- **Problem:**
+  - Archiving a room checked for occupied beds before waiting for an
+    allocation that was in progress, so it could archive a room someone
+    had just moved into.
+  - Marking a resident vacated at the same moment as giving them a bed
+    could leave a vacated resident holding a bed.
+- **Change:**
+  - Archive and shrink lock the room's beds before checking (in
+    `rooms_guard_update` and `sync_room_beds`).
+  - A new allocation locks the resident's row before checking their
+    status.
+- **Tests:** two concurrent-transaction tests, both failing before the
+  fix. A third, for shrinking, already passed before and stays as a
+  regression test.
+
+## 11. The new-hostel trial rule never ran
+
+- **Problem:** the trigger was `SECURITY DEFINER`, so its "signed-in users
+  always start on a trial" branch could never match. Column permissions
+  happened to cover for it.
+- **Change:** it now runs as the caller, so the rule applies.
+- **Tests:** the existing trial tests still pass.
+
+## 12. Owners could edit a suspended hostel's details
+
+- **Change:** the hostel update policy excludes suspended hostels.
+- **Tests:** new case in `review-fixes.test.ts`. One expectation in
+  `tests/rls/platform-admin.test.ts` changed: an owner trying to lift a
+  suspension now matches no row at all, where before the status guard
+  refused it. Either way, nothing changes.
+
+## 13. The fee month filter listed months with only void invoices
+
+- **Change:** `billed_months` counts issued invoices only.
+- **Tests:** new case in `review-fixes.test.ts`.
+
+All eleven tests above fail when run without
+`20261018090000_review_fixes.sql`, except the room-shrink case (see 10).

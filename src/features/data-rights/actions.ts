@@ -30,6 +30,12 @@ const ERASE_MESSAGES: Record<string, string> = {
   erase_deposit_held: "A security deposit is still held. Record the refund or deduction first.",
 };
 
+/** Rules whose database message names the detail (here, the month to bill). */
+const SELF_EXPLAINING: Record<string, (message: string) => string> = {
+  erase_month_unbilled: (message) =>
+    `${message}: generate that month's invoices in Fees, collect what is due, then erase.`,
+};
+
 function denied(error: unknown, values?: Record<string, string>): FormState {
   if (error instanceof AuthorizationError) return formFailure(error.message, values);
   throw error;
@@ -97,7 +103,9 @@ export async function eraseResident(_previous: FormState, formData: FormData): P
     p_reason: parsed.data.reason,
   });
   if (error) {
-    const message = error.hint ? ERASE_MESSAGES[error.hint] : undefined;
+    const message = error.hint
+      ? (SELF_EXPLAINING[error.hint]?.(error.message) ?? ERASE_MESSAGES[error.hint])
+      : undefined;
     return message
       ? formFailure(message, values)
       : unexpectedFailure("eraseResident", error, values);

@@ -190,8 +190,19 @@ describe("suspension", () => {
     });
     expect(write.error?.code).toBe(PERMISSION_DENIED);
     // And the owner cannot lift it themselves.
-    const lift = await owner.client.from("hostels").update({ status: "active" }).eq("id", hostelId);
-    expect(lift.error?.hint).toBe("hostel_status_transition");
+    // (Since the review fixes, a suspended hostel matches no owner update at all.)
+    const lift = await owner.client
+      .from("hostels")
+      .update({ status: "active" })
+      .eq("id", hostelId)
+      .select("id");
+    expect(lift.data).toEqual([]);
+    const { data: still } = await admin
+      .from("hostels")
+      .select("status")
+      .eq("id", hostelId)
+      .single();
+    expect(still?.status).toBe("suspended");
 
     const restore = await platformAdmin.client.rpc("admin_set_suspended", {
       p_hostel_id: hostelId,

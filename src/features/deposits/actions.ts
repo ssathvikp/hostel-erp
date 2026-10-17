@@ -38,6 +38,8 @@ const RULE_MESSAGES: Record<string, string> = {
   deposit_future: "The date cannot be in the future.",
   deposit_void: "This entry is already void. Refresh the page.",
   deposit_immutable: "Deposit entries cannot be edited. Void it and record it again.",
+  resident_erased: "This resident's details were erased, so no new deposit entries can be added.",
+  reference_other_resident: "That stay belongs to another resident. Refresh the page.",
   deposit_in_use:
     "Refunds or deductions have been taken from this deposit. Void those first, then the collection.",
 };
