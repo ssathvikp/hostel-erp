@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import {
   getDashboardMoney,
+  getDepositsHeld,
   getOccupancyTrend,
   getOverdueResidents,
   getRecentActivity,
@@ -58,9 +59,10 @@ const TILE_ROW = "grid grid-cols-2 gap-3 lg:grid-cols-4";
  */
 export async function KpiSection({ hostelId, range }: { hostelId: string; range: DashboardRange }) {
   const supabase = await createClient();
-  const [occupancy, money] = await Promise.all([
+  const [occupancy, money, deposits] = await Promise.all([
     getHostelOccupancy(supabase, hostelId),
     getDashboardMoney(supabase, hostelId, range),
+    getDepositsHeld(supabase, hostelId),
   ]);
   const period = `${formatDay(range.from)} – ${formatDay(range.to)}`;
 
@@ -125,6 +127,14 @@ export async function KpiSection({ hostelId, range }: { hostelId: string; range:
             href="/fees?status=overdue"
           />
         </div>
+        {deposits.held > 0 && (
+          <p className="mt-3 text-sm text-slate-600">
+            Security deposits held:{" "}
+            <span className="font-medium text-slate-900">{formatPaise(deposits.held)}</span> from{" "}
+            {deposits.residents} {deposits.residents === 1 ? "resident" : "residents"}. This money
+            is owed back unless deducted when they leave.
+          </p>
+        )}
       </section>
     </div>
   );

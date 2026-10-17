@@ -77,6 +77,14 @@ test("every signed-in screen with data on it", async ({ page }) => {
     start_date: shiftMonth(todayIst(), -2),
     created_by: owner.id,
   });
+  await owner.client.from("deposit_entries").insert({
+    hostel_id: hostel.id,
+    resident_id: resident!.id,
+    kind: "collected",
+    amount: 1500000,
+    entry_date: todayIst(),
+    mode: "upi",
+  });
   await owner.client.rpc("set_fee_structure", {
     p_hostel_id: hostel.id,
     p_sharing_type: "double",

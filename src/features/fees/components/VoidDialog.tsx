@@ -5,6 +5,8 @@ import { useActionState, useEffect, useState } from "react";
 import { Alert, Button, Modal, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
+import { voidDepositEntry } from "@/features/deposits/actions";
+
 import { voidInvoice, voidPayment } from "../actions";
 
 const COPY = {
@@ -22,9 +24,16 @@ const COPY = {
       "Use this for a payment recorded by mistake or one that bounced. It stays on record, marked void, and no longer counts towards any total.",
     confirm: "Void payment",
   },
+  deposit: {
+    action: voidDepositEntry,
+    title: "Void this deposit entry",
+    description:
+      "Use this for an entry recorded by mistake. It stays on record, marked void, and no longer counts towards the deposit held.",
+    confirm: "Void entry",
+  },
 } as const;
 
-/** Voids an invoice or a payment with a reason. Nothing is ever edited or deleted. */
+/** Voids an invoice, payment or deposit entry with a reason. Nothing is ever edited or deleted. */
 export function VoidDialog({
   kind,
   id,

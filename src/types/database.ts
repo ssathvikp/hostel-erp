@@ -298,6 +298,107 @@ export type Database = {
           },
         ];
       };
+      deposit_entries: {
+        Row: {
+          allocation_id: string | null;
+          amount: number;
+          created_at: string;
+          entry_date: string;
+          hostel_id: string;
+          id: string;
+          kind: string;
+          mode: string | null;
+          reason: string | null;
+          recorded_by: string;
+          recorded_by_name: string | null;
+          reference: string | null;
+          resident_id: string;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          allocation_id?: string | null;
+          amount: number;
+          created_at?: string;
+          entry_date: string;
+          hostel_id: string;
+          id?: string;
+          kind: string;
+          mode?: string | null;
+          reason?: string | null;
+          recorded_by?: string;
+          recorded_by_name?: string | null;
+          reference?: string | null;
+          resident_id: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          allocation_id?: string | null;
+          amount?: number;
+          created_at?: string;
+          entry_date?: string;
+          hostel_id?: string;
+          id?: string;
+          kind?: string;
+          mode?: string | null;
+          reason?: string | null;
+          recorded_by?: string;
+          recorded_by_name?: string | null;
+          reference?: string | null;
+          resident_id?: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deposit_entries_allocation_fkey";
+            columns: ["hostel_id", "allocation_id"];
+            isOneToOne: false;
+            referencedRelation: "allocations";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       fee_structures: {
         Row: {
           created_at: string;
@@ -926,6 +1027,40 @@ export type Database = {
           },
         ];
       };
+      deposit_balances: {
+        Row: {
+          collected: number | null;
+          deducted: number | null;
+          held: number | null;
+          hostel_id: string | null;
+          refunded: number | null;
+          resident_id: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "deposit_entries_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       floor_occupancy: {
         Row: {
           floor: number | null;
@@ -1157,6 +1292,7 @@ export type Database = {
           payments: number;
         }[];
       };
+      deposits_held_total: { Args: { p_hostel_id: string }; Returns: Json };
       fee_status_totals: {
         Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
         Returns: {

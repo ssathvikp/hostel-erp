@@ -270,6 +270,21 @@ async function ensureResidents(hostelId: string, ownerId: string) {
       }),
       "allocating beds",
     );
+    // Most residents paid a two-month security deposit on arrival.
+    if (i % 3 !== 2) {
+      check(
+        await admin.from("deposit_entries").insert({
+          hostel_id: hostelId,
+          resident_id: resident.id,
+          kind: "collected",
+          amount: 1200000,
+          entry_date: start > today ? today : start,
+          mode: i % 2 === 0 ? "upi" : "cash",
+          recorded_by: ownerId,
+        }),
+        "recording deposits",
+      );
+    }
   }
 }
 

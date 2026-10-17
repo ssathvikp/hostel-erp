@@ -146,6 +146,10 @@ export type InvoiceDueStatus = (typeof INVOICE_DUE_STATUSES)[number];
 export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 
+/** Security deposit ledger entries (EP-12). */
+export const DEPOSIT_ENTRY_KINDS = ["collected", "deduction", "refund"] as const;
+export type DepositEntryKind = (typeof DEPOSIT_ENTRY_KINDS)[number];
+
 // ---------------------------------------------------------------------------
 // Profile (EP-02) - id equals auth.users.id
 // ---------------------------------------------------------------------------

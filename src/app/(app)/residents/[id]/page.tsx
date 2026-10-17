@@ -9,6 +9,9 @@ import { AllocateDialog } from "@/features/allocations/components/AllocateDialog
 import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
 import { StayActions } from "@/features/allocations/components/StayActions";
 import { VACATE_REASON_LABELS } from "@/features/allocations/options";
+import { DepositDialog } from "@/features/deposits/components/DepositDialog";
+import { DepositLedger } from "@/features/deposits/components/DepositLedger";
+import { getResidentDeposit } from "@/features/deposits/queries";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
@@ -22,7 +25,7 @@ import {
   RESIDENT_STATUS_TONES,
 } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { formatMonth } from "@/lib/money";
+import { formatMonth, formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst, uuid } from "@/lib/validation";
 import type { Gender, IdProofType, ResidentStatus, VacateReason } from "@/types";
@@ -76,7 +79,7 @@ export default async function ResidentPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ registered?: string; updated?: string }>;
 }) {
-  const { hostel } = await requireActiveHostel();
+  const { user, hostel } = await requireActiveHostel();
   const { id } = await params;
   const { registered, updated } = await searchParams;
   if (!uuid("Resident").safeParse(id).success) notFound();
@@ -89,6 +92,7 @@ export default async function ResidentPage({
     events,
     balance,
     invoices,
+    deposit,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -103,6 +107,7 @@ export default async function ResidentPage({
     getAllocationEvents(supabase, hostel.id, { residentId: id }),
     getResidentBalance(supabase, hostel.id, id),
     getResidentInvoices(supabase, hostel.id, id),
+    getResidentDeposit(supabase, hostel.id, id),
   ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
@@ -173,6 +178,11 @@ export default async function ResidentPage({
                   startDate: current.start_date,
                 }}
                 bedOptions={bedOptions}
+                vacateNote={
+                  deposit.balance.held > 0
+                    ? `${formatPaise(deposit.balance.held)} security deposit is held. After vacating, record the refund and any deduction under Security deposit.`
+                    : undefined
+                }
                 feeSummary={
                   <>
                     <BalanceSentence balance={balance} />
@@ -211,6 +221,14 @@ export default async function ResidentPage({
             ) : (
               <p className="text-sm text-slate-600">Nothing is due.</p>
             )}
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-slate-700">Security deposit</h3>
+            <DepositDialog
+              residentId={resident.id}
+              residentName={resident.full_name}
+              held={deposit.balance.held}
+            />
           </div>
           <div>
             <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
@@ -316,6 +334,14 @@ export default async function ResidentPage({
 
       <Card title="Fees" id="fees-heading">
         <ResidentFees balance={balance} invoices={invoices} />
+      </Card>
+
+      <Card title="Security deposit" id="deposit-heading">
+        <DepositLedger
+          balance={deposit.balance}
+          entries={deposit.entries}
+          canVoid={user.role === "owner"}
+        />
       </Card>
     </div>
   );

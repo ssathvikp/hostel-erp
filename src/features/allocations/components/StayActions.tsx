@@ -33,12 +33,15 @@ export function StayActions({
   stay,
   bedOptions,
   feeSummary,
+  vacateNote,
   size = "md",
 }: {
   stay: Stay;
   bedOptions: readonly SelectOption[];
   /** What the resident owes, shown before a transfer is confirmed (E7-T5 fills it). */
   feeSummary: ReactNode;
+  /** Shown before a vacate is confirmed, e.g. the security deposit still held. */
+  vacateNote?: ReactNode;
   size?: "sm" | "md";
 }) {
   const earliest = nextDay(stay.startDate);
@@ -55,7 +58,13 @@ export function StayActions({
         disabled={sameDay}
         size={size}
       />
-      <VacateDialog stay={stay} earliest={earliest} disabled={sameDay} size={size} />
+      <VacateDialog
+        stay={stay}
+        earliest={earliest}
+        disabled={sameDay}
+        size={size}
+        note={vacateNote}
+      />
       {sameDay && (
         <p className="basis-full text-xs text-slate-500">
           This allocation started today. It can be vacated or transferred from tomorrow.
@@ -70,11 +79,13 @@ function VacateDialog({
   earliest,
   disabled,
   size,
+  note,
 }: {
   stay: Stay;
   earliest: string;
   disabled: boolean;
   size: "sm" | "md";
+  note?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(vacateBed, initialFormState);
@@ -119,6 +130,7 @@ function VacateDialog({
       >
         <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
           {state.formError && <Alert tone="error">{state.formError}</Alert>}
+          {note && <Alert tone="info">{note}</Alert>}
           <input type="hidden" name="allocation_id" value={stay.allocationId} />
           <input type="hidden" name="resident_id" value={stay.residentId} />
           <Input

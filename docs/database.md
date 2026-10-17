@@ -232,3 +232,18 @@ security invoker and derive everything at read time.
   session can start. The profile stays, so names on payments and history
   remain. Re-inviting clears both.
 - `account_by_email(email)` is executable by the service role only.
+
+## Security deposits (EP-12)
+
+- `deposit_entries` is an append-only ledger in paise: `collected`,
+  `deduction` (kept by the hostel, always with a reason, no payment mode)
+  and `refund`. Collections and refunds need a mode.
+- What is held is derived (`deposit_balances`, security invoker):
+  collected − deductions − refunds over entries that are not void. It is
+  never stored.
+- Deductions and refunds cannot exceed what is held (hint
+  `deposit_exceeds_held`); a collection cannot be voided while refunds or
+  deductions depend on it (`deposit_in_use`). Entries for a resident are
+  serialised on an advisory lock, like payments on an invoice.
+- Owners and staff record entries; only owners void, with a reason.
+  `deposits_held_total(hostel)` gives the dashboard one number.

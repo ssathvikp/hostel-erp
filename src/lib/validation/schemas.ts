@@ -6,6 +6,7 @@ import {
   ID_PROOF_TYPES,
   INDIAN_STATES,
   MANUAL_BED_STATUSES,
+  DEPOSIT_ENTRY_KINDS,
   PAYMENT_MODES,
   RESIDENT_STATUSES,
   SHARING_TYPES,
@@ -405,3 +406,40 @@ export const staffInviteSchema = z.object({
 export const acceptInvitationSchema = resetPasswordSchema;
 
 export type StaffInviteInput = z.output<typeof staffInviteSchema>;
+
+// ---------------------------------------------------------------------------
+// Security deposits (EP-12)
+// ---------------------------------------------------------------------------
+
+/**
+ * One deposit ledger entry. Collections and refunds move money, so they
+ * need a mode; a deduction moves none but always says why.
+ */
+export const depositEntrySchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    kind: z.enum(DEPOSIT_ENTRY_KINDS, { error: "Choose what happened to the deposit" }),
+    amount: rupees("Amount"),
+    entry_date: isoDate("Date"),
+    mode: optional(z.enum(PAYMENT_MODES, { error: "Choose a payment mode" })),
+    reference: optional(requiredText("Reference", 100)),
+    reason: optional(requiredText("Reason", 500)),
+  })
+  .refine((entry) => entry.entry_date <= todayIst(), {
+    error: "The date cannot be in the future",
+    path: ["entry_date"],
+  })
+  .refine((entry) => entry.kind === "deduction" || entry.mode !== null, {
+    error: "Choose a payment mode",
+    path: ["mode"],
+  })
+  .refine((entry) => entry.kind !== "deduction" || entry.reason !== null, {
+    error: "Say why the amount is being kept",
+    path: ["reason"],
+  })
+  // A deduction moves no money, so any mode or reference sent is dropped.
+  .transform((entry) =>
+    entry.kind === "deduction" ? { ...entry, mode: null, reference: null } : entry,
+  );
+
+export type DepositEntryInput = z.output<typeof depositEntrySchema>;

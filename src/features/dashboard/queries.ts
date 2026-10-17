@@ -49,6 +49,24 @@ export async function getDashboardMoney(
 }
 
 // ---------------------------------------------------------------------------
+// Security deposits held (EP-12)
+// ---------------------------------------------------------------------------
+
+export interface DepositsHeld {
+  /** Paise held today across the hostel. */
+  held: number;
+  /** Residents whose deposit is not fully settled. */
+  residents: number;
+}
+
+export async function getDepositsHeld(supabase: Supabase, hostelId: string): Promise<DepositsHeld> {
+  const { data, error } = await supabase.rpc("deposits_held_total", { p_hostel_id: hostelId });
+  if (error) throw error;
+  const row = (data ?? {}) as Partial<DepositsHeld>;
+  return { held: row.held ?? 0, residents: row.residents ?? 0 };
+}
+
+// ---------------------------------------------------------------------------
 // Occupancy trend (E8-T2)
 // ---------------------------------------------------------------------------
 
