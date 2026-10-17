@@ -6,7 +6,8 @@ export const DEFAULT_SIGNED_IN_PATH = "/dashboard";
  * parameter can never be used to bounce a user to another origin.
  *
  * Rejected: absolute URLs, protocol-relative `//evil.com`, backslash tricks
- * (`/\evil.com`, which browsers normalise to `//`), and control characters.
+ * (`/\evil.com`, which browsers normalise to `//`), dot segments that
+ * resolve to `//` (`/.//evil.com`), and control characters.
  */
 export function safeNextPath(next: unknown, fallback = DEFAULT_SIGNED_IN_PATH): string {
   if (typeof next !== "string" || next.length === 0 || next.length > 2048) return fallback;
@@ -18,6 +19,9 @@ export function safeNextPath(next: unknown, fallback = DEFAULT_SIGNED_IN_PATH): 
   try {
     const resolved = new URL(next, "http://localhost");
     if (resolved.origin !== "http://localhost") return fallback;
+    // Dot segments resolve away (`/.//evil.com` becomes `//evil.com`), so the
+    // path that is actually returned is checked again, not just the input.
+    if (resolved.pathname.startsWith("//") || resolved.pathname.includes("\\")) return fallback;
     return `${resolved.pathname}${resolved.search}${resolved.hash}`;
   } catch {
     return fallback;

@@ -42,6 +42,19 @@ const MAX_PROBLEMS_SHOWN = 50;
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
+/**
+ * Lookups by value go in the URL, and the API gateway refuses URLs much
+ * over 8 KB: 150 ID fingerprints (64 characters each) is already too long.
+ * 50 values per request stays well under it.
+ */
+const LOOKUP_BATCH = 50;
+
+function chunks<T>(values: T[], size = LOOKUP_BATCH): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}
+
 /** Rows that clash with records already in the hostel get an error each. */
 async function markExisting(
   supabase: Supabase,
@@ -54,13 +67,16 @@ async function markExisting(
 
   if (kind === "rooms") {
     const numbers = good.map((row) => (row.data as RoomRow).room_number);
-    const { data, error } = await supabase
-      .from("rooms")
-      .select("room_number")
-      .eq("hostel_id", hostelId)
-      .in("room_number", numbers);
-    if (error) throw error;
-    const taken = new Set(data.map((room) => room.room_number));
+    const taken = new Set<string>();
+    for (const batch of chunks(numbers)) {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("room_number")
+        .eq("hostel_id", hostelId)
+        .in("room_number", batch);
+      if (error) throw error;
+      for (const room of data) taken.add(room.room_number);
+    }
     for (const row of good) {
       const number = (row.data as RoomRow).room_number;
       if (taken.has(number)) {
@@ -75,25 +91,26 @@ async function markExisting(
   const hashes = residents.map(
     (resident) => protectIdProof(resident.id_proof_type, resident.id_proof_number).id_proof_hash,
   );
-  const [byPhone, byId] = await Promise.all([
-    supabase
+  const phones = new Set<string>();
+  const ids = new Set<string>();
+  for (const batch of chunks(residents.map((resident) => resident.phone))) {
+    const { data, error } = await supabase
       .from("residents")
       .select("phone")
       .eq("hostel_id", hostelId)
-      .in(
-        "phone",
-        residents.map((resident) => resident.phone),
-      ),
-    supabase
+      .in("phone", batch);
+    if (error) throw error;
+    for (const row of data) if (row.phone) phones.add(row.phone);
+  }
+  for (const batch of chunks(hashes)) {
+    const { data, error } = await supabase
       .from("residents")
       .select("id_proof_hash")
       .eq("hostel_id", hostelId)
-      .in("id_proof_hash", hashes),
-  ]);
-  if (byPhone.error) throw byPhone.error;
-  if (byId.error) throw byId.error;
-  const phones = new Set(byPhone.data.map((row) => row.phone));
-  const ids = new Set(byId.data.map((row) => row.id_proof_hash));
+      .in("id_proof_hash", batch);
+    if (error) throw error;
+    for (const row of data) if (row.id_proof_hash) ids.add(row.id_proof_hash);
+  }
   good.forEach((row, i) => {
     const resident = residents[i];
     if (phones.has(resident.phone)) {
@@ -248,6 +265,8 @@ async function commit(kind: ImportKind, formData: FormData): Promise<ImportState
         ({ id_proof_number, id_proof_type, ...rest }) => ({
           ...rest,
           ...protectIdProof(id_proof_type, id_proof_number),
+          // Confirmed for the whole file above; the database stamps the time.
+          consent: true,
         }),
       );
       const { data, error } = await checked.supabase.rpc("import_residents", {

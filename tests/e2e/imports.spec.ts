@@ -93,8 +93,64 @@ test("staff import residents; ID numbers never come back to the browser", async 
   ).toBeVisible();
   await inMain(page).getByRole("link", { name: "Nikhil Verma" }).click();
   await expect(inMain(page).getByText("Aadhaar ending 0123")).toBeVisible();
+  // Consent ticked on the import is stored for every resident in the file.
+  const { data: imported } = await factory.admin
+    .from("residents")
+    .select("consent_at, consent_recorded_by")
+    .eq("hostel_id", hostel.id);
+  expect(imported).toHaveLength(2);
+  for (const row of imported ?? []) {
+    expect(row.consent_at).not.toBeNull();
+    expect(row.consent_recorded_by).toBe(staff.id);
+  }
 
   // Rooms stay owner-only.
   await page.goto("/rooms/import");
   await expect(inMain(page).getByText("Only the hostel owner can add rooms.")).toBeVisible();
+});
+
+test("a 500-resident file is checked and imported in one go", async ({ page }) => {
+  test.slow();
+  const owner = await factory.createUser({ fullName: "Big Register" });
+  const hostel = await factory.createHostel(owner.id);
+  await signIn(page, owner.email, TEST_PASSWORD);
+
+  // Valid Aadhaar-format numbers (first digit 2-9) and distinct mobiles.
+  const rows = Array.from({ length: 500 }, (_, i) => {
+    const n = String(i).padStart(3, "0");
+    return `Resident ${n},9${String(100000000 + i).slice(-9)},female,04-03-2001,aadhaar,23456789${String(1000 + i)},5 Temple Street,01-06-2026`;
+  });
+  await page.goto("/residents/import");
+  await upload(
+    page,
+    "big.csv",
+    ["name,mobile,gender,dob,id_proof_type,id_proof_number,address,joining_date", ...rows].join(
+      "\n",
+    ),
+  );
+  await expect(inMain(page).getByText("big.csv: 500 of 500 residents ready")).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByLabel(/^Every resident in this file agreed/).check();
+  await page.getByRole("button", { name: "Import 500 residents" }).click();
+  await expect(page).toHaveURL(/\/residents\?imported=500$/, { timeout: 30_000 });
+
+  // The same file again: every row now clashes, found across all batches.
+  await page.goto("/residents/import");
+  await upload(
+    page,
+    "big.csv",
+    ["name,mobile,gender,dob,id_proof_type,id_proof_number,address,joining_date", ...rows].join(
+      "\n",
+    ),
+  );
+  await expect(inMain(page).getByText("big.csv: 0 of 500 residents ready")).toBeVisible({
+    timeout: 30_000,
+  });
+  const { count } = await factory.admin
+    .from("residents")
+    .select("id", { count: "exact", head: true })
+    .eq("hostel_id", hostel.id)
+    .not("consent_at", "is", null);
+  expect(count).toBe(500);
 });
