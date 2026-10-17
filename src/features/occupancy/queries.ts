@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fetchAll } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import type { BedStatus, SharingType } from "@/types";
 
@@ -90,43 +91,52 @@ export async function getOccupancySnapshot(
   supabase: Supabase,
   hostelId: string,
 ): Promise<OccupancySnapshot> {
-  const [hostel, floorsResult, roomsResult, bedsResult, occupantsResult] = await Promise.all([
+  // Rooms, beds and occupants can each pass the API's 1000-row cap in a
+  // large hostel, so they are read page by page (unique column last).
+  const [hostel, floorsResult, rooms, beds, occupants] = await Promise.all([
     getHostelOccupancy(supabase, hostelId),
     supabase
       .from("floor_occupancy")
       .select("floor, rooms, total_beds, occupied_beds, vacant_beds, out_of_service_beds")
       .eq("hostel_id", hostelId)
       .order("floor"),
-    supabase
-      .from("room_inventory")
-      .select("id, floor, room_number, sharing_type")
-      .eq("hostel_id", hostelId)
-      .eq("status", "active")
-      .order("floor")
-      .order("room_sort"),
-    supabase
-      .from("bed_states")
-      .select("id, room_id, bed_label, status, status_reason")
-      .eq("hostel_id", hostelId)
-      .order("bed_label"),
-    supabase
-      .from("resident_directory")
-      .select("id, full_name, room_id, bed_label")
-      .eq("hostel_id", hostelId)
-      .not("bed_label", "is", null),
+    fetchAll((from, to) =>
+      supabase
+        .from("room_inventory")
+        .select("id, floor, room_number, sharing_type")
+        .eq("hostel_id", hostelId)
+        .eq("status", "active")
+        .order("floor")
+        .order("room_sort")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("bed_states")
+        .select("id, room_id, bed_label, status, status_reason")
+        .eq("hostel_id", hostelId)
+        .order("bed_label")
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("resident_directory")
+        .select("id, full_name, room_id, bed_label")
+        .eq("hostel_id", hostelId)
+        .not("bed_label", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
   ]);
-  for (const result of [floorsResult, roomsResult, bedsResult, occupantsResult]) {
-    if (result.error) throw result.error;
-  }
+  if (floorsResult.error) throw floorsResult.error;
 
   const occupantByBed = new Map(
-    (occupantsResult.data ?? []).map((o) => [
-      `${o.room_id}:${o.bed_label}`,
-      { id: o.id!, name: o.full_name! },
-    ]),
+    occupants.map((o) => [`${o.room_id}:${o.bed_label}`, { id: o.id!, name: o.full_name! }]),
   );
   const bedsByRoom = new Map<string, OccupancyBed[]>();
-  for (const bed of bedsResult.data ?? []) {
+  for (const bed of beds) {
     const list = bedsByRoom.get(bed.room_id!) ?? [];
     list.push({
       id: bed.id!,
@@ -139,7 +149,7 @@ export async function getOccupancySnapshot(
   }
 
   const roomsByFloor = new Map<number, OccupancyRoom[]>();
-  for (const room of roomsResult.data ?? []) {
+  for (const room of rooms) {
     const list = roomsByFloor.get(room.floor!) ?? [];
     list.push({
       id: room.id!,

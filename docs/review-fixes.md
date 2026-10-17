@@ -226,3 +226,17 @@ All eleven tests above fail when run without
 - **Change:** `TrialBanner` is `print:hidden`.
 - **Tests:** `tests/e2e/admin.spec.ts` checks it disappears in print media
   (it failed before).
+
+## 17. Large hostels lost beds past the API's 1,000-row cap
+
+- **Problem:** the API returns at most 1,000 rows per request, silently. The
+  occupancy floor plan (rooms, beds, occupants), the vacant-bed picker when
+  allocating, and the room counts on the rate screen read whole lists, so a
+  hostel with more than 1,000 beds lost the rest while the totals (from
+  aggregate views) still counted them.
+- **Change:** `fetchAll()` in `src/lib/pagination.ts` reads page by page
+  with a unique final sort column; used in `occupancy/queries.ts`,
+  `allocations/queries.ts` (`getVacantBeds`) and `fees/queries.ts`
+  (`getRates`).
+- **Tests:** `tests/integration/row-cap.test.ts` builds a 1,200-bed hostel:
+  a plain read stops at 1,000, `fetchAll` returns all 1,200 exactly once.
