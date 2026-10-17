@@ -110,6 +110,7 @@ test("signup → hostel → room → resident → bed → invoice → payment", 
     .fill(`${randomInt(2, 10)}${String(randomInt(0, 1e11)).padStart(11, "0")}`);
   await page.getByLabel(/^Mobile number/).fill(randomMobile());
   await page.getByLabel(/^Permanent address/).fill("2 Test Lane, Nashik");
+  await page.getByLabel(/^The resident agrees/).check();
   await page.getByRole("button", { name: "Register resident" }).click();
   await expect(inMain(page).getByText("Resident registered.")).toBeVisible();
 

@@ -35,6 +35,7 @@ async function fillRegistration(
   await page.getByLabel(/^ID proof number/).fill(person.idNumber);
   await page.getByLabel(/^Mobile number/).fill(person.phone);
   await page.getByLabel(/^Permanent address/).fill("4-1-22 Gandhi Nagar, Guntur");
+  await page.getByLabel(/^The resident agrees/).check();
 }
 
 test("an owner registers a resident with server-side validation", async ({ page }) => {
@@ -120,7 +121,7 @@ test("residents are found by name, phone and status, and edited", async ({ page 
   await expect(page).toHaveURL(/q=meena/);
   await expect(inMain(page).getByText("1 resident found")).toBeVisible();
 
-  await page.getByLabel("Search", { exact: true }).fill(suresh.phone.slice(-5));
+  await page.getByLabel("Search", { exact: true }).fill(suresh.phone!.slice(-5));
   await page.getByLabel("Search", { exact: true }).press("Enter");
   await expect(inMain(page).getByRole("link", { name: "Suresh Babu" })).toBeVisible();
 

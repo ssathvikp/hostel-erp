@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 
-import { Alert, Button, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { Alert, Button, Checkbox, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { focusRing } from "@/components/ui";
 
@@ -21,12 +21,15 @@ export function ImportForm({
   commit,
   noun,
   columns,
+  consentLabel,
 }: {
   preview: Action;
   commit: Action;
   /** Plural, e.g. "rooms". */
   noun: string;
   columns: { key: string; label: string }[];
+  /** A confirmation the importer must tick, e.g. residents' consent. */
+  consentLabel?: string;
 }) {
   const [checked, check, checking] = useActionState(preview, initial);
   const [committed, save, saving] = useActionState(commit, initial);
@@ -117,9 +120,12 @@ export function ImportForm({
                   </TBody>
                 </Table>
               )}
-              <form action={save} onSubmit={() => setLast("save")}>
+              <form action={save} onSubmit={() => setLast("save")} noValidate className="space-y-4">
                 <input type="hidden" name="csv" value={state.csv ?? ""} />
                 <input type="hidden" name="file_name" value={state.fileName ?? ""} />
+                {consentLabel && (
+                  <Checkbox id="import-consent" name="consent" required label={consentLabel} />
+                )}
                 <Button type="submit" loading={saving}>
                   Import {ready} {noun}
                 </Button>

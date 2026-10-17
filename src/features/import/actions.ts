@@ -217,6 +217,13 @@ async function commit(kind: ImportKind, formData: FormData): Promise<ImportState
       return { ...state, formError: "Fix the rows below, then preview the file again." };
     }
 
+    if (kind === "residents" && formData.get("consent") !== "on") {
+      return {
+        ...state,
+        formError: "Confirm that every resident in the file agreed to their details being kept.",
+      };
+    }
+
     const good = checked.rows.map((row) => row.data!);
     if (kind === "rooms") {
       const { data, error } = await checked.supabase.rpc("import_rooms", {

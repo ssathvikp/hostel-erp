@@ -299,3 +299,26 @@ security invoker and derive everything at read time.
 - Resident ID numbers are reduced to last 4 + keyed hash in the server
   action before the call, exactly as in registration; the preview never
   sends them back to the browser.
+
+## Residents' data rights (DPDP Act, 2023)
+
+- **Consent.** `residents.consent_at` and `consent_recorded_by` are stamped
+  by trigger (the real time and the caller), once. Registration and
+  import require it; residents registered earlier show "Not recorded" with
+  a button to record it.
+- **Access.** `/residents/[id]/export` (owners) returns everything held
+  about a resident as JSON, without the ID fingerprint. Each export is
+  logged before the file is sent; if logging fails, nothing is sent.
+- **Erasure.** `erase_resident(id, reason)` (owners; `SECURITY DEFINER` in
+  `private` behind an invoker wrapper) works only for residents who are
+  vacated, hold no bed, owe nothing and have no deposit held. It nulls
+  contact, birth date, address, guardian, notes, ID last 4, ID hash and the
+  ID proof path, and renames the record "Erased resident XXXXXX". Stays,
+  invoices, payments and deposits are kept. The action then deletes the ID
+  proof file. Erased records cannot be edited or reactivated.
+- `phone`, `dob`, `permanent_address`, `id_proof_last4` and
+  `id_proof_hash` are nullable only for erased residents
+  (`residents_personal_data_present`).
+- `data_rights_log` (owners read) records exports and erasures with who,
+  when and why. Owners may insert export rows only; erasure rows come from
+  the function.

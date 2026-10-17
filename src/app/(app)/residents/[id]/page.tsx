@@ -9,6 +9,7 @@ import { AllocateDialog } from "@/features/allocations/components/AllocateDialog
 import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
 import { StayActions } from "@/features/allocations/components/StayActions";
 import { VACATE_REASON_LABELS } from "@/features/allocations/options";
+import { DataRights } from "@/features/data-rights/components/DataRights";
 import { DepositDialog } from "@/features/deposits/components/DepositDialog";
 import { DepositLedger } from "@/features/deposits/components/DepositLedger";
 import { getResidentDeposit } from "@/features/deposits/queries";
@@ -133,6 +134,15 @@ export default async function ResidentPage({
       balance: invoice.balance,
     }));
 
+  const erased = resident.erased_at !== null;
+  // Mirrors the checks in erase_resident, so the screen explains them.
+  const eraseBlockers = [
+    status !== "vacated" && "Mark them vacated once they have left.",
+    current && "Vacate their bed first.",
+    balance.outstanding > 0 && "Settle what they owe first.",
+    deposit.balance.held > 0 && "Refund or deduct the security deposit first.",
+  ].filter((blocker): blocker is string => typeof blocker === "string");
+
   return (
     <div className="max-w-4xl space-y-6">
       <div>
@@ -151,12 +161,14 @@ export default async function ResidentPage({
               </span>
             }
             actions={
-              <Link
-                href={`/residents/${resident.id}/edit`}
-                className={buttonClass({ variant: "secondary" })}
-              >
-                Edit details
-              </Link>
+              erased ? undefined : (
+                <Link
+                  href={`/residents/${resident.id}/edit`}
+                  className={buttonClass({ variant: "secondary" })}
+                >
+                  Edit details
+                </Link>
+              )
             }
           />
         </div>
@@ -164,80 +176,89 @@ export default async function ResidentPage({
         {updated && <Alert tone="success">Resident details saved.</Alert>}
       </div>
 
-      <Card title="Actions" id="actions-heading">
-        <div className="space-y-5">
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Bed</h3>
-            {current ? (
-              <StayActions
-                stay={{
-                  allocationId: current.id,
-                  residentId: resident.id,
-                  residentName: resident.full_name,
-                  bedLabel: current.beds?.bed_label ?? "",
-                  startDate: current.start_date,
-                }}
-                bedOptions={bedOptions}
-                vacateNote={
-                  deposit.balance.held > 0
-                    ? `${formatPaise(deposit.balance.held)} security deposit is held. After vacating, record the refund and any deduction under Security deposit.`
-                    : undefined
-                }
-                feeSummary={
-                  <>
-                    <BalanceSentence balance={balance} />
-                    <p className="mt-1">
-                      Rent for the new bed follows its sharing type unless you set an override. This
-                      month&apos;s invoice, if already issued, is not changed; void and generate it
-                      again to charge each bed for its nights.
-                    </p>
-                  </>
-                }
+      {erased && (
+        <Alert tone="info">
+          This resident&apos;s personal details were erased at their request. Their stays and
+          payments remain for the hostel&apos;s records.
+        </Alert>
+      )}
+
+      {!erased && (
+        <Card title="Actions" id="actions-heading">
+          <div className="space-y-5">
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Bed</h3>
+              {current ? (
+                <StayActions
+                  stay={{
+                    allocationId: current.id,
+                    residentId: resident.id,
+                    residentName: resident.full_name,
+                    bedLabel: current.beds?.bed_label ?? "",
+                    startDate: current.start_date,
+                  }}
+                  bedOptions={bedOptions}
+                  vacateNote={
+                    deposit.balance.held > 0
+                      ? `${formatPaise(deposit.balance.held)} security deposit is held. After vacating, record the refund and any deduction under Security deposit.`
+                      : undefined
+                  }
+                  feeSummary={
+                    <>
+                      <BalanceSentence balance={balance} />
+                      <p className="mt-1">
+                        Rent for the new bed follows its sharing type unless you set an override.
+                        This month&apos;s invoice, if already issued, is not changed; void and
+                        generate it again to charge each bed for its nights.
+                      </p>
+                    </>
+                  }
+                />
+              ) : allocatable ? (
+                <AllocateDialog
+                  title={`Allocate a bed to ${resident.full_name}`}
+                  fixed={{ name: "resident_id", value: resident.id }}
+                  choice={{
+                    name: "bed_id",
+                    label: "Bed",
+                    placeholder: "Choose a vacant bed",
+                    options: bedOptions,
+                    emptyMessage:
+                      "There are no vacant beds. Free a bed, or add rooms, before allocating.",
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-slate-600">
+                  {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the
+                  resident active first.
+                </p>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Fees</h3>
+              {payable.length > 0 ? (
+                <PaymentDialog residentName={resident.full_name} invoices={payable} />
+              ) : (
+                <p className="text-sm text-slate-600">Nothing is due.</p>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Security deposit</h3>
+              <DepositDialog
+                residentId={resident.id}
+                residentName={resident.full_name}
+                held={deposit.balance.held}
               />
-            ) : allocatable ? (
-              <AllocateDialog
-                title={`Allocate a bed to ${resident.full_name}`}
-                fixed={{ name: "resident_id", value: resident.id }}
-                choice={{
-                  name: "bed_id",
-                  label: "Bed",
-                  placeholder: "Choose a vacant bed",
-                  options: bedOptions,
-                  emptyMessage:
-                    "There are no vacant beds. Free a bed, or add rooms, before allocating.",
-                }}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
+              <ResidentStatusControl
+                resident={{ id: resident.id, name: resident.full_name, status }}
               />
-            ) : (
-              <p className="text-sm text-slate-600">
-                {RESIDENT_STATUS_LABELS[status]} residents cannot be given a bed. Make the resident
-                active first.
-              </p>
-            )}
+            </div>
           </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Fees</h3>
-            {payable.length > 0 ? (
-              <PaymentDialog residentName={resident.full_name} invoices={payable} />
-            ) : (
-              <p className="text-sm text-slate-600">Nothing is due.</p>
-            )}
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Security deposit</h3>
-            <DepositDialog
-              residentId={resident.id}
-              residentName={resident.full_name}
-              held={deposit.balance.held}
-            />
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-slate-700">Status</h3>
-            <ResidentStatusControl
-              resident={{ id: resident.id, name: resident.full_name, status }}
-            />
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Personal and contact" id="personal-heading">
@@ -262,7 +283,9 @@ export default async function ResidentPage({
             items={[
               [
                 "ID proof",
-                `${ID_PROOF_LABELS[resident.id_proof_type as IdProofType]} ending ${resident.id_proof_last4}`,
+                resident.id_proof_last4
+                  ? `${ID_PROOF_LABELS[resident.id_proof_type as IdProofType]} ending ${resident.id_proof_last4}`
+                  : "Erased",
               ],
               [
                 "Copy on file",
@@ -281,9 +304,11 @@ export default async function ResidentPage({
               ],
             ]}
           />
-          <div className="mt-5 border-t border-slate-200 pt-5">
-            <IdProofUpload residentId={resident.id} hasFile={Boolean(resident.id_proof_path)} />
-          </div>
+          {!erased && (
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <IdProofUpload residentId={resident.id} hasFile={Boolean(resident.id_proof_path)} />
+            </div>
+          )}
         </Card>
       </div>
 
@@ -334,6 +359,20 @@ export default async function ResidentPage({
 
       <Card title="Fees" id="fees-heading">
         <ResidentFees balance={balance} invoices={invoices} />
+      </Card>
+
+      <Card title="Data and privacy" id="privacy-heading">
+        <DataRights
+          resident={{
+            id: resident.id,
+            name: resident.full_name,
+            consentAt: resident.consent_at,
+            erasedAt: resident.erased_at,
+          }}
+          isOwner={user.role === "owner"}
+          erasable={eraseBlockers.length === 0}
+          blockers={eraseBlockers}
+        />
       </Card>
 
       <Card title="Security deposit" id="deposit-heading">

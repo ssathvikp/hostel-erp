@@ -298,6 +298,69 @@ export type Database = {
           },
         ];
       };
+      data_rights_log: {
+        Row: {
+          action: string;
+          done_at: string;
+          done_by: string;
+          done_by_name: string | null;
+          hostel_id: string;
+          id: string;
+          reason: string | null;
+          resident_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          action: string;
+          done_at?: string;
+          done_by?: string;
+          done_by_name?: string | null;
+          hostel_id: string;
+          id?: string;
+          reason?: string | null;
+          resident_id: string;
+        };
+        Update: {
+          action?: string;
+          done_at?: string;
+          done_by?: string;
+          done_by_name?: string | null;
+          hostel_id?: string;
+          id?: string;
+          reason?: string | null;
+          resident_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "data_rights_log_done_by_fkey";
+            columns: ["done_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "data_rights_log_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "data_rights_log_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "data_rights_log_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       deposit_entries: {
         Row: {
           allocation_id: string | null;
@@ -843,24 +906,28 @@ export type Database = {
       residents: {
         Row: {
           alt_phone: string | null;
+          consent_at: string | null;
+          consent_recorded_by: string | null;
           created_at: string;
           created_by: string | null;
-          dob: string;
+          dob: string | null;
           email: string | null;
+          erased_at: string | null;
+          erased_by: string | null;
           full_name: string;
           gender: string;
           guardian_name: string | null;
           guardian_phone: string | null;
           hostel_id: string;
           id: string;
-          id_proof_hash: string;
-          id_proof_last4: string;
+          id_proof_hash: string | null;
+          id_proof_last4: string | null;
           id_proof_path: string | null;
           id_proof_type: string;
           joining_date: string;
           notes: string | null;
-          permanent_address: string;
-          phone: string;
+          permanent_address: string | null;
+          phone: string | null;
           status: string;
           status_changed_at: string | null;
           status_changed_by: string | null;
@@ -869,24 +936,28 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           alt_phone?: string | null;
+          consent_at?: string | null;
+          consent_recorded_by?: string | null;
           created_at?: string;
           created_by?: string | null;
-          dob: string;
+          dob?: string | null;
           email?: string | null;
+          erased_at?: string | null;
+          erased_by?: string | null;
           full_name: string;
           gender: string;
           guardian_name?: string | null;
           guardian_phone?: string | null;
           hostel_id: string;
           id?: string;
-          id_proof_hash: string;
-          id_proof_last4: string;
+          id_proof_hash?: string | null;
+          id_proof_last4?: string | null;
           id_proof_path?: string | null;
           id_proof_type: string;
           joining_date: string;
           notes?: string | null;
-          permanent_address: string;
-          phone: string;
+          permanent_address?: string | null;
+          phone?: string | null;
           status?: string;
           status_changed_at?: string | null;
           status_changed_by?: string | null;
@@ -894,24 +965,28 @@ export type Database = {
         };
         Update: {
           alt_phone?: string | null;
+          consent_at?: string | null;
+          consent_recorded_by?: string | null;
           created_at?: string;
           created_by?: string | null;
-          dob?: string;
+          dob?: string | null;
           email?: string | null;
+          erased_at?: string | null;
+          erased_by?: string | null;
           full_name?: string;
           gender?: string;
           guardian_name?: string | null;
           guardian_phone?: string | null;
           hostel_id?: string;
           id?: string;
-          id_proof_hash?: string;
-          id_proof_last4?: string;
+          id_proof_hash?: string | null;
+          id_proof_last4?: string | null;
           id_proof_path?: string | null;
           id_proof_type?: string;
           joining_date?: string;
           notes?: string | null;
-          permanent_address?: string;
-          phone?: string;
+          permanent_address?: string | null;
+          phone?: string | null;
           status?: string;
           status_changed_at?: string | null;
           status_changed_by?: string | null;
@@ -919,8 +994,22 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "residents_consent_recorded_by_fkey";
+            columns: ["consent_recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "residents_created_by_fkey";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "residents_erased_by_fkey";
+            columns: ["erased_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -1452,6 +1541,7 @@ export type Database = {
         }[];
       };
       deposits_held_total: { Args: { p_hostel_id: string }; Returns: Json };
+      erase_resident: { Args: { p_reason: string; p_resident_id: string }; Returns: undefined };
       fee_status_totals: {
         Args: { p_hostel_id: string; p_period_month?: string; p_room_id?: string };
         Returns: {

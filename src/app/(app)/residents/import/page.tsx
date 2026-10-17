@@ -38,6 +38,7 @@ export default async function ImportResidentsPage() {
         preview={previewResidentImport}
         commit={commitResidentImport}
         noun="residents"
+        consentLabel="Every resident in this file agreed to their details being kept for running the hostel (DPDP Act, 2023)"
         columns={[
           { key: "full_name", label: "Name" },
           { key: "phone", label: "Mobile" },

@@ -226,6 +226,7 @@ async function ensureResidents(hostelId: string, ownerId: string) {
         guardian_phone: `97400${String(20001 + i).padStart(5, "0")}`,
         permanent_address: "Demo address, Andhra Pradesh",
         joining_date: monthStart(-4),
+        consent_at: `${monthStart(-4)}T09:00:00+05:30`,
         created_by: ownerId,
       })),
       { onConflict: "hostel_id,phone", ignoreDuplicates: true },

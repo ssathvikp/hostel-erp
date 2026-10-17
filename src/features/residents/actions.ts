@@ -32,6 +32,7 @@ const BUCKET = "id-proofs";
 
 /** Everything the registration form echoes back. The ID number is never echoed. */
 const CREATE_FIELDS = [
+  "consent",
   "full_name",
   "phone",
   "alt_phone",
@@ -110,7 +111,13 @@ export async function registerResident(
   }
 
   const parsed = validateFormData(residentSchema, formData);
-  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const consented = formData.get("consent") === "on";
+  if (!parsed.ok || !consented) {
+    return formFailure(undefined, values, {
+      ...(parsed.ok ? {} : parsed.fieldErrors),
+      ...(consented ? {} : { consent: ["Record the resident's consent to register them"] }),
+    });
+  }
 
   const hostelId = await activeHostelId();
   if (!hostelId) return formFailure(NO_HOSTEL, values);
@@ -122,7 +129,13 @@ export async function registerResident(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("residents")
-    .insert({ ...resident, ...fingerprint, hostel_id: hostelId })
+    // The database stamps the actual time and who recorded it.
+    .insert({
+      ...resident,
+      ...fingerprint,
+      hostel_id: hostelId,
+      consent_at: new Date().toISOString(),
+    })
     .select("id")
     .single();
 

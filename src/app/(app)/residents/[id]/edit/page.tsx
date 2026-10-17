@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { ResidentForm } from "@/features/residents/components/ResidentForm";
@@ -19,19 +19,24 @@ export default async function EditResidentPage({ params }: { params: Promise<{ i
   const { data: resident, error } = await supabase
     .from("residents")
     .select(
-      "id, full_name, gender, dob, id_proof_type, id_proof_last4, phone, alt_phone, email, guardian_name, guardian_phone, permanent_address, notes",
+      "id, full_name, gender, dob, id_proof_type, id_proof_last4, phone, alt_phone, email, guardian_name, guardian_phone, permanent_address, notes, erased_at",
     )
     .eq("id", id)
     .eq("hostel_id", hostel.id)
     .maybeSingle();
   if (error) throw error;
   if (!resident) notFound();
+  // Erased records keep no personal details to edit (DPDP).
+  const { erased_at, phone, dob, id_proof_last4, permanent_address, ...rest } = resident;
+  if (erased_at || !phone || !dob || !id_proof_last4 || !permanent_address) {
+    redirect(`/residents/${resident.id}`);
+  }
 
   return (
     <div className="max-w-3xl">
       <PageHeader title={`Edit ${resident.full_name}`} />
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
-        <ResidentForm resident={resident} />
+        <ResidentForm resident={{ ...rest, phone, dob, id_proof_last4, permanent_address }} />
       </div>
     </div>
   );

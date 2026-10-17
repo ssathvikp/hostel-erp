@@ -81,6 +81,11 @@ test("staff import residents; ID numbers never come back to the browser", async 
   await expect(inMain(page).getByRole("cell", { name: "Nikhil Verma" })).toBeVisible();
   await expect(inMain(page).getByText("234567890123")).toHaveCount(0);
   await page.getByRole("button", { name: "Import 2 residents" }).click();
+  await expect(
+    inMain(page).getByText("Confirm that every resident in the file agreed"),
+  ).toBeVisible();
+  await page.getByLabel(/^Every resident in this file agreed/).check();
+  await page.getByRole("button", { name: "Import 2 residents" }).click();
 
   await expect(page).toHaveURL(/\/residents\?imported=2$/);
   await expect(

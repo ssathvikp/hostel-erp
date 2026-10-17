@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState, type ReactNode } from "react";
 
-import { Alert, Button, buttonClass, Input, Select, Textarea } from "@/components/ui";
+import { Alert, Button, buttonClass, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { ID_PROOF_FORMATS } from "@/lib/validation/schemas";
 import { todayIst } from "@/lib/validation/fields";
 import type { IdProofType } from "@/types";
@@ -238,6 +238,18 @@ export function ResidentForm({ resident }: { resident?: ResidentFormValues }) {
           />
         </div>
       </Section>
+
+      {!resident && (
+        <Checkbox
+          id="consent"
+          name="consent"
+          required
+          defaultChecked={state.values?.consent === "on"}
+          label="The resident agrees to these details being kept for running the hostel"
+          hint="Required under the Digital Personal Data Protection Act, 2023. They can ask for a copy or, after leaving, for their details to be erased."
+          error={errors.consent?.[0]}
+        />
+      )}
 
       <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
         <Link
