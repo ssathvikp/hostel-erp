@@ -163,3 +163,7 @@ changed) lands in the mail catcher at <http://localhost:54324>.
 
 ClickUp is the source of truth for task status and acceptance criteria. The
 repository mirror of the plan lives in [`scripts/clickup/`](scripts/clickup/README.md).
+
+Revenue ideas not yet scheduled (billing, online rent collection, a resident
+app, a vacancy marketplace and more) are in EP-14, in
+[`scripts/clickup/plan-11.ndjson`](scripts/clickup/plan-11.ndjson).

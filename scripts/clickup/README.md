@@ -51,6 +51,7 @@ Folder    : Hostel/PG ERP
 | 2026-09-21 | EP-10, EP-11 and EP-12 remain container epics with zero subtasks | Detail is written only when an epic is scheduled; no invented requirements |
 | 2026-09-21 | The gaps listed below stay out of the MVP by choice | Owner decision, taken with the retrofit cost understood |
 | 2026-10-17 | Scheduled the backlog work that needs no external account (plan-10.ndjson): EP-10, EP-11 manual channel, staff and deposits from EP-12, and new EP-13 for data import and DPDP | MVP complete; these are what the first paying hostels need. Tasks tagged `built` are done in code; set their ClickUp status after syncing |
+| 2026-10-17 | Added EP-14 Revenue Engine (plan-11.ndjson): 13 revenue ideas, tagged `backlog` and `revenue`, not scheduled | Ideas only; detail and estimates are refined when a task is scheduled |
 
 ### Gaps knowingly deferred out of the MVP
 
