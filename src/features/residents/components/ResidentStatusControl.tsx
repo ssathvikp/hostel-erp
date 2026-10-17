@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Modal } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 import type { ResidentStatus } from "@/types";
@@ -61,6 +62,7 @@ export function ResidentStatusControl({
               Cancel
             </Button>
             <form action={action} onSubmit={() => setTarget(null)}>
+              <HostelField />
               <input type="hidden" name="resident_id" value={resident.id} />
               <input type="hidden" name="status" value={target ?? ""} />
               <Button type="submit" loading={pending} className="w-full">

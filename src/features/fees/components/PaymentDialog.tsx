@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select } from "@/components/ui";
 import { formatPaise, paiseToInput } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
@@ -82,6 +83,7 @@ export function PaymentDialog({
         }
       >
         <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <HostelField />
           {state.formError && <Alert tone="error">{state.formError}</Alert>}
           {invoices.length === 1 ? (
             <>

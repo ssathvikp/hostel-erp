@@ -7,6 +7,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { focusRing, Spinner } from "@/components/ui";
 import { signOut } from "@/features/auth/actions";
 import { HostelSwitcher, type SwitcherHostel } from "@/features/hostels/components/HostelSwitcher";
+
+import { ActiveHostelProvider } from "./ActiveHostel";
 import { cn } from "@/lib/cn";
 
 import { NAV_ITEMS } from "./nav";
@@ -154,102 +156,107 @@ export function AppShell({
   }, [drawerOpen]);
 
   return (
-    <div className="min-h-dvh bg-slate-50 print:min-h-0 print:bg-white">
-      <a
-        href="#main"
-        className="sr-only z-50 rounded-md bg-white px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 print:hidden"
-      >
-        Skip to content
-      </a>
-
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex print:hidden">
-        <div className="flex h-16 items-center px-5">
-          <Brand />
-        </div>
-        <div className="border-b border-slate-200 pb-4">
-          <HostelSwitcher idPrefix="sidebar" {...hostels} />
-        </div>
-        <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
-          <NavLinks />
-        </nav>
-        <UserMenu user={user} />
-      </aside>
-
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden print:hidden">
-        <Brand />
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open navigation"
-          aria-expanded={drawerOpen}
-          aria-controls="mobile-nav"
-          className={cn("rounded-md p-2 text-slate-700 hover:bg-slate-100", focusRing)}
+    <ActiveHostelProvider id={hostels.activeId}>
+      <div className="min-h-dvh bg-slate-50 print:min-h-0 print:bg-white">
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-md bg-white px-3 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 print:hidden"
         >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="size-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <path strokeLinecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
-          </svg>
-        </button>
-      </header>
+          Skip to content
+        </a>
 
-      {/* Mobile drawer */}
-      {drawerOpen && (
-        <div
-          className="fixed inset-0 z-40 lg:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Navigation"
-        >
-          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setDrawerOpen(false)} />
-          <div
-            id="mobile-nav"
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-white shadow-xl"
-          >
-            <div className="flex h-14 items-center justify-between px-4">
-              <Brand />
-              <button
-                type="button"
-                autoFocus
-                onClick={() => setDrawerOpen(false)}
-                aria-label="Close navigation"
-                className={cn("rounded-md p-2 text-slate-500 hover:bg-slate-100", focusRing)}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="size-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path strokeLinecap="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="border-b border-slate-200 pb-4">
-              <HostelSwitcher idPrefix="drawer" {...hostels} />
-            </div>
-            <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
-              <NavLinks onNavigate={() => setDrawerOpen(false)} />
-            </nav>
-            <UserMenu user={user} />
+        {/* Desktop sidebar */}
+        <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex print:hidden">
+          <div className="flex h-16 items-center px-5">
+            <Brand />
           </div>
-        </div>
-      )}
+          <div className="border-b border-slate-200 pb-4">
+            <HostelSwitcher idPrefix="sidebar" {...hostels} />
+          </div>
+          <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
+            <NavLinks />
+          </nav>
+          <UserMenu user={user} />
+        </aside>
 
-      <main id="main" className="lg:pl-64 print:pl-0">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
-          {children}
-        </div>
-      </main>
-    </div>
+        {/* Mobile top bar */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden print:hidden">
+          <Brand />
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={drawerOpen}
+            aria-controls="mobile-nav"
+            className={cn("rounded-md p-2 text-slate-700 hover:bg-slate-100", focusRing)}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path strokeLinecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+            </svg>
+          </button>
+        </header>
+
+        {/* Mobile drawer */}
+        {drawerOpen && (
+          <div
+            className="fixed inset-0 z-40 lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+          >
+            <div
+              className="absolute inset-0 bg-slate-900/50"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <div
+              id="mobile-nav"
+              className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-white shadow-xl"
+            >
+              <div className="flex h-14 items-center justify-between px-4">
+                <Brand />
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setDrawerOpen(false)}
+                  aria-label="Close navigation"
+                  className={cn("rounded-md p-2 text-slate-500 hover:bg-slate-100", focusRing)}
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="size-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path strokeLinecap="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="border-b border-slate-200 pb-4">
+                <HostelSwitcher idPrefix="drawer" {...hostels} />
+              </div>
+              <nav aria-label="Primary" className="flex-1 overflow-y-auto px-3 py-4">
+                <NavLinks onNavigate={() => setDrawerOpen(false)} />
+              </nav>
+              <UserMenu user={user} />
+            </div>
+          </div>
+        )}
+
+        <main id="main" className="lg:pl-64 print:pl-0">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
+            {children}
+          </div>
+        </main>
+      </div>
+    </ActiveHostelProvider>
   );
 }

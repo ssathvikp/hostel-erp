@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { unexpectedFailure } from "@/lib/request-context";
 import { protectIdProof } from "@/lib/residents/id-proof";
 import { createClient } from "@/lib/supabase/server";
@@ -141,8 +141,9 @@ async function check(kind: ImportKind, formData: FormData) {
     return { error: "Choose a CSV file to import." } as const;
   }
 
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!hostelId) return { error: "Finish setting up your hostel first." } as const;
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return { error: hostel.error } as const;
+  const hostelId = hostel.id;
 
   const parsed = kind === "rooms" ? parseImport("rooms", text) : parseImport("residents", text);
   if (parsed.fileErrors.length > 0) return { error: parsed.fileErrors[0] } as const;

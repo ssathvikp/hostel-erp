@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import { formFailure, formSuccess, formValues, uuid, type FormState } from "@/lib/validation";
@@ -13,6 +13,8 @@ import { formFailure, formSuccess, formValues, uuid, type FormState } from "@/li
 import { MAX_TEMPLATE_LENGTH, unknownPlaceholders } from "./message";
 
 const sendSchema = z.object({
+  /** The hostel the screen was shown for (see formHostel). */
+  hostelId: uuid("Hostel"),
   residentId: uuid("Resident"),
   kind: z.enum(["due", "receipt"]),
   channel: z.enum(["whatsapp", "copy"]),
@@ -34,8 +36,10 @@ export async function logReminderSend(input: ReminderSend): Promise<{ ok: boolea
     return { ok: false };
   }
   const parsed = sendSchema.safeParse(input);
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!parsed.success || !hostelId) return { ok: false };
+  if (!parsed.success) return { ok: false };
+  const hostel = await formHostel(parsed.data.hostelId);
+  if ("error" in hostel) return { ok: false };
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { error } = await supabase.from("reminder_log").insert({
@@ -67,8 +71,9 @@ export async function saveReminderTemplate(
     if (error instanceof AuthorizationError) return formFailure(error.message, values);
     throw error;
   }
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!hostelId) return formFailure("Finish setting up your hostel first.", values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const text = values.reminder_template.trim();
   if (text.length > MAX_TEMPLATE_LENGTH) {

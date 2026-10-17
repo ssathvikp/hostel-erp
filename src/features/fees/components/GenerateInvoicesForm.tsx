@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -16,6 +17,7 @@ export function GenerateInvoicesForm({ currentMonth }: { currentMonth: string })
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-4">
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {state.status === "success" && <Alert tone="success">{state.message}</Alert>}
       {state.warning && <Alert tone="warning">{state.warning}</Alert>}

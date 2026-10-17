@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, buttonClass, Modal, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -63,6 +64,7 @@ export function DataRights({
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <p className="text-slate-600">Not recorded. Ask the resident, then record it.</p>
             <form action={consent}>
+              <HostelField />
               <input type="hidden" name="resident_id" value={resident.id} />
               <Button type="submit" size="sm" variant="secondary" loading={recording}>
                 Record consent
@@ -130,6 +132,7 @@ export function DataRights({
         }
       >
         <form key={eraseState.id} id="erase-form" action={erase} noValidate className="space-y-4">
+          <HostelField />
           {eraseState.formError && <Alert tone="error">{eraseState.formError}</Alert>}
           <input type="hidden" name="resident_id" value={resident.id} />
           <Textarea

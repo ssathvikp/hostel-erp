@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Badge, Button, Modal, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -63,12 +64,14 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
                   {row.status === "invited" && row.invitationId && (
                     <>
                       <form action={resend} onSubmit={() => setLast("resend")}>
+                        <HostelField />
                         <input type="hidden" name="invitation_id" value={row.invitationId} />
                         <Button type="submit" size="sm" variant="secondary" loading={resending}>
                           Resend<span className="sr-only"> invitation to {row.fullName}</span>
                         </Button>
                       </form>
                       <form action={revoke} onSubmit={() => setLast("revoke")}>
+                        <HostelField />
                         <input type="hidden" name="invitation_id" value={row.invitationId} />
                         <Button type="submit" size="sm" variant="ghost" loading={revoking}>
                           Cancel<span className="sr-only"> invitation to {row.fullName}</span>
@@ -105,6 +108,7 @@ export function StaffList({ staff }: { staff: StaffRow[] }) {
                 setRemoving(null);
               }}
             >
+              <HostelField />
               <input type="hidden" name="profile_id" value={removing?.profileId ?? ""} />
               <Button type="submit" variant="danger" loading={removingNow} className="w-full">
                 Remove access

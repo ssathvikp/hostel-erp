@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { ACTIVE_HOSTEL_COOKIE, ACTIVE_HOSTEL_COOKIE_OPTIONS } from "@/lib/hostels/cookie";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
@@ -178,10 +179,12 @@ export async function updateHostelSettings(
   const parsed = validateFormData(hostelSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  // The hostel comes from the session, never from the form, so a tampered
-  // request cannot name another hostel. RLS backs this up.
-  const { active } = await getHostelContext();
-  if (!active) return formFailure("Finish setting up your hostel first.", values);
+  // The hostel is the session's active one. The form's hostel_id only
+  // confirms the page was shown for it (another tab may have switched), so a
+  // tampered value can refuse a save but never redirect it. RLS backs this up.
+  const checked = await formHostel(formData);
+  if ("error" in checked) return formFailure(checked.error, values);
+  const active = { id: checked.id };
 
   const supabase = await createClient();
   const { data, error } = await supabase

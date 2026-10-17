@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, buttonClass, Input } from "@/components/ui";
 
 import { generateRooms, type BulkRoomState } from "../actions";
@@ -59,6 +60,7 @@ function BulkRoomRound({ onReset }: { onReset: () => void }) {
       onChange={() => setEditedSince(state.id)}
       className="space-y-6"
     >
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
 
       <div className="grid gap-5 sm:grid-cols-2">

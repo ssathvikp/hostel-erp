@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -17,6 +18,7 @@ export function IdProofUpload({ residentId, hasFile }: { residentId: string; has
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-3">
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {state.status === "success" && <Alert tone="success">{state.message}</Alert>}
       <input type="hidden" name="resident_id" value={residentId} />

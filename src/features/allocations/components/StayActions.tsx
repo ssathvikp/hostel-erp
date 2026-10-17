@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Checkbox, Input, Modal, Select, type SelectOption } from "@/components/ui";
 import { todayIst } from "@/lib/validation";
 import { initialFormState } from "@/lib/validation/result";
@@ -129,6 +130,7 @@ function VacateDialog({
         }
       >
         <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <HostelField />
           {state.formError && <Alert tone="error">{state.formError}</Alert>}
           {note && <Alert tone="info">{note}</Alert>}
           <input type="hidden" name="allocation_id" value={stay.allocationId} />
@@ -227,6 +229,7 @@ function TransferDialog({
           <Alert tone="info">There are no vacant beds to move to.</Alert>
         ) : (
           <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+            <HostelField />
             {state.formError && <Alert tone="error">{state.formError}</Alert>}
             <input type="hidden" name="allocation_id" value={stay.allocationId} />
             <input type="hidden" name="resident_id" value={stay.residentId} />

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -24,8 +24,6 @@ import {
 import type { SharingType } from "@/types";
 
 import { planBulkRooms } from "./plan";
-
-const NO_HOSTEL = "Finish setting up your hostel first.";
 
 const ROOM_FIELDS = ["room_number", "floor", "sharing_type", "capacity"] as const;
 const ROOM_UPDATE_FIELDS = ["floor", "sharing_type", "capacity"] as const;
@@ -73,10 +71,6 @@ function authorizationFailure(error: unknown, values?: Record<string, string>): 
 }
 
 /** The active hostel, taken from the session; never from the submitted form. */
-async function activeHostelId(): Promise<string | null> {
-  return (await getHostelContext()).active?.id ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Create one room (E4-T2, E4-T3, E4-T4)
 // ---------------------------------------------------------------------------
@@ -92,8 +86,9 @@ export async function createRoom(_previous: FormState, formData: FormData): Prom
   const parsed = validateFormData(roomSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   // The insert trigger creates the beds in the same statement.
   const supabase = await createClient();
@@ -153,8 +148,9 @@ export async function generateRooms(
   const parsed = validateFormData(bulkRoomSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const input = parsed.data;
   const supabase = await createClient();
@@ -236,8 +232,9 @@ export async function updateRoom(_previous: FormState, formData: FormData): Prom
   const parsed = validateFormData(roomUpdateSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   // A capacity change adds or retires beds in the same statement.
   const supabase = await createClient();
@@ -264,8 +261,10 @@ export async function archiveRoom(_previous: FormState, formData: FormData): Pro
   }
 
   const roomId = roomIdFrom(formData);
-  const hostelId = await activeHostelId();
-  if (!roomId || !hostelId) return formFailure("This room could not be found.");
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+  const hostelId = hostel.id;
+  if (!roomId) return formFailure("This room could not be found.");
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -291,8 +290,10 @@ export async function deleteRoom(_previous: FormState, formData: FormData): Prom
   }
 
   const roomId = roomIdFrom(formData);
-  const hostelId = await activeHostelId();
-  if (!roomId || !hostelId) return formFailure("This room could not be found.");
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+  const hostelId = hostel.id;
+  if (!roomId) return formFailure("This room could not be found.");
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -334,8 +335,9 @@ export async function setBedStatus(_previous: FormState, formData: FormData): Pr
   const parsed = validateFormData(bedStatusSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const { bed_id, ...change } = parsed.data;
   const supabase = await createClient();

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { PAYMENT_MODE_OPTIONS } from "@/features/fees/options";
 import { formatPaise, paiseToInput } from "@/lib/money";
@@ -77,6 +78,7 @@ export function DepositDialog({
         }
       >
         <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <HostelField />
           {state.formError && <Alert tone="error">{state.formError}</Alert>}
           <input type="hidden" name="resident_id" value={residentId} />
           <Select

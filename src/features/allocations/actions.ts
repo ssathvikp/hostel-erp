@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -19,8 +19,6 @@ import {
   validateFormData,
   type FormState,
 } from "@/lib/validation";
-
-const NO_HOSTEL = "Finish setting up your hostel first.";
 
 const ALLOCATE_FIELDS = ["resident_id", "bed_id", "start_date", "rent_override"] as const;
 const VACATE_FIELDS = ["move_out_date", "vacate_reason", "mark_vacated"] as const;
@@ -71,10 +69,6 @@ function authorizationFailure(error: unknown, values?: Record<string, string>): 
   throw error;
 }
 
-async function activeHostelId(): Promise<string | null> {
-  return (await getHostelContext()).active?.id ?? null;
-}
-
 /** Every screen that shows who sleeps where. */
 function revalidateOccupancy(residentId: unknown) {
   const resident = uuid("Resident").safeParse(residentId);
@@ -99,7 +93,8 @@ export async function allocateBed(_previous: FormState, formData: FormData): Pro
 
   const parsed = validateFormData(allocationSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("allocate_bed", {
@@ -128,7 +123,8 @@ export async function vacateBed(_previous: FormState, formData: FormData): Promi
 
   const parsed = validateFormData(vacateSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("vacate_allocation", {
@@ -159,7 +155,8 @@ export async function transferBed(_previous: FormState, formData: FormData): Pro
 
   const parsed = validateFormData(transferSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  if (!(await activeHostelId())) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("transfer_allocation", {

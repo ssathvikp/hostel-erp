@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { getSessionUser, requireRole } from "@/lib/auth/session";
 import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -20,7 +21,6 @@ import {
   type FormState,
 } from "@/lib/validation";
 
-const NO_HOSTEL = "Finish setting up your hostel first.";
 const INVITE_FIELDS = ["full_name", "email"] as const;
 const RATE_LIMITED = "Too many invitations in a short time. Wait a minute and try again.";
 /** Removed staff stay banned until re-invited; Supabase takes a duration. */
@@ -38,10 +38,12 @@ function authorizationFailure(error: unknown, values?: Record<string, string>): 
  * The owner and the hostel they are managing. Owners only ever see hostels
  * they own, so the active hostel is one of theirs.
  */
-async function ownerAndHostel() {
+async function ownerAndHostel(formData: FormData) {
   const user = await requireRole(["owner"]);
-  const context = await getHostelContext();
-  return { user, hostel: context.active };
+  const checked = await formHostel(formData);
+  if ("error" in checked) return { user, hostel: null, hostelError: checked.error };
+  const hostel = (await getHostelContext()).active!;
+  return { user, hostel, hostelError: null };
 }
 
 async function accountByEmail(admin: Admin, email: string) {
@@ -96,12 +98,12 @@ export async function inviteStaff(_previous: FormState, formData: FormData): Pro
   const values = formValues(formData, INVITE_FIELDS);
   let owner;
   try {
-    owner = await ownerAndHostel();
+    owner = await ownerAndHostel(formData);
   } catch (error) {
     return authorizationFailure(error, values);
   }
   const { user, hostel } = owner;
-  if (!hostel) return formFailure(NO_HOSTEL, values);
+  if (!hostel) return formFailure(owner.hostelError, values);
 
   const parsed = validateFormData(staffInviteSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
@@ -222,12 +224,12 @@ export async function resendInvitation(
 ): Promise<FormState> {
   let owner;
   try {
-    owner = await ownerAndHostel();
+    owner = await ownerAndHostel(formData);
   } catch (error) {
     return authorizationFailure(error);
   }
   const { user, hostel } = owner;
-  if (!hostel) return formFailure(NO_HOSTEL);
+  if (!hostel) return formFailure(owner.hostelError);
 
   try {
     const invitation = await pendingInvitation(formData.get("invitation_id"));
@@ -273,12 +275,12 @@ export async function revokeInvitation(
 ): Promise<FormState> {
   let owner;
   try {
-    owner = await ownerAndHostel();
+    owner = await ownerAndHostel(formData);
   } catch (error) {
     return authorizationFailure(error);
   }
   const { user, hostel } = owner;
-  if (!hostel) return formFailure(NO_HOSTEL);
+  if (!hostel) return formFailure(owner.hostelError);
 
   try {
     const invitation = await pendingInvitation(formData.get("invitation_id"));
@@ -326,12 +328,12 @@ async function deactivate(admin: Admin, profileId: string): Promise<unknown> {
 export async function removeStaff(_previous: FormState, formData: FormData): Promise<FormState> {
   let owner;
   try {
-    owner = await ownerAndHostel();
+    owner = await ownerAndHostel(formData);
   } catch (error) {
     return authorizationFailure(error);
   }
   const { user, hostel } = owner;
-  if (!hostel) return formFailure(NO_HOSTEL);
+  if (!hostel) return formFailure(owner.hostelError);
 
   const id = uuid("Staff member").safeParse(formData.get("profile_id"));
   if (!id.success) return formFailure("This staff member could not be found. Refresh the page.");

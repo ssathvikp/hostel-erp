@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, buttonClass, Input } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -30,6 +31,7 @@ export function RoomForm({ room }: { room?: RoomFormValues }) {
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-5">
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {room && <input type="hidden" name="room_id" value={room.id} />}
 

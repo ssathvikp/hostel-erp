@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Modal, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -87,6 +88,7 @@ export function VoidDialog({
         }
       >
         <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+          <HostelField />
           {state.formError && <Alert tone="error">{state.formError}</Alert>}
           <input type="hidden" name="id" value={id} />
           <Textarea

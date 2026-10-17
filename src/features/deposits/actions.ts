@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { formatPaise } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
@@ -21,7 +21,6 @@ import {
 
 import { DEPOSIT_KIND_LABELS } from "./options";
 
-const NO_HOSTEL = "Finish setting up your hostel first.";
 const FOREIGN_KEY_VIOLATION = "23503";
 const ENTRY_FIELDS = [
   "resident_id",
@@ -72,8 +71,9 @@ export async function recordDepositEntry(
 
   const parsed = validateFormData(depositEntrySchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -112,8 +112,9 @@ export async function voidDepositEntry(
 
   const parsed = validateFormData(voidSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase

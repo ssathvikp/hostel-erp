@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 
+import { useActiveHostelId } from "@/components/shell/ActiveHostel";
 import { buttonClass, Button } from "@/components/ui";
 
 import { logReminderSend, type ReminderSend } from "../actions";
@@ -20,17 +21,18 @@ export function SendButtons({
 }: {
   link: string;
   message: string;
-  send: Omit<ReminderSend, "channel">;
+  send: Omit<ReminderSend, "channel" | "hostelId">;
   /** Who it is for, for accessible names, e.g. "reminder to Ravi". */
   subject: string;
   label?: string;
 }) {
   const [, startTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
+  const hostelId = useActiveHostelId() ?? "";
 
   function record(channel: ReminderSend["channel"], done: string) {
     startTransition(async () => {
-      const result = await logReminderSend({ ...send, channel });
+      const result = await logReminderSend({ ...send, hostelId, channel });
       setStatus(result.ok ? done : "Sent, but it could not be recorded. Refresh to check.");
     });
   }

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { formatMonth, formatPaise } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
@@ -69,10 +69,6 @@ function authorizationFailure(error: unknown, values?: Record<string, string>): 
   throw error;
 }
 
-async function activeHostelId(): Promise<string | null> {
-  return (await getHostelContext()).active?.id ?? null;
-}
-
 /** Every screen that shows money. */
 function revalidateFees() {
   revalidatePath("/fees", "layout");
@@ -97,8 +93,9 @@ export async function setFeeStructure(
 
   const parsed = validateFormData(feeStructureSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_fee_structure", {
@@ -142,8 +139,9 @@ export async function generateInvoices(
 
   const parsed = validateFormData(generateInvoicesSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("generate_invoices", {
@@ -186,8 +184,9 @@ export async function voidInvoice(_previous: FormState, formData: FormData): Pro
 
   const parsed = validateFormData(voidSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -217,8 +216,9 @@ export async function recordPayment(_previous: FormState, formData: FormData): P
 
   const parsed = validateFormData(paymentSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { error } = await supabase.from("payments").insert({ hostel_id: hostelId, ...parsed.data });
@@ -260,8 +260,9 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   const parsed = validateFormData(voidSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase

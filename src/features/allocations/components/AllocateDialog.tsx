@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Modal, Select, type SelectOption } from "@/components/ui";
 import { todayIst } from "@/lib/validation";
 import { initialFormState } from "@/lib/validation/result";
@@ -77,6 +78,7 @@ export function AllocateModal({
           <Alert tone="info">{choice.emptyMessage}</Alert>
         ) : (
           <form key={state.id} id={formId} action={action} noValidate className="space-y-4">
+            <HostelField />
             {state.formError && <Alert tone="error">{state.formError}</Alert>}
             <input type="hidden" name={fixed.name} value={fixed.value} />
             <Select

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Modal } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -52,6 +53,7 @@ export function RoomDangerZone({ room }: { room: { id: string; number: string } 
               Cancel
             </Button>
             <form action={archive} onSubmit={() => setConfirming(null)}>
+              <HostelField />
               <input type="hidden" name="room_id" value={room.id} />
               <Button type="submit" loading={archiving} className="w-full">
                 Archive room
@@ -72,6 +74,7 @@ export function RoomDangerZone({ room }: { room: { id: string; number: string } 
               Cancel
             </Button>
             <form action={remove} onSubmit={() => setConfirming(null)}>
+              <HostelField />
               <input type="hidden" name="room_id" value={room.id} />
               <Button type="submit" variant="danger" loading={deleting} className="w-full">
                 Delete room

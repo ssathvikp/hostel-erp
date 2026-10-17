@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { detectIdProofType } from "@/lib/residents/file-type";
 import { protectIdProof } from "@/lib/residents/id-proof";
 import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
@@ -26,7 +26,6 @@ import type { ResidentStatus } from "@/types";
 
 import { ID_PROOF_MAX_BYTES, RESIDENT_STATUS_LABELS } from "./options";
 
-const NO_HOSTEL = "Finish setting up your hostel first.";
 const NOT_FOUND = "This resident could not be found.";
 const BUCKET = "id-proofs";
 
@@ -73,10 +72,6 @@ function authorizationFailure(error: unknown, values?: Record<string, string>): 
   throw error;
 }
 
-async function activeHostelId(): Promise<string | null> {
-  return (await getHostelContext()).active?.id ?? null;
-}
-
 function ruleMessage(error: PostgrestError): string | null {
   return error.code === "P0001" && error.hint ? (RULE_MESSAGES[error.hint] ?? null) : null;
 }
@@ -119,8 +114,9 @@ export async function registerResident(
     });
   }
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   // The full ID number goes no further than this line.
   const { id_proof_number, id_proof_type, ...resident } = parsed.data;
@@ -195,8 +191,9 @@ export async function updateResident(
   const parsed = validateFormData(residentUpdateSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL, values);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -249,8 +246,9 @@ export async function changeResidentStatus(
   const parsed = validateFormData(residentStatusSchema, formData);
   if (!parsed.ok) return formFailure(NOT_FOUND);
 
-  const hostelId = await activeHostelId();
-  if (!hostelId) return formFailure(NO_HOSTEL);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+  const hostelId = hostel.id;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -283,8 +281,10 @@ export async function uploadIdProof(_previous: FormState, formData: FormData): P
   }
 
   const residentId = residentIdFrom(formData);
-  const hostelId = await activeHostelId();
-  if (!residentId || !hostelId) return formFailure(NOT_FOUND);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+  const hostelId = hostel.id;
+  if (!residentId) return formFailure(NOT_FOUND);
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {

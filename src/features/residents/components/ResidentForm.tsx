@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState, type ReactNode } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, buttonClass, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { ID_PROOF_FORMATS } from "@/lib/validation/schemas";
 import { todayIst } from "@/lib/validation/fields";
@@ -69,6 +70,7 @@ export function ResidentForm({ resident }: { resident?: ResidentFormValues }) {
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-6">
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {state.existing && (
         <Alert tone="error" title="Already registered">

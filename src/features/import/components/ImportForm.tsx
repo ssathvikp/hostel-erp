@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Checkbox, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { focusRing } from "@/components/ui";
@@ -44,6 +45,7 @@ export function ImportForm({
   return (
     <div className="space-y-6">
       <form action={check} onSubmit={() => setLast("check")} className="space-y-4">
+        <HostelField />
         <div>
           <label htmlFor="import-file" className="block text-sm font-medium text-slate-700">
             CSV file
@@ -121,6 +123,7 @@ export function ImportForm({
                 </Table>
               )}
               <form action={save} onSubmit={() => setLast("save")} noValidate className="space-y-4">
+                <HostelField />
                 <input type="hidden" name="csv" value={state.csv ?? ""} />
                 <input type="hidden" name="file_name" value={state.fileName ?? ""} />
                 {consentLabel && (

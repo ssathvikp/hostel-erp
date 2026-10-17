@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
-import { getHostelContext } from "@/lib/hostels/active";
+import { formHostel } from "@/lib/hostels/form";
 import { logUnexpected, unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -43,8 +43,10 @@ export async function recordConsent(_previous: FormState, formData: FormData): P
     return denied(error);
   }
   const id = uuid("Resident").safeParse(formData.get("resident_id"));
-  const hostelId = (await getHostelContext()).active?.id;
-  if (!id.success || !hostelId) return formFailure("This resident could not be found.");
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+  const hostelId = hostel.id;
+  if (!id.success) return formFailure("This resident could not be found.");
 
   const supabase = await createClient();
   const { data, error } = await supabase

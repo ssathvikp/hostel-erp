@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Select } from "@/components/ui";
 import { SHARING_TYPE_OPTIONS } from "@/features/rooms/options";
 import { initialFormState } from "@/lib/validation/result";
@@ -17,6 +18,7 @@ export function RateForm({ defaultFrom }: { defaultFrom: string }) {
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-4">
+      <HostelField />
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {state.status === "success" && <Alert tone="success">{state.message}</Alert>}
       <div className="grid gap-4 sm:grid-cols-3">

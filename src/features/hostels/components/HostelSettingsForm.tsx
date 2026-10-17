@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { HostelField } from "@/components/shell/ActiveHostel";
 import { Alert, Button, Input, Select } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -50,6 +51,7 @@ export function HostelSettingsForm({
 
   return (
     <form key={state.id} action={action} noValidate className="space-y-6">
+      <HostelField />
       {!canEdit && <Alert tone="info">Only the hostel owner can change these details.</Alert>}
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
       {state.status === "success" && <Alert tone="success">{state.message}</Alert>}
