@@ -59,27 +59,28 @@ The app refuses to build or start when a required variable is missing.
 
 ## Scripts
 
-| Command                     | What it does                                                  |
-| --------------------------- | ------------------------------------------------------------- |
-| `npm run dev`               | Dev server with Turbopack                                     |
-| `npm run build`             | Production build                                              |
-| `npm run lint`              | ESLint                                                        |
-| `npm run typecheck`         | `tsc --noEmit`                                                |
-| `npm run format`            | Prettier write (`format:check` to verify only)                |
-| `npm test`                  | Every test suite                                              |
-| `npm run test:unit`         | Unit tests; no database needed                                |
-| `npm run test:db`           | Schema, RLS and integration tests against local Supabase      |
-| `npm run test:integrity`    | The bed and money integrity rules on their own (about 2 s)    |
-| `npm run test:e2e`          | Browser tests (desktop and mobile) against a production build |
-| `npm run db:start` / `stop` | Start or stop the local Supabase stack                        |
-| `npm run db:new -- <name>`  | Create a migration in `supabase/migrations/`                  |
-| `npm run db:reset`          | Rebuild the local database from empty with every migration    |
-| `npm run db:types`          | Regenerate `src/types/database.ts` from the local schema      |
-| `npm run db:seed`           | Add a demo hostel with residents, invoices and payments       |
-| `npm run db:lint`           | Lint the database schema                                      |
-| `npm run env:local`         | Write local Supabase values into `.env.local`                 |
-| `npm run staging:auth`      | Apply auth settings and email templates to staging            |
-| `npm run test:staging`      | The smoke journey against the deployed staging site           |
+| Command                          | What it does                                                  |
+| -------------------------------- | ------------------------------------------------------------- |
+| `npm run dev`                    | Dev server with Turbopack                                     |
+| `npm run build`                  | Production build                                              |
+| `npm run lint`                   | ESLint                                                        |
+| `npm run typecheck`              | `tsc --noEmit`                                                |
+| `npm run format`                 | Prettier write (`format:check` to verify only)                |
+| `npm test`                       | Every test suite                                              |
+| `npm run test:unit`              | Unit tests; no database needed                                |
+| `npm run test:db`                | Schema, RLS and integration tests against local Supabase      |
+| `npm run test:integrity`         | The bed and money integrity rules on their own (about 2 s)    |
+| `npm run test:e2e`               | Browser tests (desktop and mobile) against a production build |
+| `npm run db:start` / `stop`      | Start or stop the local Supabase stack                        |
+| `npm run db:new -- <name>`       | Create a migration in `supabase/migrations/`                  |
+| `npm run db:reset`               | Rebuild the local database from empty with every migration    |
+| `npm run db:types`               | Regenerate `src/types/database.ts` from the local schema      |
+| `npm run db:seed`                | Add a demo hostel with residents, invoices and payments       |
+| `npm run db:lint`                | Lint the database schema                                      |
+| `npm run env:local`              | Write local Supabase values into `.env.local`                 |
+| `npm run admin:grant -- <email>` | Make an existing account a platform admin (`/admin`)          |
+| `npm run staging:auth`           | Apply auth settings and email templates to staging            |
+| `npm run test:staging`           | The smoke journey against the deployed staging site           |
 
 ## Database
 
