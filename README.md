@@ -167,3 +167,6 @@ repository mirror of the plan lives in [`scripts/clickup/`](scripts/clickup/READ
 Revenue ideas not yet scheduled (billing, online rent collection, a resident
 app, a vacancy marketplace and more) are in EP-14, in
 [`scripts/clickup/plan-11.ndjson`](scripts/clickup/plan-11.ndjson).
+The business weak points and their fixes are in
+[`docs/business-analysis.md`](docs/business-analysis.md), tracked as EP-15 in
+[`scripts/clickup/plan-12.ndjson`](scripts/clickup/plan-12.ndjson).
