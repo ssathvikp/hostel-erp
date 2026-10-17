@@ -3,7 +3,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import {
+  Alert,
+  Badge,
+  buttonClass,
+  EmptyState,
+  Table,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
+} from "@/components/ui";
 import { ResidentFilters } from "@/features/residents/components/ResidentFilters";
 import { RESIDENT_STATUS_LABELS, RESIDENT_STATUS_TONES } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
@@ -132,11 +143,24 @@ export default async function ResidentsPage({
         title="Residents"
         description={`People staying at ${hostel.name}.`}
         actions={
-          <Link href="/residents/new" className={buttonClass()}>
-            Register resident
-          </Link>
+          <>
+            <Link href="/residents/import" className={buttonClass({ variant: "secondary" })}>
+              Import
+            </Link>
+            <Link href="/residents/new" className={buttonClass()}>
+              Register resident
+            </Link>
+          </>
         }
       />
+
+      {Number(single(params.imported)) > 0 && (
+        <Alert tone="success" className="mb-4">
+          {single(params.imported)}{" "}
+          {single(params.imported) === "1" ? "resident was" : "residents were"} imported. Allocate
+          their beds from each profile or the occupancy screen.
+        </Alert>
+      )}
 
       {(anyCount ?? 0) === 0 ? (
         <EmptyState

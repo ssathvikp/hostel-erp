@@ -285,3 +285,17 @@ security invoker and derive everything at read time.
   suspended.
 - Nothing is locked when a trial ends; the owner sees a banner from 14 days
   before. What happens next is a business decision made in `/admin`.
+
+## Spreadsheet import
+
+- Rooms (`/rooms/import`, owners) and residents (`/residents/import`,
+  owners and staff) come in as CSV. The app parses the file
+  (`src/lib/csv.ts`) and validates every row with the same schemas as the
+  forms (`src/features/import/spec.ts`), then checks clashes with records
+  already in the hostel. Nothing is saved until every row is clean.
+- `import_rooms(hostel, rooms)` and `import_residents(hostel, residents)`
+  are single INSERT statements run as the caller: a file goes in whole or
+  not at all, and RLS decides who may import. At most 500 rows per call.
+- Resident ID numbers are reduced to last 4 + keyed hash in the server
+  action before the call, exactly as in registration; the preview never
+  sends them back to the browser.

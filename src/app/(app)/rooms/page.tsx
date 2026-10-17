@@ -117,6 +117,7 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
   const created = single(params.created);
   const archived = single(params.archived);
   const deleted = single(params.deleted);
+  const imported = Number(single(params.imported));
 
   return (
     <>
@@ -126,6 +127,9 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
         actions={
           canEdit && (
             <>
+              <Link href="/rooms/import" className={buttonClass({ variant: "secondary" })}>
+                Import
+              </Link>
               <Link href="/rooms/bulk" className={buttonClass({ variant: "secondary" })}>
                 Add rooms in bulk
               </Link>
@@ -140,6 +144,11 @@ export default async function RoomsPage({ searchParams }: { searchParams: Promis
       {created && (
         <Alert tone="success" className="mb-4">
           Room {created} was created with its beds.
+        </Alert>
+      )}
+      {imported > 0 && (
+        <Alert tone="success" className="mb-4">
+          {imported} {imported === 1 ? "room was" : "rooms were"} imported with their beds.
         </Alert>
       )}
       {archived && (

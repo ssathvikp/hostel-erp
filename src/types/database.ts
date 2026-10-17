@@ -1466,6 +1466,14 @@ export type Database = {
         Args: { p_due_day?: number; p_hostel_id: string; p_period_month: string };
         Returns: Json;
       };
+      import_residents: { Args: { p_hostel_id: string; p_residents: Json }; Returns: number };
+      import_rooms: {
+        Args: { p_hostel_id: string; p_rooms: Json };
+        Returns: {
+          beds_created: number;
+          rooms_created: number;
+        }[];
+      };
       occupancy_trend: {
         Args: { p_from: string; p_granularity?: string; p_hostel_id: string; p_to: string };
         Returns: {
