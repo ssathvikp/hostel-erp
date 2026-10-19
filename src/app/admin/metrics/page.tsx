@@ -80,7 +80,7 @@ export default async function AdminMetricsPage() {
       </dl>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section aria-labelledby="signups-heading">
+        <section className="min-w-0" aria-labelledby="signups-heading">
           <h2 id="signups-heading" className="mb-3 text-base font-semibold text-slate-900">
             Sign-ups per week
           </h2>
@@ -102,7 +102,7 @@ export default async function AdminMetricsPage() {
           </Table>
         </section>
 
-        <section aria-labelledby="money-heading">
+        <section className="min-w-0" aria-labelledby="money-heading">
           <h2 id="money-heading" className="mb-3 text-base font-semibold text-slate-900">
             Rent handled through the app
           </h2>
