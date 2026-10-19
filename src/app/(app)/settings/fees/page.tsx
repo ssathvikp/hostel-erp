@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import {
+  ArchiveHeadButton,
+  ElectricityRateForm,
+  FeeHeadForm,
+  FeeHeadPriceForm,
+} from "@/features/charges/components/FeeHeadForms";
+import { getElectricityRate, getFeeHeads, type FeeHeadPrice } from "@/features/charges/queries";
 import { LateFeeRuleForm } from "@/features/fees/components/LateFeeRuleForm";
 import { RateForm } from "@/features/fees/components/RateForm";
 import { describeLateFeeRule } from "@/features/fees/late-fees";
@@ -23,11 +30,23 @@ const formatDay = (value: string) => day.format(new Date(value));
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const [{ history, summaries }, reminderTemplate, lateFeeRule] = await Promise.all([
-    getRates(supabase, hostel.id),
-    getReminderTemplate(supabase, hostel.id),
-    getLateFeeRule(supabase, hostel.id),
-  ]);
+  const [{ history, summaries }, reminderTemplate, lateFeeRule, heads, electricityRate] =
+    await Promise.all([
+      getRates(supabase, hostel.id),
+      getReminderTemplate(supabase, hostel.id),
+      getLateFeeRule(supabase, hostel.id),
+      getFeeHeads(supabase, hostel.id),
+      getElectricityRate(supabase, hostel.id),
+    ]);
+  const priceText = (prices: FeeHeadPrice[]) =>
+    prices.length === 0
+      ? null
+      : prices
+          .map(
+            (price) =>
+              `${formatPaise(price.amount)}${price.sharingType ? ` (${SHARING_TYPE_LABELS[price.sharingType]})` : ""}`,
+          )
+          .join(", ");
   const isOwner = user.role === "owner";
 
   // Sharing types with rooms but no rate today would go unbilled.
@@ -118,6 +137,95 @@ export default async function FeeSettingsPage() {
       ) : (
         <Alert tone="info">Only the hostel owner can change rates.</Alert>
       )}
+
+      <section
+        id="other-charges"
+        aria-labelledby="heads-heading"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="heads-heading" className="text-base font-semibold text-slate-900">
+          Other charges
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          Charges besides rent. Monthly ones (mess, maintenance) go on every monthly invoice, for
+          the nights held; one-time ones (admission, a key) are added to a resident when they apply.
+        </p>
+        {heads.length === 0 ? (
+          <p className="mb-4 text-sm text-slate-600">None yet.</p>
+        ) : (
+          <div className="mb-6">
+            <Table caption="Other charges">
+              <THead>
+                <tr>
+                  <Th>Charge</Th>
+                  <Th>Charged</Th>
+                  <Th>Price today</Th>
+                  <Th>
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </THead>
+              <TBody>
+                {heads.map((head) => (
+                  <Tr key={head.id}>
+                    <Td className="font-medium">{head.name}</Td>
+                    <Td>
+                      {head.kind === "monthly"
+                        ? "Monthly"
+                        : head.onFirstAllocation
+                          ? "Once, on first bed"
+                          : "Once"}
+                    </Td>
+                    <Td className="whitespace-normal">
+                      {priceText(head.current) ?? <Badge tone="warning">No price</Badge>}
+                      {head.upcoming.length > 0 && (
+                        <span className="block text-xs text-slate-500">
+                          Then {priceText(head.upcoming)} from{" "}
+                          {formatDay(head.upcoming[0].effectiveFrom)}
+                        </span>
+                      )}
+                    </Td>
+                    <Td>{isOwner && <ArchiveHeadButton id={head.id} name={head.name} />}</Td>
+                  </Tr>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        )}
+        {isOwner && (
+          <div className="space-y-6">
+            {heads.length > 0 && (
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Set a price</h3>
+                <FeeHeadPriceForm
+                  heads={heads.map((head) => ({ value: head.id, label: head.name }))}
+                  defaultFrom={shiftMonth(todayIst(), 0)}
+                />
+              </div>
+            )}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Add a charge type</h3>
+              <FeeHeadForm />
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section
+        id="electricity"
+        aria-labelledby="electricity-heading"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="electricity-heading" className="text-base font-semibold text-slate-900">
+          Electricity
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          {electricityRate
+            ? `Room meters are billed at ${formatPaise(electricityRate)} a unit, split among each room's residents by nights held. Enter readings under Fees → Electricity.`
+            : "Electricity is included in rent. Set a price per unit to bill room meters separately."}
+        </p>
+        {isOwner && <ElectricityRateForm rate={electricityRate} />}
+      </section>
 
       <section
         id="late-fees"

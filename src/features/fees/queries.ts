@@ -200,7 +200,7 @@ function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
     status: row.status as InvoiceRow["status"],
     dueStatus: row.due_status as InvoiceDueStatus | null,
     voidReason: row.void_reason,
-    kind: row.kind === "late_fee" ? "late_fee" : "rent",
+    kind: (["late_fee", "charges"].includes(row.kind ?? "") ? row.kind : "rent") as InvoiceKind,
     lateFeeFor: row.late_fee_for,
     invoiceNumber: row.invoice_number ?? "",
   };
@@ -358,14 +358,25 @@ export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId
   if (detailError) throw detailError;
   if (!invoice || !detail) return null;
 
-  // A rent invoice links to its late fee, if one was charged.
-  const { data: lateFee, error: lateFeeError } = await supabase
-    .from("invoices")
-    .select("id, amount, status")
-    .eq("hostel_id", hostelId)
-    .eq("late_fee_for", invoiceId)
-    .maybeSingle();
+  // A rent invoice links to its late fee, if one was charged; itemised
+  // invoices have lines (ClickUp E13-T1).
+  const [{ data: lateFee, error: lateFeeError }, { data: lines, error: linesError }] =
+    await Promise.all([
+      supabase
+        .from("invoices")
+        .select("id, amount, status")
+        .eq("hostel_id", hostelId)
+        .eq("late_fee_for", invoiceId)
+        .maybeSingle(),
+      supabase
+        .from("invoice_lines")
+        .select("id, kind, description, amount")
+        .eq("hostel_id", hostelId)
+        .eq("invoice_id", invoiceId)
+        .order("position"),
+    ]);
   if (lateFeeError) throw lateFeeError;
+  if (linesError) throw linesError;
 
   return {
     ...toInvoiceRow(invoice),
@@ -376,6 +387,12 @@ export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId
     lateFee: lateFee
       ? { id: lateFee.id, amount: lateFee.amount, void: lateFee.status === "void" }
       : null,
+    lines: (lines ?? []).map((line) => ({
+      id: line.id,
+      kind: line.kind as "rent" | "fee_head" | "discount" | "charge",
+      description: line.description,
+      amount: line.amount,
+    })),
   };
 }
 

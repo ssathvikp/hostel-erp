@@ -131,7 +131,34 @@ export function InvoiceDocument({
       )}
       <Party invoice={invoice} />
 
-      {invoice.kind === "late_fee" ? (
+      {invoice.lines.length > 1 || invoice.kind === "charges" ? (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-300 text-left text-slate-600">
+              <th className="py-2 font-medium">Description</th>
+              <th className="py-2 text-right font-medium">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoice.lines.map((line) => (
+              <tr key={line.id} className="border-b border-slate-200">
+                <td className="py-2">
+                  {line.description}
+                  {line.kind === "rent" &&
+                    stays.map((stay) => (
+                      <span key={stay.allocation_id} className="block text-xs text-slate-500">
+                        Bed {stay.bed_label} ({SHARING_TYPE_LABELS[stay.sharing_type]}),{" "}
+                        {formatDay(stay.from)} to {formatDay(stay.to)}: {stay.nights} of{" "}
+                        {daysInMonth} nights at {formatPaise(stay.monthly_rate)} a month
+                      </span>
+                    ))}
+                </td>
+                <td className="py-2 text-right tabular-nums">{formatPaise(line.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : invoice.kind === "late_fee" ? (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-300 text-left text-slate-600">

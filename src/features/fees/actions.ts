@@ -129,6 +129,8 @@ export async function setFeeStructure(
 interface GenerationSummary {
   created: number;
   total_amount: number;
+  /** Monthly charges, pending charges and discounts on top of rent. */
+  extras_amount: number;
   already_invoiced: number;
   unpriced: { resident_id: string; full_name: string }[];
 }
@@ -169,6 +171,11 @@ export async function generateInvoices(
       ? `Created ${plural(summary.created, "invoice")} for ${month} worth ${formatPaise(summary.total_amount)}.`
       : `No new invoices for ${month}.`,
   ];
+  if (summary.extras_amount !== 0) {
+    parts.push(
+      `That includes ${formatPaise(Math.abs(summary.extras_amount))} ${summary.extras_amount > 0 ? "of other charges besides rent" : "of discounts"}.`,
+    );
+  }
   if (summary.already_invoiced > 0) {
     parts.push(
       `${plural(summary.already_invoiced, "resident")} already had an invoice for this month and ${summary.already_invoiced === 1 ? "was" : "were"} skipped.`,

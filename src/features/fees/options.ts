@@ -61,7 +61,9 @@ export function invoiceLabel(
   options?: { short?: boolean },
 ): string {
   const month = formatMonth(invoice.periodMonth, options);
-  return invoice.kind === "late_fee" ? `${month} late fee` : month;
+  if (invoice.kind === "late_fee") return `${month} late fee`;
+  if (invoice.kind === "charges") return `${month} charges`;
+  return month;
 }
 
 export const LATE_FEE_MODE_OPTIONS: readonly SelectOption[] = [

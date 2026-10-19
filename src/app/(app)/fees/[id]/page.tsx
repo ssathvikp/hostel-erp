@@ -155,6 +155,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </p>
       )}
 
+      {invoice.lines.length > 1 && (
+        <section aria-labelledby="lines-heading">
+          <h2 id="lines-heading" className="mb-2 text-base font-semibold text-slate-900">
+            What it is for
+          </h2>
+          <dl className="max-w-md space-y-1 text-sm">
+            {invoice.lines.map((line) => (
+              <div key={line.id} className="flex justify-between gap-4">
+                <dt className="text-slate-700">{line.description}</dt>
+                <dd className="text-slate-900 tabular-nums">{formatPaise(line.amount)}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+
       <section aria-labelledby="resident-heading" className="text-sm text-slate-700">
         <h2 id="resident-heading" className="sr-only">
           Resident

@@ -111,9 +111,12 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         title="Fees"
         description="Invoices, payments and what is still due."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href="/fees/reminders" className={buttonClass({ variant: "secondary" })}>
               Send reminders
+            </Link>
+            <Link href="/fees/electricity" className={buttonClass({ variant: "secondary" })}>
+              Electricity
             </Link>
             <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
               Rates

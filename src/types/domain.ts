@@ -140,7 +140,7 @@ export type VacateReason = (typeof VACATE_REASONS)[number];
  */
 export const INVOICE_STATUSES = ["issued", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
-export const INVOICE_KINDS = ["rent", "late_fee"] as const;
+export const INVOICE_KINDS = ["rent", "late_fee", "charges"] as const;
 export type InvoiceKind = (typeof INVOICE_KINDS)[number];
 export const INVOICE_DUE_STATUSES = ["unpaid", "partial", "paid", "overdue"] as const;
 export type InvoiceDueStatus = (typeof INVOICE_DUE_STATUSES)[number];

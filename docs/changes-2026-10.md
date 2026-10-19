@@ -334,3 +334,105 @@ How to add, remove and recover admins is in [`admin.md`](admin.md).
   - a void invoice keeps its number, and a sent number is ignored;
   - `generate_invoices` invoices are numbered;
   - a refused payment takes no number.
+
+### Fee heads and itemised invoices (ClickUp E13-T1)
+
+- **What:** owners add charge types besides rent in Settings → Fees → Other
+  charges:
+  - monthly ones (mess, maintenance), billed on every monthly invoice for the
+    nights held;
+  - one-time ones (admission, a key).
+- **Prices:** per sharing type, or one price for all, from a date. As with
+  rent, setting a new price closes the old one, and price ranges never
+  overlap.
+- **Opting out:** a stay can be excluded from a monthly charge (e.g. a
+  resident who skips the mess), from the resident page.
+- **Itemised invoices:**
+  - Monthly invoices are now itemised in `invoice_lines`: a rent line,
+    monthly charges, discounts (negative) and pending charges.
+  - A commit-time constraint trigger refuses an invoice whose lines do not
+    add up to its amount, and lines can never be changed.
+  - Rent itself is computed exactly as before, so all existing billing tests
+    pass unchanged.
+- **How:** `generate_invoices` is now an owner-checked `SECURITY DEFINER`
+  function, because it writes lines and marks charges billed. Staff still get
+  `42501` and strangers `hostel_not_found`, as before.
+- **Screens:** printed invoices show each line, with the stays under the rent
+  line, and the invoice page shows "What it is for".
+- **Files:** `supabase/migrations/20261022090000_fee_heads.sql`, `src/features/charges/*`,
+  `src/app/(app)/settings/fees/page.tsx`, `src/features/fees/components/InvoiceDocument.tsx`,
+  `src/app/(app)/fees/[id]/page.tsx`, `src/features/fees/queries.ts`.
+
+### One-time and ad-hoc charges (ClickUp E13-T2)
+
+- **What:** owners and staff add a charge to a resident (description, amount,
+  date, optional type).
+- **Pending charges:**
+  - The next monthly invoice picks them up.
+  - The owner can "Bill pending charges now" as an invoice of their own, due
+    today.
+  - Before they are billed, the owner can void them with a reason.
+  - Voiding an invoice frees its charges for the next one.
+- **Admission fee:** a one-time type marked "charge on first bed" is added
+  automatically when a resident first gets a bed.
+- **Erasing:** a resident with pending charges cannot be erased (`erase_pending_charges`).
+- **Files:** `src/features/charges/components/ResidentCharges.tsx`,
+  `ResidentChargeForms.tsx`, `ReasonDialog.tsx`, `src/app/(app)/residents/[id]/page.tsx`,
+  `src/features/data-rights/actions.ts`.
+
+### Metered electricity per room (ClickUp E13-T3)
+
+- **What:**
+  - The owner sets a price per unit in Settings → Fees.
+  - Owners or staff record each room's meter reading at month end, on
+    Fees → Electricity.
+  - "Add electricity charges" turns each room's units × price into charges.
+    They are split among the room's residents by nights held, with the last
+    share taking the rounding, and go on their next invoice.
+- **Rules:**
+  - A reading lower than the previous one, or higher than the next, is
+    refused.
+  - A room's first reading is a starting point and bills nothing.
+  - An occupied room without a reading is listed, never billed as zero.
+  - Each room is billed once per month, and a billed reading cannot change.
+- **Files:** `src/app/(app)/fees/electricity/page.tsx`,
+  `src/features/charges/components/ElectricityForms.tsx`.
+
+### Discounts and concessions (ClickUp E13-T5)
+
+- **What:** owners give a resident a percentage or fixed discount on rent or
+  on one monthly charge, for a range of months, with a reason. Staff can see
+  discounts but not create them.
+- **Rules:** on each monthly invoice, discounts apply oldest first and never
+  take a line below zero. Ending a discount is a void with a reason.
+- **Not done:** the monthly report of discounts given. It comes with the
+  collection reports.
+
+### Tests
+
+- `tests/integration/fee-heads.test.ts` (13 cases), covering:
+  - head prices per type and for all types;
+  - proration and opt-outs;
+  - lines adding up at commit, and lines being immutable;
+  - pending charges, billing them, and releasing them when an invoice is
+    voided;
+  - "bill now", and the admission fee on the first stay only;
+  - discount caps and owner-only discounts;
+  - electricity shares, idempotency, billed-reading lock, lower readings,
+    missing readings, and no unit price set;
+  - the erase guard.
+- `tests/unit/charges.test.ts`.
+- `tests/e2e/charges.spec.ts`.
+
+### Fix: the occupancy trend re-read stays once per day
+
+`occupancy_trend` counted occupied beds per day with a subquery over the
+stays. Depending on the table statistics of the moment, Postgres re-read
+the allocations, and re-checked row-level security, once for every day in
+the range. The new insert trigger on allocations changed when the
+statistics were refreshed after a bulk insert. That was enough for the
+"500 beds, 2000 stays" timing test to pass alone before the change and then
+take about 1.6 s every time after it, against a 1.5 s limit.
+
+The beds and stays are now `MATERIALIZED`, so each is read once. The test
+passes again.

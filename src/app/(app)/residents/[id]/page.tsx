@@ -15,6 +15,7 @@ import { DepositLedger } from "@/features/deposits/components/DepositLedger";
 import { getResidentDeposit } from "@/features/deposits/queries";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
+import { ResidentCharges } from "@/features/charges/components/ResidentCharges";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
 import { invoiceLabel } from "@/features/fees/options";
 import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
@@ -136,12 +137,19 @@ export default async function ResidentPage({
     }));
 
   const erased = resident.erased_at !== null;
+  const { count: pendingCharges } = await supabase
+    .from("resident_charges")
+    .select("id", { count: "exact", head: true })
+    .eq("resident_id", id)
+    .is("invoice_id", null)
+    .is("voided_at", null);
   // Mirrors the checks in erase_resident, so the screen explains them.
   const eraseBlockers = [
     status !== "vacated" && "Mark them vacated once they have left.",
     current && "Vacate their bed first.",
     balance.outstanding > 0 && "Settle what they owe first.",
     deposit.balance.held > 0 && "Refund or deduct the security deposit first.",
+    (pendingCharges ?? 0) > 0 && "Bill or void their pending charges first.",
   ].filter((blocker): blocker is string => typeof blocker === "string");
 
   return (
@@ -360,6 +368,16 @@ export default async function ResidentPage({
 
       <Card title="Fees" id="fees-heading">
         <ResidentFees balance={balance} invoices={invoices} />
+      </Card>
+
+      <Card title="Charges and discounts" id="charges-heading">
+        <ResidentCharges
+          residentId={resident.id}
+          hostelId={hostel.id}
+          isOwner={user.role === "owner"}
+          editable={!erased}
+          currentAllocationId={current?.id ?? null}
+        />
       </Card>
 
       <Card title="Data and privacy" id="privacy-heading">

@@ -28,6 +28,7 @@ const ERASE_MESSAGES: Record<string, string> = {
     "Only residents who have left can be erased. Vacate their bed and mark them vacated first.",
   erase_balance_due: "This resident still owes rent. Record or void what is due first.",
   erase_deposit_held: "A security deposit is still held. Record the refund or deduction first.",
+  erase_pending_charges: "This resident has charges not yet billed. Bill or void them first.",
 };
 
 /** Rules whose database message names the detail (here, the month to bill). */

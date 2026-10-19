@@ -364,6 +364,14 @@ export const billingMonth = z
   })
   .transform((value) => `${value}-01`);
 
+/** Any month typed into `<input type="month">`, future ones included, as `YYYY-MM-01`. */
+export function billingMonthAny(label: string) {
+  return z
+    .string({ error: `Choose ${label.toLowerCase()}` })
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, { error: `Choose ${label.toLowerCase()}` })
+    .transform((value) => `${value}-01`);
+}
+
 /** Monthly invoice generation (E7-T3). Due days stop at 28 so every month has one. */
 export const generateInvoicesSchema = z.object({
   period_month: billingMonth,
@@ -425,6 +433,94 @@ export const lateFeeRuleSchema = z
   });
 
 export type LateFeeRuleInput = z.output<typeof lateFeeRuleSchema>;
+
+// ---------------------------------------------------------------------------
+// Fee heads, charges, discounts and electricity (ClickUp E13-T1/2/3/5)
+// ---------------------------------------------------------------------------
+
+export const feeHeadSchema = z.object({
+  name: requiredText("Name", 60),
+  kind: z.enum(["monthly", "one_time"], { error: "Choose monthly or one-time" }),
+  on_first_allocation: z
+    .enum(["on"])
+    .optional()
+    .transform((value) => value === "on"),
+});
+
+export const feeHeadPriceSchema = z.object({
+  head_id: uuid("Charge"),
+  // Empty means one price for every sharing type.
+  sharing_type: optional(z.enum(SHARING_TYPES, { error: "Choose a sharing type" })),
+  amount: rupees("Amount"),
+  effective_from: isoDate("Applies from"),
+});
+
+export const chargeSchema = z.object({
+  resident_id: uuid("Resident"),
+  head_id: optional(uuid("Charge type")),
+  description: requiredText("Description", 200),
+  amount: rupees("Amount"),
+  charge_date: isoDate("Date"),
+});
+
+export const discountSchema = z
+  .object({
+    resident_id: uuid("Resident"),
+    // Empty means rent.
+    head_id: optional(uuid("Applies to")),
+    kind: z.enum(["percent", "fixed"], { error: "Choose percentage or fixed amount" }),
+    value: z.string({ error: "Enter the discount" }).trim().min(1, { error: "Enter the discount" }),
+    from_month: billingMonthAny("From"),
+    to_month: optional(billingMonthAny("Until")),
+    reason: requiredText("Reason", 500),
+  })
+  .transform((input, ctx) => {
+    let value: number;
+    if (input.kind === "percent") {
+      value = Number(input.value);
+      if (!Number.isInteger(value) || value < 1 || value > 100) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a whole percentage from 1 to 100",
+          path: ["value"],
+        });
+        return z.NEVER;
+      }
+    } else {
+      const parsed = rupees("Discount").safeParse(input.value);
+      if (!parsed.success) {
+        ctx.addIssue({ code: "custom", message: parsed.error.issues[0].message, path: ["value"] });
+        return z.NEVER;
+      }
+      value = parsed.data;
+    }
+    if (input.to_month && input.to_month < input.from_month) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Until must be on or after From",
+        path: ["to_month"],
+      });
+      return z.NEVER;
+    }
+    return { ...input, value };
+  });
+
+export const meterReadingSchema = z.object({
+  room_id: uuid("Room"),
+  reading_month: billingMonth,
+  reading: z.coerce
+    .number({ error: "Enter the meter reading" })
+    .refine((value) => Number.isFinite(value) && value >= 0 && value < 1e10, {
+      error: "Enter the meter reading",
+    })
+    .refine((value) => Math.abs(value * 10 - Math.round(value * 10)) < 1e-6, {
+      error: "At most one decimal place",
+    }),
+});
+
+export const electricityRateSchema = z.object({
+  electricity_unit_rate: optional(rupees("Price per unit", { max: 100 })),
+});
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;
 export type PaymentInput = z.output<typeof paymentSchema>;
