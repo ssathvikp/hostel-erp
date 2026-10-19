@@ -121,6 +121,11 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <Link href="/fees/cheques" className={buttonClass({ variant: "secondary" })}>
               Cheques
             </Link>
+            {isOwner && (
+              <Link href="/fees/reports" className={buttonClass({ variant: "secondary" })}>
+                Reports
+              </Link>
+            )}
             <Link href="/settings/fees" className={buttonClass({ variant: "secondary" })}>
               Rates
             </Link>

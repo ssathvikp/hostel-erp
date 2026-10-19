@@ -528,3 +528,33 @@ passes again.
 DEFINER` function in the exposed `public` schema, which the schema-guard
   test forbids. It now lives in `private` behind an invoker wrapper, like
   every other function.
+
+## Phase 3d: collection reports and CSV exports (ClickUp E13-T12)
+
+- **What:** a Fee reports page at `/fees/reports`, for owners only, with:
+  - **Money in** for a date range (this month so far by default, a year at most),
+    broken down by payment mode, by who collected it, and by day. Cheques count
+    once cleared. Credit applied to an invoice is not counted, because it is not
+    new money. Advances kept as credit are counted.
+  - **Dues by age**: open balances grouped as not yet due, 1–30, 31–60, 61–90 and
+    over 90 days late. Pending cheques still count as owed.
+  - **Fee register** for a billing month: each live invoice by room, with billed,
+    paid, owed and status.
+  - **Discounts** given on the month's invoices.
+  - A CSV download for each of the four (`/fees/reports/export?report=collections|dues|register|discounts`).
+    Amounts are in rupees. The file starts with a byte-order mark so Excel reads
+    ₹ and Indian names correctly. Text a spreadsheet would run as a formula gets
+    a leading apostrophe.
+- **Why:** owners asked for daily collection by mode and collector, dues ageing,
+  and a monthly register they can hand to an accountant.
+- **No migration.** Everything reads tables and views owners can already see.
+  The page and the CSV share the same summaries, so their numbers agree.
+- **Files:** `src/features/fees/reports.ts` (summaries, ageing, CSV writer,
+  period parsing), `src/features/fees/report-queries.ts`,
+  `src/app/(app)/fees/reports/page.tsx`, `src/app/(app)/fees/reports/export/route.ts`,
+  and a Reports link on `/fees` for owners.
+- **Tests:** `tests/unit/reports.test.ts` covers totals, age bucket edges, CSV
+  quoting and formula defusing, and period defaults, swapping, the one-year cap
+  and bad input. `tests/e2e/reports.spec.ts` checks the owner's view and CSV
+  contents, and that staff are redirected from the page and get 403 on the
+  downloads.
