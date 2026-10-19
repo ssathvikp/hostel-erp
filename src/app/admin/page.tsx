@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { HOSTEL_STATUS_LABELS, HOSTEL_STATUS_TONES, PLAN_LABELS } from "@/features/admin/options";
 import { getAdminHostels, requirePlatformAdmin } from "@/features/admin/queries";
 import { attentionList, SIGNAL_LABELS } from "@/features/admin/signals";
@@ -17,9 +17,33 @@ const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "U
 const moment = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
 
 /** Every hostel on the platform, its plan and how much it is used (EP-10). */
-export default async function AdminHostelsPage() {
+export default async function AdminHostelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requirePlatformAdmin();
   const hostels = await getAdminHostels(await createClient());
+  const params = await searchParams;
+  const pick = (key: string) => {
+    const value = params[key];
+    return (Array.isArray(value) ? value[0] : value)?.trim() || null;
+  };
+  const filters = {
+    q: pick("q")?.toLowerCase() ?? null,
+    plan: pick("plan"),
+    status: pick("status"),
+  };
+  const listed = hostels.filter(
+    (hostel) =>
+      (!filters.plan || hostel.plan === filters.plan) &&
+      (!filters.status || hostel.status === filters.status) &&
+      (!filters.q ||
+        [hostel.name, hostel.city ?? "", hostel.ownerName, hostel.ownerEmail].some((text) =>
+          text.toLowerCase().includes(filters.q!),
+        )),
+  );
+  const filtered = Boolean(filters.q || filters.plan || filters.status);
   const today = todayIst();
   const trialsEnding = hostels.filter(
     (hostel) =>
@@ -86,8 +110,62 @@ export default async function AdminHostelsPage() {
         </section>
       )}
 
-      {hostels.length === 0 ? (
-        <EmptyState title="No hostels yet" description="Hostels appear here as owners sign up." />
+      <form role="search" className="flex flex-wrap items-end gap-3 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="text-slate-600">Search</span>
+          <input
+            name="q"
+            type="search"
+            defaultValue={pick("q") ?? ""}
+            placeholder="Hostel, city or owner"
+            className="h-10 rounded-md border border-slate-300 px-3"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-slate-600">Plan</span>
+          <select
+            name="plan"
+            defaultValue={filters.plan ?? ""}
+            className="h-10 rounded-md border border-slate-300 px-3"
+          >
+            <option value="">Any plan</option>
+            {Object.entries(PLAN_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-slate-600">Status</span>
+          <select
+            name="status"
+            defaultValue={filters.status ?? ""}
+            className="h-10 rounded-md border border-slate-300 px-3"
+          >
+            <option value="">Any status</option>
+            {Object.entries(HOSTEL_STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit" className={buttonClass({ variant: "secondary" })}>
+          Filter
+        </button>
+        {filtered && (
+          <Link href="/admin" className="text-brand-700 underline">
+            Clear
+          </Link>
+        )}
+      </form>
+
+      {listed.length === 0 ? (
+        <EmptyState
+          title={filtered ? "No hostels match" : "No hostels yet"}
+          description={filtered ? undefined : "Hostels appear here as owners sign up."}
+        />
       ) : (
         <Table caption="Hostels on the platform">
           <THead>
@@ -102,7 +180,7 @@ export default async function AdminHostelsPage() {
             </tr>
           </THead>
           <TBody>
-            {hostels.map((hostel) => (
+            {listed.map((hostel) => (
               <Tr key={hostel.id}>
                 <Td>
                   <Link

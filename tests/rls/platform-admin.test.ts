@@ -11,7 +11,7 @@ import { createUserFactory, type TestUser } from "../support/supabase";
  */
 const PERMISSION_DENIED = "42501";
 
-const { admin, createUser, createHostel, cleanup } = createUserFactory();
+const { admin, createUser, createPlatformAdmin, createHostel, cleanup } = createUserFactory();
 
 afterAll(cleanup);
 
@@ -27,7 +27,7 @@ function addDays(date: string, days: number): string {
 }
 
 beforeAll(async () => {
-  platformAdmin = await createUser({ profile: { role: "platform_admin" } });
+  platformAdmin = await createPlatformAdmin();
   owner = await createUser();
   hostelId = (await createHostel(owner.id, { name: "Admin Test PG" })).id;
   staff = await createUser({ profile: { role: "staff", hostel_id: hostelId } });
@@ -71,6 +71,7 @@ describe("admin functions", () => {
         p_hostel_id: hostelId,
         p_plan: "free",
         p_trial_ends_at: todayIst(),
+        p_reason: "Agreed with the owner",
       });
       expect(plan.error?.code).toBe(PERMISSION_DENIED);
       const suspend = await user.client.rpc("admin_set_suspended", {
@@ -108,6 +109,7 @@ describe("admin functions", () => {
       p_hostel_id: hostelId,
       p_plan: "bogus",
       p_trial_ends_at: todayIst(),
+      p_reason: "Agreed with the owner",
     });
     expect(missing.error?.hint).toBe("plan_invalid");
 
@@ -118,6 +120,7 @@ describe("admin functions", () => {
           p_hostel_id: hostelId,
           p_plan: "trial",
           p_trial_ends_at: extended,
+          p_reason: "Agreed with the owner",
         })
       ).error,
     ).toBeNull();
@@ -127,6 +130,7 @@ describe("admin functions", () => {
           p_hostel_id: hostelId,
           p_plan: "paid",
           p_trial_ends_at: todayIst(),
+          p_reason: "Agreed with the owner",
         })
       ).error,
     ).toBeNull();
@@ -207,7 +211,7 @@ describe("suspension", () => {
     const restore = await platformAdmin.client.rpc("admin_set_suspended", {
       p_hostel_id: hostelId,
       p_suspend: false,
-      p_reason: "",
+      p_reason: "Paid up",
     });
     expect(restore.error).toBeNull();
     expect((await staff.client.from("rooms").select("id")).data).toHaveLength(1);

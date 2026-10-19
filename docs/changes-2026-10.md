@@ -163,3 +163,138 @@ by the new tests").
    granted to signed-in users, so hostels created by scripts and fixtures
    failed. The lookup returns a number of days, which is not sensitive, so it
    is now callable by every role.
+
+## Phase 2: platform admin hardening (ClickUp EP-10)
+
+Database work is in `supabase/migrations/20261020090000_admin_hardening.sql`.
+How to add, remove and recover admins is in [`admin.md`](admin.md).
+
+### Admins confirm sign-in with an authenticator (ClickUp "Bootstrap platform admins with MFA")
+
+- **What:** every admin function now requires a second factor (`aal2`).
+  `private.require_platform_admin()` refuses a password-only session with
+  `mfa_required`. Admin pages send such a session to `/admin/mfa`, which sets
+  up an authenticator app the first time (QR code or typed key) and asks for
+  the 6-digit code after that.
+- **Admin accounts:** `scripts/grant-admin.mts` gained `--revoke` (back to a
+  plain owner account) and `--reset-mfa` (lost phone). Both remove the
+  authenticator and end every session, through a new service-role-only
+  `account_sign_out()`.
+- **Config:** TOTP is switched on in `supabase/config.toml`. On a hosted
+  project it must also be switched on in the Supabase dashboard (noted in
+  `admin.md`).
+- **Files:** `src/app/admin/mfa/page.tsx`, `src/features/admin/components/MfaForm.tsx`,
+  `src/features/admin/queries.ts` (`requirePlatformAdmin`), `scripts/grant-admin.mts`,
+  `docs/admin.md`.
+- **Tests:**
+  - `tests/rls/admin-security.test.ts` checks that an admin without the second
+    factor is refused by every admin function.
+  - `tests/support/totp.ts` produces real TOTP codes for tests.
+  - `tests/e2e/helpers.ts` (`completeAdminMfa`) sets up the authenticator in
+    the browser the way a person would.
+
+### Immutable admin audit log (ClickUp "Record every admin action in an immutable audit log")
+
+- **What:** `admin_audit_log` records each admin action, with names and
+  e-mails snapshotted so entries stay readable later:
+  - who did it;
+  - what, to which hostel or account;
+  - why;
+  - the details (e.g. plan from → to).
+- **How:**
+  - Entries are written only inside the admin functions.
+  - A trigger refuses every update and delete, even from the service role.
+  - The table has no foreign keys, so no cascade can touch it.
+- **Reasons required for:** plan changes, suspending and restoring (restoring
+  needed none before), opening the support view, signing an account out
+  everywhere, and the e-mail support actions.
+- **Screens:** `/admin/audit`, filtered by admin and date range, and per
+  hostel from each hostel page. The plan and suspend forms now ask for a
+  reason.
+- **Files:** `src/app/admin/audit/page.tsx`, `src/features/admin/components/AuditTable.tsx`,
+  `PlanForm.tsx`, `SuspendForm.tsx`, `src/features/admin/actions.ts`.
+- **Tests:**
+  - `tests/integration/admin-console.test.ts` ("audit log").
+  - `tests/rls/admin-security.test.ts`: tables closed to users; entries
+    immutable against the service role.
+  - `tests/e2e/admin.spec.ts`.
+
+### Customer directory (ClickUp "Customer directory: owners, hostels and usage")
+
+- **What:** `/admin/owners` lists every owner with:
+  - whether their e-mail is confirmed, their last sign-in, and when they
+    signed up;
+  - their active and half-set-up hostels;
+  - who referred them.
+- **Search:** matches name, e-mail, phone, or a hostel's name or city.
+  Searching and paging both happen in the database (`admin_owners()`), and
+  search text is matched literally.
+- **Hostel list:** `/admin` can now be filtered by search, plan and status.
+- **Files:** `src/app/admin/owners/page.tsx`, `src/app/admin/owners/[id]/page.tsx`,
+  `src/app/admin/page.tsx`.
+- **Tests:** `tests/integration/admin-console.test.ts` ("owner directory").
+
+### Read-only support view (ClickUp "Read-only support view into a hostel, shown to its owner")
+
+- **What:** from a hostel page, an admin gives a reason and opens
+  `/admin/hostels/<id>/support`. It shows the hostel's rooms and beds,
+  residents and fees, read-only, for one hour.
+- **Privacy:**
+  - Phone and ID numbers show only their last four digits.
+  - ID proof files cannot be opened.
+  - Admins are still members of no hostel: the snapshot comes from an
+    admin-only function, and the tenant tables stay closed, for reading and
+    writing.
+- **Owner notice:** the owner sees each opening, with the admin's name and
+  reason, under Settings → Hostel → Support access.
+- **Files:** `src/app/admin/hostels/[id]/support/page.tsx`,
+  `src/features/admin/components/SupportForms.tsx`, `src/app/(app)/settings/hostel/page.tsx`.
+- **Tests:** `tests/integration/admin-console.test.ts` ("support view"), `tests/e2e/admin.spec.ts`.
+
+### Account support actions without passwords (ClickUp "Account support actions without seeing passwords")
+
+- **What:** on an owner's page, an admin can do any of these, each with a
+  reason and an audit entry:
+  - send a password reset link;
+  - resend the sign-up confirmation;
+  - sign them out of every device (their sessions are deleted, so no refresh
+    works).
+- **Never possible:** admins cannot set or see a password, and other admins
+  cannot be targeted.
+- **Not done:** changing an owner's e-mail address. The owner changes it from
+  their own account.
+- **Files:** `src/features/admin/actions.ts` (`runSupportAction`), `src/app/admin/owners/[id]/page.tsx`.
+- **Tests:** `tests/integration/admin-console.test.ts` ("support actions"), `tests/e2e/admin.spec.ts`.
+
+### Platform announcements (ClickUp "Platform announcements to owners")
+
+- **What:** admins publish a message, optionally with a "show until" date,
+  from `/admin/announcements`. Every signed-in owner and staff member sees it
+  as a banner until it ends or they dismiss it. Dismissals are stored per
+  user, so they hold across devices.
+- **Files:** `src/features/announcements/*`, `src/app/(app)/layout.tsx`,
+  `src/app/admin/announcements/page.tsx`, `src/features/admin/components/AnnouncementForms.tsx`.
+- **Tests:** `tests/integration/admin-console.test.ts` ("announcements"), `tests/e2e/admin.spec.ts`.
+
+### Download all hostel data (part of ClickUp "Handle data export and erasure requests")
+
+- **What:** Settings → Hostel → "Download data" gives the owner one JSON file
+  covering the hostel's rooms, beds, residents, stays, rates, invoices,
+  payments and deposit entries, read past the 1000-row cap.
+- **Not done (needs a lawyer):** closing an account with scheduled deletion
+  after a retention period. That needs the retention periods confirmed first.
+- **Files:** `src/app/(app)/settings/hostel/export/route.ts`.
+
+### Admin security tests (ClickUp "Prove that tenants can never reach admin functions")
+
+- **What:** `tests/rls/admin-security.test.ts` calls all 15 admin functions as
+  an owner, a staff member, a signed-out visitor, and an admin without the
+  second factor. Every call is refused, and the test then checks that
+  nothing changed.
+
+### Bug caught by the new tests
+
+- **An announcement stayed live after it was ended.** Ending set the end time
+  to one second after the start, so an announcement ended within a second of
+  being published stayed visible for that second. It now ends at the current
+  time.

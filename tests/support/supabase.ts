@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/types/database";
 
+import { enrollTotp } from "./totp";
+
 /**
  * Test harness for access-rule tests. Fixtures are created with the service
  * role; every assertion about what a user can or cannot do goes through a
@@ -119,6 +121,17 @@ export function createUserFactory() {
     return data;
   }
 
+  /**
+   * A platform admin whose client has completed the authenticator step
+   * (aal2), as every admin function requires (ClickUp E10-T1). `totpSecret`
+   * produces codes for signing in again, e.g. in a browser.
+   */
+  async function createPlatformAdmin(options: { fullName?: string } = {}) {
+    const user = await createUser({ ...options, profile: { role: "platform_admin" } });
+    const totpSecret = await enrollTotp(user.client);
+    return { ...user, totpSecret };
+  }
+
   /** Registers a user created outside the factory (e.g. by signUp) for cleanup. */
   function track(id: string) {
     created.push(id);
@@ -169,5 +182,5 @@ export function createUserFactory() {
     created.length = 0;
   }
 
-  return { admin, createUser, createHostel, track, cleanup };
+  return { admin, createUser, createPlatformAdmin, createHostel, track, cleanup };
 }

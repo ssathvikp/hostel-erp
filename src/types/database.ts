@@ -3,6 +3,49 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string;
+          actor_email: string;
+          actor_id: string;
+          created_at: string;
+          details: NonNullable<Json>;
+          hostel_id: string | null;
+          hostel_name: string | null;
+          id: number;
+          reason: string | null;
+          target_email: string | null;
+          target_user_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          action: string;
+          actor_email: string;
+          actor_id: string;
+          created_at?: string;
+          details?: NonNullable<Json>;
+          hostel_id?: string | null;
+          hostel_name?: string | null;
+          id?: never;
+          reason?: string | null;
+          target_email?: string | null;
+          target_user_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_email?: string;
+          actor_id?: string;
+          created_at?: string;
+          details?: NonNullable<Json>;
+          hostel_id?: string | null;
+          hostel_name?: string | null;
+          id?: never;
+          reason?: string | null;
+          target_email?: string | null;
+          target_user_id?: string | null;
+        };
+        Relationships: [];
+      };
       allocation_events: {
         Row: {
           action: string;
@@ -230,6 +273,79 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "rooms";
             referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
+      announcement_dismissals: {
+        Row: {
+          announcement_id: string;
+          dismissed_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          announcement_id: string;
+          dismissed_at?: string;
+          user_id: string;
+        };
+        Update: {
+          announcement_id?: string;
+          dismissed_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcement_dismissals_announcement_id_fkey";
+            columns: ["announcement_id"];
+            isOneToOne: false;
+            referencedRelation: "announcements";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "announcement_dismissals_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      announcements: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          ends_at: string | null;
+          id: string;
+          message: string;
+          severity: string;
+          starts_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          id?: string;
+          message: string;
+          severity?: string;
+          starts_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          id?: string;
+          message?: string;
+          severity?: string;
+          starts_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -1271,6 +1387,45 @@ export type Database = {
           },
         ];
       };
+      support_access: {
+        Row: {
+          admin_id: string;
+          admin_name: string;
+          expires_at: string;
+          hostel_id: string;
+          id: string;
+          opened_at: string;
+          reason: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          admin_id: string;
+          admin_name: string;
+          expires_at?: string;
+          hostel_id: string;
+          id?: string;
+          opened_at?: string;
+          reason: string;
+        };
+        Update: {
+          admin_id?: string;
+          admin_name?: string;
+          expires_at?: string;
+          hostel_id?: string;
+          id?: string;
+          opened_at?: string;
+          reason?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "support_access_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       bed_states: {
@@ -1610,6 +1765,47 @@ export type Database = {
           user_id: string;
         }[];
       };
+      account_sign_out: { Args: { p_user_id: string }; Returns: undefined };
+      admin_announcements: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          created_at: string;
+          dismissals: number;
+          ends_at: string;
+          id: string;
+          message: string;
+          severity: string;
+          starts_at: string;
+        }[];
+      };
+      admin_audit_entries: {
+        Args: {
+          p_actor_id?: string;
+          p_from?: string;
+          p_hostel_id?: string;
+          p_limit?: number;
+          p_offset?: number;
+          p_target_user_id?: string;
+          p_to?: string;
+        };
+        Returns: {
+          action: string;
+          actor_email: string;
+          created_at: string;
+          details: Json;
+          hostel_id: string;
+          hostel_name: string;
+          id: number;
+          reason: string;
+          target_email: string;
+          total: number;
+        }[];
+      };
+      admin_create_announcement: {
+        Args: { p_ends_at?: string; p_message: string; p_severity: string; p_starts_at?: string };
+        Returns: string;
+      };
+      admin_end_announcement: { Args: { p_id: string }; Returns: undefined };
       admin_hostels: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -1641,9 +1837,39 @@ export type Database = {
           trial_ends_at: string;
         }[];
       };
+      admin_list_admins: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          email: string;
+          full_name: string;
+          id: string;
+        }[];
+      };
       admin_metrics: { Args: Record<PropertyKey, never>; Returns: Json };
+      admin_open_support_view: { Args: { p_hostel_id: string; p_reason: string }; Returns: string };
+      admin_owners: {
+        Args: { p_limit?: number; p_offset?: number; p_owner_id?: string; p_search?: string };
+        Returns: {
+          active_hostels: number;
+          created_at: string;
+          draft_hostels: number;
+          email: string;
+          email_confirmed_at: string;
+          full_name: string;
+          hostels: number;
+          id: string;
+          last_sign_in_at: string;
+          phone: string;
+          referred_by_name: string;
+          total: number;
+        }[];
+      };
+      admin_record_email_action: {
+        Args: { p_action: string; p_reason: string; p_user_id: string };
+        Returns: undefined;
+      };
       admin_set_plan: {
-        Args: { p_hostel_id: string; p_plan: string; p_trial_ends_at: string };
+        Args: { p_hostel_id: string; p_plan: string; p_reason: string; p_trial_ends_at: string };
         Returns: undefined;
       };
       admin_set_suspended: {
@@ -1651,6 +1877,11 @@ export type Database = {
         Returns: undefined;
       };
       admin_set_trial_days: { Args: { p_days: number }; Returns: undefined };
+      admin_sign_out_everywhere: {
+        Args: { p_reason: string; p_user_id: string };
+        Returns: undefined;
+      };
+      admin_support_snapshot: { Args: { p_hostel_id: string }; Returns: Json };
       allocate_bed: {
         Args: {
           p_bed_id: string;

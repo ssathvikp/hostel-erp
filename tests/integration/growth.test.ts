@@ -10,7 +10,7 @@ import { createUserFactory, type TestUser } from "../support/supabase";
  */
 const PERMISSION_DENIED = "42501";
 
-const { admin, createUser, createHostel, cleanup } = createUserFactory();
+const { admin, createUser, createPlatformAdmin, createHostel, cleanup } = createUserFactory();
 
 afterAll(async () => {
   // Leave the platform default as the migration set it.
@@ -30,7 +30,7 @@ function addDays(date: string, days: number): string {
 }
 
 beforeAll(async () => {
-  platformAdmin = await createUser({ profile: { role: "platform_admin" } });
+  platformAdmin = await createPlatformAdmin();
   owner = await createUser();
   hostelId = (await createHostel(owner.id)).id;
   staff = await createUser({ profile: { role: "staff", hostel_id: hostelId } });
@@ -68,6 +68,7 @@ describe("plan history", () => {
       p_hostel_id: id,
       p_plan: "paid",
       p_trial_ends_at: todayIst(),
+      p_reason: "Agreed with the owner",
     });
     const { data } = await admin
       .from("plan_events")

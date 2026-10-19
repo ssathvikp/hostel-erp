@@ -1,10 +1,10 @@
 import "server-only";
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/session";
 import type { SetupFacts } from "@/lib/hostels/activation";
-import type { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -41,10 +41,14 @@ export interface AdminHostel {
 /**
  * For every admin page. Layouts and pages render in parallel, so each page
  * checks the role itself before loading anything; anyone else gets a 404.
+ * An admin who signed in with a password only is sent to the authenticator
+ * step first (ClickUp E10-T1); the database refuses them regardless.
  */
 export async function requirePlatformAdmin() {
   const user = await requireUser();
   if (user.role !== "platform_admin") notFound();
+  const { data } = await (await createClient()).auth.mfa.getAuthenticatorAssuranceLevel();
+  if (data?.currentLevel !== "aal2") redirect("/admin/mfa");
   return user;
 }
 
@@ -160,4 +164,184 @@ export async function getAdminMetrics(supabase: Supabase): Promise<AdminMetrics>
     paying30DaysAgo: raw.paying_30_days_ago,
     leftPaid30Days: raw.left_paid_30_days,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Owner directory (ClickUp E10-T4)
+// ---------------------------------------------------------------------------
+
+export interface AdminOwner {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  createdAt: string;
+  emailConfirmedAt: string | null;
+  lastSignInAt: string | null;
+  hostels: number;
+  activeHostels: number;
+  draftHostels: number;
+  referredByName: string | null;
+}
+
+export const OWNER_PAGE_SIZE = 50;
+
+export async function getAdminOwners(
+  supabase: Supabase,
+  { search, page = 1, ownerId }: { search?: string | null; page?: number; ownerId?: string },
+): Promise<{ owners: AdminOwner[]; total: number }> {
+  const { data, error } = await supabase.rpc("admin_owners", {
+    p_search: search ?? undefined,
+    p_limit: OWNER_PAGE_SIZE,
+    p_offset: (page - 1) * OWNER_PAGE_SIZE,
+    p_owner_id: ownerId,
+  });
+  if (error) throw error;
+  return {
+    owners: (data ?? []).map((row) => ({
+      id: row.id,
+      fullName: row.full_name,
+      email: row.email,
+      phone: row.phone,
+      createdAt: row.created_at,
+      emailConfirmedAt: row.email_confirmed_at,
+      lastSignInAt: row.last_sign_in_at,
+      hostels: row.hostels,
+      activeHostels: row.active_hostels,
+      draftHostels: row.draft_hostels,
+      referredByName: row.referred_by_name,
+    })),
+    total: Number(data?.[0]?.total ?? 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (ClickUp E10-T3)
+// ---------------------------------------------------------------------------
+
+export interface AuditEntry {
+  id: number;
+  createdAt: string;
+  actorEmail: string;
+  action: string;
+  hostelId: string | null;
+  hostelName: string | null;
+  targetEmail: string | null;
+  reason: string | null;
+  details: Record<string, unknown>;
+}
+
+export const AUDIT_PAGE_SIZE = 50;
+
+export async function getAuditEntries(
+  supabase: Supabase,
+  filters: {
+    hostelId?: string | null;
+    actorId?: string | null;
+    targetUserId?: string | null;
+    from?: string | null;
+    to?: string | null;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ entries: AuditEntry[]; total: number }> {
+  const limit = filters.limit ?? AUDIT_PAGE_SIZE;
+  const { data, error } = await supabase.rpc("admin_audit_entries", {
+    p_hostel_id: filters.hostelId ?? undefined,
+    p_actor_id: filters.actorId ?? undefined,
+    p_from: filters.from ?? undefined,
+    p_to: filters.to ?? undefined,
+    p_limit: limit,
+    p_offset: ((filters.page ?? 1) - 1) * limit,
+    p_target_user_id: filters.targetUserId ?? undefined,
+  });
+  if (error) throw error;
+  return {
+    entries: (data ?? []).map((row) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      actorEmail: row.actor_email,
+      action: row.action,
+      hostelId: row.hostel_id,
+      hostelName: row.hostel_name,
+      targetEmail: row.target_email,
+      reason: row.reason,
+      details: (row.details ?? {}) as Record<string, unknown>,
+    })),
+    total: Number(data?.[0]?.total ?? 0),
+  };
+}
+
+export async function getAdmins(supabase: Supabase) {
+  const { data, error } = await supabase.rpc("admin_list_admins");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ id: row.id, fullName: row.full_name, email: row.email }));
+}
+
+// ---------------------------------------------------------------------------
+// Support view (ClickUp E10-T5)
+// ---------------------------------------------------------------------------
+
+export interface SupportSnapshot {
+  opened_at: string;
+  expires_at: string;
+  reason: string;
+  rooms: {
+    room_number: string;
+    floor: number;
+    sharing_type: string;
+    status: string;
+    beds: { label: string; status: string; occupant: string | null }[];
+  }[];
+  residents: {
+    full_name: string;
+    phone: string | null;
+    status: string;
+    joining_date: string;
+    id_proof_type: string;
+    id_proof: string | null;
+    erased: boolean;
+  }[];
+  residents_total: number;
+  fees: {
+    outstanding: number;
+    overdue: number;
+    recent: {
+      period_month: string;
+      kind: string;
+      resident_name: string;
+      amount: number;
+      paid: number;
+      due_status: string | null;
+    }[];
+  };
+}
+
+/** The open support view, or null when the admin has not opened one in the last hour. */
+export async function getSupportSnapshot(
+  supabase: Supabase,
+  hostelId: string,
+): Promise<SupportSnapshot | null> {
+  const { data, error } = await supabase.rpc("admin_support_snapshot", { p_hostel_id: hostelId });
+  if (error?.hint === "support_view_closed") return null;
+  if (error) throw error;
+  return data as unknown as SupportSnapshot;
+}
+
+// ---------------------------------------------------------------------------
+// Announcements (ClickUp E10-T11)
+// ---------------------------------------------------------------------------
+
+export async function getAdminAnnouncements(supabase: Supabase) {
+  const { data, error } = await supabase.rpc("admin_announcements");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    message: row.message,
+    severity: row.severity as "info" | "warning",
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    createdAt: row.created_at,
+    dismissals: row.dismissals,
+  }));
 }

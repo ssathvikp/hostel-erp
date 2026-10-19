@@ -6,7 +6,7 @@ import { todayIst } from "@/lib/validation";
 
 import { residentRow } from "../support/residents";
 import { createUserFactory, TEST_PASSWORD } from "../support/supabase";
-import { signIn } from "./helpers";
+import { completeAdminMfa, signIn } from "./helpers";
 
 /**
  * Automated WCAG 2.1 AA checks (axe-core) on every screen, filled with real
@@ -142,6 +142,7 @@ test("every signed-in screen with data on it", async ({ page }) => {
 });
 
 test("the platform admin console and a suspended hostel", async ({ page, browser }) => {
+  test.slow();
   const platformAdmin = await factory.createUser({
     fullName: "Ops Admin",
     profile: { role: "platform_admin" },
@@ -154,7 +155,18 @@ test("the platform admin console and a suspended hostel", async ({ page, browser
   });
 
   await signIn(page, platformAdmin.email, TEST_PASSWORD);
-  for (const path of ["/admin", `/admin/hostels/${hostel.id}`]) {
+  await expectNoViolations(page, "/admin/mfa");
+  await completeAdminMfa(page);
+  for (const path of [
+    "/admin",
+    `/admin/hostels/${hostel.id}`,
+    `/admin/hostels/${hostel.id}/support`,
+    "/admin/owners",
+    `/admin/owners/${owner.id}`,
+    "/admin/metrics",
+    "/admin/announcements",
+    "/admin/audit",
+  ]) {
     await expectNoViolations(page, path);
   }
 

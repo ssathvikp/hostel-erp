@@ -1,5 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
+import { totpCode } from "../support/totp";
+
 // Next.js renders its own role="alert" route announcer, so page messages are
 // always looked up inside <main>.
 export const inMain = (page: Page) => page.getByRole("main");
@@ -29,4 +31,17 @@ export async function signOut(page: Page) {
 export async function openNavigation(page: Page) {
   const openNav = page.getByRole("button", { name: "Open navigation" });
   if (await openNav.isVisible()) await openNav.click();
+}
+
+/**
+ * After an admin's password sign-in: sets up the authenticator on
+ * /admin/mfa (reading the key the page shows, as a person would type it
+ * into their app) and enters the current code. Lands on /admin.
+ */
+export async function completeAdminMfa(page: Page) {
+  await expect(page).toHaveURL(/\/admin\/mfa$/);
+  const secret = (await page.getByTestId("totp-secret").textContent())?.trim() ?? "";
+  await page.getByLabel(/^6-digit code/).fill(totpCode(secret));
+  await page.getByRole("button", { name: "Turn on and continue" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
 }

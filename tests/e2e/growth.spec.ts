@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createUserFactory, TEST_PASSWORD } from "../support/supabase";
-import { inMain, signIn } from "./helpers";
+import { completeAdminMfa, inMain, signIn } from "./helpers";
 
 /** Set-up checklist, money lost, referrals and the admin metrics page. */
 const factory = createUserFactory();
@@ -65,6 +65,7 @@ test("an owner shares a referral link and a new owner signs up with it", async (
 test("a platform admin reads the metrics and changes the trial length", async ({ page }) => {
   const platformAdmin = await factory.createUser({ profile: { role: "platform_admin" } });
   await signIn(page, platformAdmin.email, TEST_PASSWORD);
+  await completeAdminMfa(page);
   await page
     .getByRole("navigation", { name: "Admin" })
     .getByRole("link", { name: "Metrics" })

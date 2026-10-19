@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 
-import { Alert, Button, Input, Select } from "@/components/ui";
+import { Alert, Button, Input, Select, Textarea } from "@/components/ui";
 import { initialFormState } from "@/lib/validation/result";
 
 import { setHostelPlan } from "../actions";
@@ -48,6 +48,17 @@ export function PlanForm({
           />
         )}
       </div>
+      <Textarea
+        id="admin-plan-reason"
+        name="reason"
+        label="Reason"
+        rows={2}
+        maxLength={500}
+        required
+        hint="Why the plan or trial is changing. Kept in the audit log."
+        defaultValue={state.values?.reason ?? ""}
+        error={state.fieldErrors.reason?.[0]}
+      />
       <Button type="submit" loading={pending}>
         Save plan
       </Button>

@@ -17,23 +17,26 @@ export function SuspendForm({ hostelId, suspended }: { hostelId: string; suspend
       {state.status === "success" && <Alert tone="success">{state.message}</Alert>}
       <input type="hidden" name="hostel_id" value={hostelId} />
       <input type="hidden" name="suspend" value={suspended ? "false" : "true"} />
-      {suspended ? (
+      {suspended && (
         <p className="text-sm text-slate-600">
           The owner and staff can use the hostel again as soon as it is restored.
         </p>
-      ) : (
-        <Textarea
-          id="admin-suspend-reason"
-          name="reason"
-          label="Reason"
-          rows={2}
-          maxLength={500}
-          required
-          hint="Shown to the owner. Nobody can open the hostel's rooms, residents or fees while it is suspended; nothing is deleted."
-          defaultValue={state.values?.reason ?? ""}
-          error={state.fieldErrors.reason?.[0]}
-        />
       )}
+      <Textarea
+        id={suspended ? "admin-restore-reason" : "admin-suspend-reason"}
+        name="reason"
+        label="Reason"
+        rows={2}
+        maxLength={500}
+        required
+        hint={
+          suspended
+            ? "Why it is being restored. Kept in the audit log."
+            : "Shown to the owner and kept in the audit log. Nobody can open the hostel's rooms, residents or fees while it is suspended; nothing is deleted."
+        }
+        defaultValue={state.values?.reason ?? ""}
+        error={state.fieldErrors.reason?.[0]}
+      />
       <Button type="submit" variant={suspended ? "primary" : "danger"} loading={pending}>
         {suspended ? "Restore hostel" : "Suspend hostel"}
       </Button>

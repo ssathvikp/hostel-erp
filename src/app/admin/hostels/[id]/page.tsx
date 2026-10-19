@@ -81,6 +81,21 @@ export default async function AdminHostelPage({ params }: { params: Promise<{ id
         </dl>
       </section>
 
+      <div className="flex flex-wrap gap-3 text-sm">
+        <Link
+          href={`/admin/hostels/${hostel.id}/support`}
+          className="font-medium text-brand-700 underline"
+        >
+          Open the read-only support view
+        </Link>
+        <Link
+          href={`/admin/audit?hostel=${hostel.id}`}
+          className="font-medium text-brand-700 underline"
+        >
+          Audit log for this hostel
+        </Link>
+      </div>
+
       <section
         aria-labelledby="setup-heading"
         className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
