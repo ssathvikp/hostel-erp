@@ -524,6 +524,11 @@ export type Database = {
           floors: number | null;
           gstin: string | null;
           id: string;
+          late_fee_amount: number | null;
+          late_fee_cap: number | null;
+          late_fee_grace_days: number;
+          late_fee_mode: string;
+          late_fee_since: string | null;
           name: string;
           owner_id: string;
           phone: string;
@@ -548,6 +553,11 @@ export type Database = {
           floors?: number | null;
           gstin?: string | null;
           id?: string;
+          late_fee_amount?: number | null;
+          late_fee_cap?: number | null;
+          late_fee_grace_days?: number;
+          late_fee_mode?: string;
+          late_fee_since?: string | null;
           name: string;
           owner_id?: string;
           phone: string;
@@ -571,6 +581,11 @@ export type Database = {
           floors?: number | null;
           gstin?: string | null;
           id?: string;
+          late_fee_amount?: number | null;
+          late_fee_cap?: number | null;
+          late_fee_grace_days?: number;
+          late_fee_mode?: string;
+          late_fee_since?: string | null;
           name?: string;
           owner_id?: string;
           phone?: string;
@@ -605,6 +620,8 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id: string;
+          kind: string;
+          late_fee_for: string | null;
           period_month: string;
           resident_id: string;
           status: string;
@@ -623,6 +640,8 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id?: string;
+          kind?: string;
+          late_fee_for?: string | null;
           period_month: string;
           resident_id: string;
           status?: string;
@@ -640,6 +659,8 @@ export type Database = {
           due_date?: string;
           hostel_id?: string;
           id?: string;
+          kind?: string;
+          late_fee_for?: string | null;
           period_month?: string;
           resident_id?: string;
           status?: string;
@@ -669,6 +690,20 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "hostels";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_late_fee_source_fkey";
+            columns: ["hostel_id", "late_fee_for"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_late_fee_source_fkey";
+            columns: ["hostel_id", "late_fee_for"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
           },
           {
             foreignKeyName: "invoices_resident_fkey";
@@ -778,6 +813,79 @@ export type Database = {
           },
         ];
       };
+      plan_events: {
+        Row: {
+          changed_at: string;
+          changed_by: string | null;
+          hostel_id: string;
+          id: number;
+          plan: string;
+          trial_ends_at: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          changed_at?: string;
+          changed_by?: string | null;
+          hostel_id: string;
+          id?: never;
+          plan: string;
+          trial_ends_at?: string | null;
+        };
+        Update: {
+          changed_at?: string;
+          changed_by?: string | null;
+          hostel_id?: string;
+          id?: never;
+          plan?: string;
+          trial_ends_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plan_events_changed_by_fkey";
+            columns: ["changed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plan_events_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      platform_settings: {
+        Row: {
+          id: boolean;
+          trial_days: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          id?: boolean;
+          trial_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: boolean;
+          trial_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -786,6 +894,8 @@ export type Database = {
           hostel_id: string | null;
           id: string;
           phone: string | null;
+          referral_code: string | null;
+          referred_by: string | null;
           role: string;
           updated_at: string;
         };
@@ -797,6 +907,8 @@ export type Database = {
           hostel_id?: string | null;
           id: string;
           phone?: string | null;
+          referral_code?: string | null;
+          referred_by?: string | null;
           role?: string;
           updated_at?: string;
         };
@@ -807,6 +919,8 @@ export type Database = {
           hostel_id?: string | null;
           id?: string;
           phone?: string | null;
+          referral_code?: string | null;
+          referred_by?: string | null;
           role?: string;
           updated_at?: string;
         };
@@ -816,6 +930,13 @@ export type Database = {
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profiles_referred_by_fkey";
+            columns: ["referred_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1297,6 +1418,8 @@ export type Database = {
           due_status: string | null;
           hostel_id: string | null;
           id: string | null;
+          kind: string | null;
+          late_fee_for: string | null;
           paid: number | null;
           period_month: string | null;
           resident_email: string | null;
@@ -1324,6 +1447,20 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "hostels";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_late_fee_source_fkey";
+            columns: ["hostel_id", "late_fee_for"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_late_fee_source_fkey";
+            columns: ["hostel_id", "late_fee_for"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
           },
           {
             foreignKeyName: "invoices_resident_fkey";
@@ -1476,18 +1613,26 @@ export type Database = {
       admin_hostels: {
         Args: Record<PropertyKey, never>;
         Returns: {
+          allocations_ever: number;
           beds: number;
           city: string;
           collected_this_month: number;
           created_at: string;
+          first_invoice_on: string;
+          first_payment_on: string;
           id: string;
           invoices_this_month: number;
           last_activity_at: string;
           name: string;
           occupied_beds: number;
           owner_email: string;
+          owner_hostels: number;
           owner_name: string;
+          paying_referrals: number;
           plan: string;
+          rates_set: boolean;
+          referrals: number;
+          referred_by_name: string;
           residents: number;
           rooms: number;
           staff: number;
@@ -1496,6 +1641,7 @@ export type Database = {
           trial_ends_at: string;
         }[];
       };
+      admin_metrics: { Args: Record<PropertyKey, never>; Returns: Json };
       admin_set_plan: {
         Args: { p_hostel_id: string; p_plan: string; p_trial_ends_at: string };
         Returns: undefined;
@@ -1504,6 +1650,7 @@ export type Database = {
         Args: { p_hostel_id: string; p_reason: string; p_suspend: boolean };
         Returns: undefined;
       };
+      admin_set_trial_days: { Args: { p_days: number }; Returns: undefined };
       allocate_bed: {
         Args: {
           p_bed_id: string;
@@ -1513,6 +1660,7 @@ export type Database = {
         };
         Returns: string;
       };
+      apply_late_fees: { Args: { p_hostel_id: string }; Returns: Json };
       billed_months: { Args: { p_hostel_id: string }; Returns: string[] };
       create_rooms_bulk: {
         Args: {
@@ -1564,6 +1712,8 @@ export type Database = {
           rooms_created: number;
         }[];
       };
+      my_referral_code: { Args: Record<PropertyKey, never>; Returns: string };
+      my_referrals: { Args: Record<PropertyKey, never>; Returns: Json };
       occupancy_trend: {
         Args: { p_from: string; p_granularity?: string; p_hostel_id: string; p_to: string };
         Returns: {
@@ -1592,6 +1742,7 @@ export type Database = {
         };
         Returns: string;
       };
+      vacancy_cost: { Args: { p_hostel_id: string }; Returns: Json };
       vacate_allocation: {
         Args: {
           p_allocation_id: string;

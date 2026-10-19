@@ -41,13 +41,13 @@ beforeAll(async () => {
 });
 
 describe("plans and trials", () => {
-  it("start every new hostel on a 90-day trial", async () => {
+  it("start every new hostel on a trial of the platform's length (30 days by default)", async () => {
     const { data } = await owner.client
       .from("hostels")
       .select("plan, trial_ends_at")
       .eq("id", hostelId)
       .single();
-    expect(data).toEqual({ plan: "trial", trial_ends_at: addDays(todayIst(), 90) });
+    expect(data).toEqual({ plan: "trial", trial_ends_at: addDays(todayIst(), 30) });
   });
 
   it("cannot be changed by owners", async () => {
