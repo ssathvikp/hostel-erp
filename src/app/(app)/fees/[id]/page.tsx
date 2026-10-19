@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
-import { documentNumber } from "@/features/fees/components/InvoiceDocument";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { explainLateFee, isLateFeeLine } from "@/features/fees/late-fees";
@@ -72,7 +71,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             title={`${invoice.residentName}, ${month}`}
             description={
               <span className="inline-flex items-center gap-2">
-                <span className="font-mono">{documentNumber("INV", invoice.id)}</span>
+                <span className="font-mono">{invoice.invoiceNumber}</span>
                 {invoice.dueStatus ? (
                   <Badge tone={DUE_STATUS_TONES[invoice.dueStatus]}>
                     {DUE_STATUS_LABELS[invoice.dueStatus]}
@@ -182,6 +181,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <THead>
               <tr>
                 <Th>Received</Th>
+                <Th>Receipt</Th>
                 <Th>Mode</Th>
                 <Th>Reference</Th>
                 <Th className="text-right">Amount</Th>
@@ -195,6 +195,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               {invoice.payments.map((payment) => (
                 <Tr key={payment.id} className={payment.voidedAt ? "text-slate-400" : undefined}>
                   <Td>{formatDay(payment.paidAt)}</Td>
+                  <Td className="font-mono text-xs">{payment.receiptNumber}</Td>
                   <Td>{PAYMENT_MODE_LABELS[payment.mode]}</Td>
                   <Td>{payment.reference ?? "—"}</Td>
                   <Td className="text-right tabular-nums">

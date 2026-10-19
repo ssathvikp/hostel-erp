@@ -153,10 +153,12 @@ export interface InvoiceRow {
   kind: InvoiceKind;
   /** For a late fee: the rent invoice that was paid late. */
   lateFeeFor: string | null;
+  /** INV/26-27/00001: per hostel, per financial year (ClickUp E13-T9). */
+  invoiceNumber: string;
 }
 
 const INVOICE_COLUMNS =
-  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, kind, late_fee_for";
+  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, kind, late_fee_for, invoice_number";
 
 type InvoiceBalanceRow = {
   id: string | null;
@@ -177,6 +179,7 @@ type InvoiceBalanceRow = {
   void_reason: string | null;
   kind: string | null;
   late_fee_for: string | null;
+  invoice_number: string | null;
 };
 
 function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
@@ -199,6 +202,7 @@ function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
     voidReason: row.void_reason,
     kind: row.kind === "late_fee" ? "late_fee" : "rent",
     lateFeeFor: row.late_fee_for,
+    invoiceNumber: row.invoice_number ?? "",
   };
 }
 
@@ -329,6 +333,8 @@ export interface PaymentRow {
   recordedAt: string;
   voidedAt: string | null;
   voidReason: string | null;
+  /** RCT/26-27/00001: per hostel, per financial year (ClickUp E13-T9). */
+  receiptNumber: string;
 }
 
 export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId: string) {
@@ -383,7 +389,7 @@ async function getInvoicePayments(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name",
+      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name, receipt_number",
     )
     .eq("hostel_id", hostelId)
     .eq("invoice_id", invoiceId)
@@ -400,6 +406,7 @@ async function getInvoicePayments(
     recordedAt: row.created_at,
     voidedAt: row.voided_at,
     voidReason: row.void_reason,
+    receiptNumber: row.receipt_number,
   }));
 }
 

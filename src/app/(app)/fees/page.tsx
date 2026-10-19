@@ -268,6 +268,9 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                         {row.kind === "late_fee" && (
                           <span className="block text-xs text-slate-500">Late fee</span>
                         )}
+                        <span className="block font-mono text-xs text-slate-500">
+                          {row.invoiceNumber}
+                        </span>
                       </Td>
                       <Td className="text-right tabular-nums">{formatPaise(row.amount)}</Td>
                       <Td className="text-right tabular-nums">{formatPaise(row.paid)}</Td>

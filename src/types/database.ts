@@ -578,6 +578,36 @@ export type Database = {
           },
         ];
       };
+      document_counters: {
+        Row: {
+          fiscal_year: string;
+          hostel_id: string;
+          last_number: number;
+          series: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          fiscal_year: string;
+          hostel_id: string;
+          last_number: number;
+          series: string;
+        };
+        Update: {
+          fiscal_year?: string;
+          hostel_id?: string;
+          last_number?: number;
+          series?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_counters_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       fee_structures: {
         Row: {
           created_at: string;
@@ -736,6 +766,7 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id: string;
+          invoice_number: string;
           kind: string;
           late_fee_for: string | null;
           period_month: string;
@@ -756,6 +787,7 @@ export type Database = {
           due_date: string;
           hostel_id: string;
           id?: string;
+          invoice_number?: string;
           kind?: string;
           late_fee_for?: string | null;
           period_month: string;
@@ -775,6 +807,7 @@ export type Database = {
           due_date?: string;
           hostel_id?: string;
           id?: string;
+          invoice_number?: string;
           kind?: string;
           late_fee_for?: string | null;
           period_month?: string;
@@ -853,6 +886,7 @@ export type Database = {
           invoice_id: string;
           mode: string;
           paid_at: string;
+          receipt_number: string;
           recorded_by: string;
           recorded_by_name: string | null;
           reference: string | null;
@@ -869,6 +903,7 @@ export type Database = {
           invoice_id: string;
           mode: string;
           paid_at: string;
+          receipt_number?: string;
           recorded_by?: string;
           recorded_by_name?: string | null;
           reference?: string | null;
@@ -884,6 +919,7 @@ export type Database = {
           invoice_id?: string;
           mode?: string;
           paid_at?: string;
+          receipt_number?: string;
           recorded_by?: string;
           recorded_by_name?: string | null;
           reference?: string | null;
@@ -1573,6 +1609,7 @@ export type Database = {
           due_status: string | null;
           hostel_id: string | null;
           id: string | null;
+          invoice_number: string | null;
           kind: string | null;
           late_fee_for: string | null;
           paid: number | null;

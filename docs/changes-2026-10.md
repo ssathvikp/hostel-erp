@@ -298,3 +298,39 @@ How to add, remove and recover admins is in [`admin.md`](admin.md).
   to one second after the start, so an announcement ended within a second of
   being published stayed visible for that second. It now ends at the current
   time.
+
+## Phase 3: resident fees (ClickUp EP-13)
+
+### Sequential invoice and receipt numbers (ClickUp E13-T9)
+
+- **What:** invoices and receipts are numbered in a series per hostel per
+  Indian financial year, e.g. `INV/26-27/00001` and `RCT/26-27/00001`, at
+  most 16 characters. Before this, the number shown was the first 8
+  characters of the record id.
+- **How:**
+  - A trigger gives each new invoice and payment the next number from a
+    per-hostel counter row (`document_counters`). The row stays locked until
+    the transaction ends, so concurrent inserts never share or skip a number,
+    and a rolled-back insert rolls its counter back.
+  - The number triggers run after the guards, so a refused payment (e.g.
+    overpayment) uses up no number.
+  - Users cannot write a number; anything sent is replaced.
+  - A void invoice keeps its number, and generating the month again takes a
+    new one.
+  - Existing invoices and payments were numbered in the order they were
+    created.
+- **Not done (needs a CA):** GST tax lines (rate and SAC code). They wait for
+  a chartered accountant to confirm how hostel rent is taxed.
+- **Screens:**
+  - Printed invoices and receipts, and the invoice page, show the numbers.
+  - The fee list shows each invoice's number.
+  - Payments on an invoice show their receipt numbers.
+- **Files:** `supabase/migrations/20261021090000_document_numbers.sql`,
+  `src/features/fees/queries.ts`, `components/InvoiceDocument.tsx`,
+  `src/app/(app)/fees/page.tsx`, `fees/[id]/page.tsx`.
+- **Tests:** `tests/integration/document-numbers.test.ts`:
+  - series per hostel;
+  - 12 concurrent inserts get 00001 to 00012 exactly;
+  - a void invoice keeps its number, and a sent number is ignored;
+  - `generate_invoices` invoices are numbered;
+  - a refused payment takes no number.
