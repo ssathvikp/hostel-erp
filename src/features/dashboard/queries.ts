@@ -67,6 +67,33 @@ export async function getDepositsHeld(supabase: Supabase, hostelId: string): Pro
 }
 
 // ---------------------------------------------------------------------------
+// What empty beds cost (plan E15-T4)
+// ---------------------------------------------------------------------------
+
+export interface VacancyCost {
+  vacantBeds: number;
+  /** Paise a month the vacant beds would bring in at today's rates. */
+  monthlyValue: number;
+  /** Vacant beds whose sharing type has no rate, so are not in the figure. */
+  unpricedBeds: number;
+}
+
+export async function getVacancyCost(supabase: Supabase, hostelId: string): Promise<VacancyCost> {
+  const { data, error } = await supabase.rpc("vacancy_cost", { p_hostel_id: hostelId });
+  if (error) throw error;
+  const row = (data ?? {}) as {
+    vacant_beds?: number;
+    monthly_value?: number;
+    unpriced_beds?: number;
+  };
+  return {
+    vacantBeds: row.vacant_beds ?? 0,
+    monthlyValue: Number(row.monthly_value ?? 0),
+    unpricedBeds: row.unpriced_beds ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Occupancy trend (E8-T2)
 // ---------------------------------------------------------------------------
 

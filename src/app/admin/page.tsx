@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
 import { HOSTEL_STATUS_LABELS, HOSTEL_STATUS_TONES, PLAN_LABELS } from "@/features/admin/options";
 import { getAdminHostels, requirePlatformAdmin } from "@/features/admin/queries";
+import { attentionList, SIGNAL_LABELS } from "@/features/admin/signals";
 import { TRIAL_WARNING_DAYS } from "@/features/hostels/components/TrialBanner";
 import { daysBetween, formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -32,6 +33,15 @@ export default async function AdminHostelsPage() {
     ["On trial", hostels.filter((hostel) => hostel.plan === "trial").length],
     [`Trials ending in ${TRIAL_WARNING_DAYS} days or ended`, trialsEnding.length],
   ] as const;
+  const attention = attentionList(hostels, today);
+  // One row per owner who has referred anyone (plan E14-T12).
+  const referrers = [
+    ...new Map(
+      hostels
+        .filter((hostel) => hostel.referrals > 0)
+        .map((hostel) => [hostel.ownerEmail, hostel] as const),
+    ).values(),
+  ].sort((a, b) => b.payingReferrals - a.payingReferrals || b.referrals - a.referrals);
 
   return (
     <div className="space-y-6">
@@ -48,6 +58,33 @@ export default async function AdminHostelsPage() {
           </div>
         ))}
       </dl>
+
+      {attention.length > 0 && (
+        <section aria-labelledby="attention-heading">
+          <h2 id="attention-heading" className="mb-3 text-base font-semibold text-slate-900">
+            Needs attention
+          </h2>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-xs">
+            {attention.map((signal) => (
+              <li
+                key={`${signal.hostelId}-${signal.kind}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm"
+              >
+                <Badge tone={signal.kind === "upsell" ? "info" : "warning"}>
+                  {SIGNAL_LABELS[signal.kind]}
+                </Badge>
+                <Link
+                  href={`/admin/hostels/${signal.hostelId}`}
+                  className="font-medium text-brand-700 hover:underline"
+                >
+                  {signal.hostelName}
+                </Link>
+                <span className="text-slate-600">{signal.message}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {hostels.length === 0 ? (
         <EmptyState title="No hostels yet" description="Hostels appear here as owners sign up." />
@@ -106,6 +143,39 @@ export default async function AdminHostelsPage() {
             ))}
           </TBody>
         </Table>
+      )}
+
+      {referrers.length > 0 && (
+        <section aria-labelledby="referrals-heading">
+          <h2 id="referrals-heading" className="mb-1 text-base font-semibold text-slate-900">
+            Referrals
+          </h2>
+          <p className="mb-3 text-sm text-slate-600">
+            Owners who brought in other owners. Each referred hostel that pays earns its referrer a
+            free month; extend their plan by hand from the hostel page.
+          </p>
+          <Table caption="Owners who referred others">
+            <THead>
+              <tr>
+                <Th>Owner</Th>
+                <Th className="text-right">Signed up</Th>
+                <Th className="text-right">Paying</Th>
+              </tr>
+            </THead>
+            <TBody>
+              {referrers.map((hostel) => (
+                <Tr key={hostel.ownerEmail}>
+                  <Td>
+                    {hostel.ownerName}
+                    <span className="block text-xs text-slate-500">{hostel.ownerEmail}</span>
+                  </Td>
+                  <Td className="text-right tabular-nums">{hostel.referrals}</Td>
+                  <Td className="text-right tabular-nums">{hostel.payingReferrals}</Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </section>
       )}
     </div>
   );

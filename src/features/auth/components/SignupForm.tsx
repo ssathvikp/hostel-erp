@@ -7,7 +7,7 @@ import { initialFormState } from "@/lib/validation/result";
 
 import { signUp } from "../actions";
 
-export function SignupForm() {
+export function SignupForm({ referralCode }: { referralCode?: string }) {
   const [state, action, pending] = useActionState(signUp, initialFormState);
 
   if (state.status === "success") {
@@ -27,6 +27,7 @@ export function SignupForm() {
   return (
     <form key={state.id} action={action} noValidate className="space-y-4">
       {state.formError && <Alert tone="error">{state.formError}</Alert>}
+      {referralCode && <input type="hidden" name="referral_code" value={referralCode} />}
 
       <Input
         id="full_name"

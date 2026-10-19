@@ -389,6 +389,42 @@ export const paymentSchema = z
     path: ["paid_at"],
   });
 
+export const LATE_FEE_MODES = ["off", "fixed", "per_day"] as const;
+export type LateFeeMode = (typeof LATE_FEE_MODES)[number];
+
+/**
+ * The hostel's late-fee rule (ClickUp E13-T6). Amounts only matter when the
+ * rule is on, and a cap only for a per-day fee.
+ */
+export const lateFeeRuleSchema = z
+  .object({
+    late_fee_mode: z.enum(LATE_FEE_MODES, { error: "Choose how late fees work" }),
+    late_fee_amount: optional(rupees("Late fee", { max: 1_00_000 })),
+    late_fee_cap: optional(rupees("Most per invoice", { max: 1_00_000 })),
+    late_fee_grace_days: integer("Grace days", 0, 28),
+  })
+  .superRefine((rule, ctx) => {
+    if (rule.late_fee_mode === "off") return;
+    if (rule.late_fee_amount === null) {
+      ctx.addIssue({ code: "custom", message: "Enter the late fee", path: ["late_fee_amount"] });
+    }
+    if (rule.late_fee_mode !== "per_day") return;
+    if (rule.late_fee_cap === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter the most a late fee can reach",
+        path: ["late_fee_cap"],
+      });
+    } else if (rule.late_fee_amount !== null && rule.late_fee_cap < rule.late_fee_amount) {
+      ctx.addIssue({
+        code: "custom",
+        message: "The most per invoice cannot be less than the fee per day",
+        path: ["late_fee_cap"],
+      });
+    }
+  });
+
+export type LateFeeRuleInput = z.output<typeof lateFeeRuleSchema>;
 export type FeeStructureInput = z.output<typeof feeStructureSchema>;
 export type GenerateInvoicesInput = z.output<typeof generateInvoicesSchema>;
 export type PaymentInput = z.output<typeof paymentSchema>;

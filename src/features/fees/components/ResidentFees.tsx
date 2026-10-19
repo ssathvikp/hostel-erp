@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 import { Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
-import { daysBetween, formatMonth, formatPaise } from "@/lib/money";
+import { daysBetween, formatPaise } from "@/lib/money";
 import { todayIst } from "@/lib/validation";
 
-import { DUE_STATUS_LABELS, DUE_STATUS_TONES } from "../options";
+import { DUE_STATUS_LABELS, DUE_STATUS_TONES, invoiceLabel } from "../options";
 import type { InvoiceRow, ResidentBalance } from "../queries";
 
 /** What the resident owes, in one sentence. Shown before a transfer is confirmed (E6-T4). */
@@ -96,7 +96,7 @@ export function ResidentFees({
                 key={invoice.id}
                 className={invoice.status === "void" ? "text-slate-400" : undefined}
               >
-                <Td>{formatMonth(invoice.periodMonth)}</Td>
+                <Td>{invoiceLabel(invoice)}</Td>
                 <Td className="text-right tabular-nums">{formatPaise(invoice.amount)}</Td>
                 <Td className="text-right tabular-nums">{formatPaise(invoice.paid)}</Td>
                 <Td className="text-right tabular-nums">{formatPaise(invoice.balance)}</Td>
@@ -113,7 +113,7 @@ export function ResidentFees({
                   <Link
                     href={`/fees/${invoice.id}`}
                     className="font-medium text-brand-700 hover:underline"
-                    aria-label={`Invoice for ${formatMonth(invoice.periodMonth)}`}
+                    aria-label={`Invoice for ${invoiceLabel(invoice)}`}
                   >
                     View
                   </Link>

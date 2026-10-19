@@ -10,7 +10,9 @@ import {
   getOccupancyTrend,
   getOverdueResidents,
   getRecentActivity,
+  getVacancyCost,
 } from "../queries";
+import type { VacancyCost } from "../queries";
 import type { DashboardRange } from "../range";
 import { ActivityPanel, OverduePanel, Panel } from "./Panels";
 import { TrendChart } from "./TrendChart";
@@ -68,15 +70,22 @@ export async function KpiSection({
   canAddRooms: boolean;
 }) {
   const supabase = await createClient();
-  const [occupancy, money, deposits] = await Promise.all([
+  const [occupancy, money, deposits, vacancy] = await Promise.all([
     getHostelOccupancy(supabase, hostelId),
     getDashboardMoney(supabase, hostelId, range),
     getDepositsHeld(supabase, hostelId),
+    getVacancyCost(supabase, hostelId),
   ]);
   const period = `${formatDay(range.from)} – ${formatDay(range.to)}`;
 
   return (
     <div className="space-y-6">
+      <MoneyLost
+        vacancy={vacancy}
+        overdue={money.overdue}
+        overdueResidents={money.overdueResidents}
+      />
+
       <section aria-labelledby="occupancy-kpis">
         <h2 id="occupancy-kpis" className="mb-2 text-sm font-medium text-slate-600">
           Beds today
@@ -152,6 +161,63 @@ export async function KpiSection({
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * What the hostel is losing right now, in rupees (plan E15-T4): rent the
+ * empty beds would bring in each month, and rent that is overdue.
+ */
+function MoneyLost({
+  vacancy,
+  overdue,
+  overdueResidents,
+}: {
+  vacancy: VacancyCost;
+  overdue: number;
+  overdueResidents: number;
+}) {
+  if (vacancy.monthlyValue === 0 && overdue === 0) return null;
+  return (
+    <section
+      aria-labelledby="money-lost"
+      className="rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-5"
+    >
+      <h2 id="money-lost" className="text-sm font-semibold text-amber-900">
+        Money you are missing
+      </h2>
+      <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+        {vacancy.monthlyValue > 0 && (
+          <div>
+            <dt className="text-sm text-amber-800">Empty beds, every month</dt>
+            <dd className="mt-1 text-2xl font-semibold text-amber-950">
+              {formatPaise(vacancy.monthlyValue)}
+            </dd>
+            <dd className="mt-0.5 text-xs text-amber-800">
+              {vacancy.vacantBeds} vacant {vacancy.vacantBeds === 1 ? "bed" : "beds"} at
+              today&apos;s rates.{" "}
+              {vacancy.unpricedBeds > 0 &&
+                `${vacancy.unpricedBeds} more have no rate set, so are not counted. `}
+              <Link href="/occupancy" className="font-medium underline">
+                See vacant beds
+              </Link>
+            </dd>
+          </div>
+        )}
+        {overdue > 0 && (
+          <div>
+            <dt className="text-sm text-amber-800">Overdue rent</dt>
+            <dd className="mt-1 text-2xl font-semibold text-amber-950">{formatPaise(overdue)}</dd>
+            <dd className="mt-0.5 text-xs text-amber-800">
+              Owed by {overdueResidents} {overdueResidents === 1 ? "resident" : "residents"}.{" "}
+              <Link href="/fees/reminders" className="font-medium underline">
+                Send reminders
+              </Link>
+            </dd>
+          </div>
+        )}
+      </dl>
+    </section>
   );
 }
 

@@ -1,7 +1,9 @@
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
 import { formatMonth, formatPaise } from "@/lib/money";
+import type { InvoiceLine } from "@/types";
 
-import { DUE_STATUS_LABELS, PAYMENT_MODE_LABELS } from "../options";
+import { explainLateFee, isLateFeeLine } from "../late-fees";
+import { DUE_STATUS_LABELS, invoiceLabel, PAYMENT_MODE_LABELS } from "../options";
 import type { InvoiceDetail, PaymentRow } from "../queries";
 import { receiptTotals } from "../receipt";
 
@@ -108,56 +110,89 @@ export function InvoiceDocument({
   const live = invoice.payments.filter((payment) => !payment.voidedAt);
   const [year, month] = invoice.periodMonth.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const stays = invoice.breakdown.filter((line) => !isLateFeeLine(line)) as InvoiceLine[];
+  const lateFee = invoice.breakdown.find(isLateFeeLine);
 
   return (
     <article className="space-y-6 text-slate-900">
       <Header
         hostel={hostel}
-        title={invoice.status === "void" ? "Invoice (void)" : "Invoice"}
+        title={
+          invoice.kind === "late_fee"
+            ? invoice.status === "void"
+              ? "Late fee (waived)"
+              : "Late fee"
+            : invoice.status === "void"
+              ? "Invoice (void)"
+              : "Invoice"
+        }
         number={documentNumber("INV", invoice.id)}
       />
       {invoice.status === "void" && (
         <p className="rounded border border-red-300 px-3 py-2 text-sm text-red-800">
-          This invoice was voided: {invoice.voidReason}
+          This {invoice.kind === "late_fee" ? "late fee was waived" : "invoice was voided"}:{" "}
+          {invoice.voidReason}
         </p>
       )}
       <Party invoice={invoice} />
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-300 text-left text-slate-600">
-            <th className="py-2 font-medium">Description</th>
-            <th className="py-2 font-medium">Nights</th>
-            <th className="py-2 text-right font-medium">Monthly rent</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoice.breakdown.length === 0 ? (
+      {invoice.kind === "late_fee" ? (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-300 text-left text-slate-600">
+              <th className="py-2 font-medium">Description</th>
+              <th className="py-2 text-right font-medium">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
             <tr className="border-b border-slate-200">
-              <td className="py-2">Rent for {formatMonth(invoice.periodMonth)}</td>
-              <td className="py-2">—</td>
+              <td className="py-2">
+                Late fee for {formatMonth(invoice.periodMonth)} rent
+                {lateFee && (
+                  <span className="block text-xs text-slate-500">{explainLateFee(lateFee)}</span>
+                )}
+              </td>
               <td className="py-2 text-right tabular-nums">{formatPaise(invoice.amount)}</td>
             </tr>
-          ) : (
-            invoice.breakdown.map((line) => (
-              <tr key={line.allocation_id} className="border-b border-slate-200">
-                <td className="py-2">
-                  Bed {line.bed_label} ({SHARING_TYPE_LABELS[line.sharing_type]}),{" "}
-                  {formatDay(line.from)} to {formatDay(line.to)}
-                  {line.rate_source === "override" && (
-                    <span className="text-slate-500"> · agreed rent</span>
-                  )}
-                </td>
-                <td className="py-2">
-                  {line.nights} of {daysInMonth}
-                </td>
-                <td className="py-2 text-right tabular-nums">{formatPaise(line.monthly_rate)}</td>
+          </tbody>
+        </table>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-300 text-left text-slate-600">
+              <th className="py-2 font-medium">Description</th>
+              <th className="py-2 font-medium">Nights</th>
+              <th className="py-2 text-right font-medium">Monthly rent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stays.length === 0 ? (
+              <tr className="border-b border-slate-200">
+                <td className="py-2">Rent for {formatMonth(invoice.periodMonth)}</td>
+                <td className="py-2">—</td>
+                <td className="py-2 text-right tabular-nums">{formatPaise(invoice.amount)}</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      {invoice.breakdown.some((line) => line.nights < daysInMonth) && (
+            ) : (
+              stays.map((line) => (
+                <tr key={line.allocation_id} className="border-b border-slate-200">
+                  <td className="py-2">
+                    Bed {line.bed_label} ({SHARING_TYPE_LABELS[line.sharing_type]}),{" "}
+                    {formatDay(line.from)} to {formatDay(line.to)}
+                    {line.rate_source === "override" && (
+                      <span className="text-slate-500"> · agreed rent</span>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {line.nights} of {daysInMonth}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">{formatPaise(line.monthly_rate)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
+      {stays.some((line) => line.nights < daysInMonth) && (
         <p className="text-xs text-slate-500">
           Part months are charged for the nights held: monthly rent × nights ÷ {daysInMonth}.
         </p>
@@ -239,7 +274,7 @@ export function ReceiptDocument({
         {PAYMENT_MODE_LABELS[payment.mode]} on {formatDay(payment.paidAt)}
         {payment.reference && <> (reference {payment.reference})</>}, towards invoice{" "}
         <span className="font-mono">{documentNumber("INV", invoice.id)}</span> for{" "}
-        {formatMonth(invoice.periodMonth)}.
+        {invoiceLabel(invoice)}.
       </p>
       <Party invoice={invoice} />
       <div className="flex justify-end">

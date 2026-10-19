@@ -16,6 +16,7 @@ import { getResidentDeposit } from "@/features/deposits/queries";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
+import { invoiceLabel } from "@/features/fees/options";
 import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
@@ -26,7 +27,7 @@ import {
   RESIDENT_STATUS_TONES,
 } from "@/features/residents/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
-import { formatMonth, formatPaise } from "@/lib/money";
+import { formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { todayIst, uuid } from "@/lib/validation";
 import type { Gender, IdProofType, ResidentStatus, VacateReason } from "@/types";
@@ -130,7 +131,7 @@ export default async function ResidentPage({
     .reverse()
     .map((invoice) => ({
       id: invoice.id,
-      label: formatMonth(invoice.periodMonth),
+      label: invoiceLabel(invoice),
       balance: invoice.balance,
     }));
 

@@ -10,6 +10,7 @@ const TABS = [
   { href: "/settings/hostel", label: "Hostel", ownerOnly: false },
   { href: "/settings/fees", label: "Fees", ownerOnly: false },
   { href: "/settings/staff", label: "Staff", ownerOnly: true },
+  { href: "/settings/referrals", label: "Refer", ownerOnly: true },
 ] as const;
 
 export function SettingsTabs({ isOwner }: { isOwner: boolean }) {

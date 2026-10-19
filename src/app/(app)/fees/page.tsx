@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, EmptyState, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { ApplyLateFeesForm } from "@/features/fees/components/ApplyLateFeesForm";
 import { FeeFilters } from "@/features/fees/components/FeeFilters";
 import { GenerateInvoicesForm } from "@/features/fees/components/GenerateInvoicesForm";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
@@ -11,14 +12,17 @@ import {
   DUE_STATUS_LABELS,
   DUE_STATUS_ORDER,
   DUE_STATUS_TONES,
+  invoiceLabel,
   isDueStatus,
 } from "@/features/fees/options";
+import { describeLateFeeRule } from "@/features/fees/late-fees";
 import {
   FEE_PAGE_SIZE,
   FEE_SORTS,
   getBilledMonths,
   getFeeList,
   getFeeTotals,
+  getLateFeeRule,
   type FeeListFilters,
   type FeeSort,
 } from "@/features/fees/queries";
@@ -64,17 +68,20 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = parseFilters(params);
   const supabase = await createClient();
 
-  const [list, totals, months, { data: rooms, error: roomsError }] = await Promise.all([
-    getFeeList(supabase, hostel.id, filters),
-    getFeeTotals(supabase, hostel.id, filters),
-    getBilledMonths(supabase, hostel.id),
-    supabase
-      .from("room_inventory")
-      .select("id, room_number")
-      .eq("hostel_id", hostel.id)
-      .order("floor")
-      .order("room_sort"),
-  ]);
+  const [list, totals, months, lateFeeRule, { data: rooms, error: roomsError }] = await Promise.all(
+    [
+      getFeeList(supabase, hostel.id, filters),
+      getFeeTotals(supabase, hostel.id, filters),
+      getBilledMonths(supabase, hostel.id),
+      getLateFeeRule(supabase, hostel.id),
+      supabase
+        .from("room_inventory")
+        .select("id, room_number")
+        .eq("hostel_id", hostel.id)
+        .order("floor")
+        .order("room_sort"),
+    ],
+  );
   if (roomsError) throw roomsError;
 
   const href = (changes: Record<string, string | null>) => {
@@ -124,6 +131,24 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             Generate monthly invoices
           </h2>
           <GenerateInvoicesForm currentMonth={todayIst().slice(0, 7)} />
+        </section>
+      )}
+
+      {isOwner && lateFeeRule.mode !== "off" && (
+        <section
+          aria-labelledby="late-fees-heading"
+          className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+        >
+          <h2 id="late-fees-heading" className="text-base font-semibold text-slate-900">
+            Late fees
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-slate-600">
+            {describeLateFeeRule(lateFeeRule)}{" "}
+            <Link href="/settings/fees#late-fees" className="font-medium text-brand-700 underline">
+              Change the rule
+            </Link>
+          </p>
+          <ApplyLateFeesForm />
         </section>
       )}
 
@@ -238,7 +263,12 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                         )}
                       </Td>
                       <Td>{row.bedLabel ?? row.roomNumber ?? "—"}</Td>
-                      <Td>{formatMonth(row.periodMonth, { short: true })}</Td>
+                      <Td>
+                        {formatMonth(row.periodMonth, { short: true })}
+                        {row.kind === "late_fee" && (
+                          <span className="block text-xs text-slate-500">Late fee</span>
+                        )}
+                      </Td>
                       <Td className="text-right tabular-nums">{formatPaise(row.amount)}</Td>
                       <Td className="text-right tabular-nums">{formatPaise(row.paid)}</Td>
                       <Td className="text-right font-medium tabular-nums">
@@ -260,7 +290,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                               invoices={[
                                 {
                                   id: row.id,
-                                  label: formatMonth(row.periodMonth),
+                                  label: invoiceLabel(row),
                                   balance: row.balance,
                                 },
                               ]}
@@ -271,7 +301,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                           <Link
                             href={`/fees/${row.id}`}
                             className={buttonClass({ variant: "secondary", size: "sm" })}
-                            aria-label={`View invoice for ${row.residentName}, ${formatMonth(row.periodMonth)}`}
+                            aria-label={`View invoice for ${row.residentName}, ${invoiceLabel(row)}`}
                           >
                             View
                           </Link>

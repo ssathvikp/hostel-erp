@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { LateFeeRuleForm } from "@/features/fees/components/LateFeeRuleForm";
 import { RateForm } from "@/features/fees/components/RateForm";
-import { getRates } from "@/features/fees/queries";
+import { describeLateFeeRule } from "@/features/fees/late-fees";
+import { getLateFeeRule, getRates } from "@/features/fees/queries";
 import { ReminderTemplateForm } from "@/features/notifications/components/ReminderTemplateForm";
 import { getReminderTemplate } from "@/features/notifications/queries";
 import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
@@ -21,9 +23,10 @@ const formatDay = (value: string) => day.format(new Date(value));
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const [{ history, summaries }, reminderTemplate] = await Promise.all([
+  const [{ history, summaries }, reminderTemplate, lateFeeRule] = await Promise.all([
     getRates(supabase, hostel.id),
     getReminderTemplate(supabase, hostel.id),
+    getLateFeeRule(supabase, hostel.id),
   ]);
   const isOwner = user.role === "owner";
 
@@ -115,6 +118,23 @@ export default async function FeeSettingsPage() {
       ) : (
         <Alert tone="info">Only the hostel owner can change rates.</Alert>
       )}
+
+      <section
+        id="late-fees"
+        aria-labelledby="late-fee-heading"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="late-fee-heading" className="text-base font-semibold text-slate-900">
+          Late fees
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          {describeLateFeeRule(lateFeeRule)} Late fees are added as their own invoice, once per
+          month&apos;s rent, from Fees → Add late fees now. The owner can waive one with a reason.
+          {lateFeeRule.since &&
+            ` Applies to rent due on or after ${formatDay(lateFeeRule.since)}, when the rule was switched on.`}
+        </p>
+        {isOwner && <LateFeeRuleForm rule={lateFeeRule} />}
+      </section>
 
       {isOwner && (
         <section

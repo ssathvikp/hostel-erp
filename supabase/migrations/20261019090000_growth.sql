@@ -26,11 +26,14 @@ alter table public.hostels
   add column late_fee_grace_days integer not null default 3,
   add column late_fee_since date,
   add constraint hostels_late_fee_mode_valid check (late_fee_mode in ('off', 'fixed', 'per_day')),
-  -- ₹1 to ₹1,00,000, in paise.
+  -- ₹1 to ₹1,00,000, in paise. The explicit not-null tests matter: a check
+  -- that evaluates to null passes.
   add constraint hostels_late_fee_amount_range
-    check (late_fee_mode = 'off' or late_fee_amount between 100 and 10000000),
+    check (late_fee_mode = 'off'
+           or (late_fee_amount is not null and late_fee_amount between 100 and 10000000)),
   add constraint hostels_late_fee_cap_range
-    check (late_fee_mode <> 'per_day' or late_fee_cap between late_fee_amount and 10000000),
+    check (late_fee_mode <> 'per_day'
+           or (late_fee_cap is not null and late_fee_cap between late_fee_amount and 10000000)),
   add constraint hostels_late_fee_grace_range check (late_fee_grace_days between 0 and 28),
   add constraint hostels_late_fee_since_set check (late_fee_mode = 'off' or late_fee_since is not null);
 
@@ -970,8 +973,10 @@ begin
   if p_days is null or p_days not between 7 and 180 then
     raise exception 'Choose between 7 and 180 days' using errcode = 'P0001', hint = 'trial_days_range';
   end if;
+  -- The one row. Supabase refuses an update with no where clause.
   update public.platform_settings
-     set trial_days = p_days, updated_at = now(), updated_by = (select auth.uid());
+     set trial_days = p_days, updated_at = now(), updated_by = (select auth.uid())
+   where id;
 end;
 $$;
 

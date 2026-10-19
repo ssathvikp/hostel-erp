@@ -19,6 +19,8 @@ import {
 } from "@/lib/validation";
 
 const RATE_LIMITED = "Too many attempts. Wait a minute and try again.";
+/** Matches private.my_referral_code(): 8 letters and digits, no I, O, 0 or 1. */
+const REFERRAL_CODE = /^[A-HJ-NP-Z2-9]{8}$/;
 
 function isRateLimited(error: AuthError) {
   return error.status === 429 || error.code === "over_request_rate_limit";
@@ -34,11 +36,17 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
 
   const { full_name, email, password } = parsed.data;
+  // A referral code from an owner's link (plan E14-T12). Only ever used to
+  // look up the referring owner at signup; anything malformed is dropped.
+  const code = String(formData.get("referral_code") ?? "")
+    .trim()
+    .toUpperCase();
+  const referral_code = REFERRAL_CODE.test(code) ? code : undefined;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name } },
+    options: { data: { full_name, ...(referral_code && { referral_code }) } },
   });
 
   if (error) {

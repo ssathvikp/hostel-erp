@@ -140,6 +140,8 @@ export type VacateReason = (typeof VACATE_REASONS)[number];
  */
 export const INVOICE_STATUSES = ["issued", "void"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+export const INVOICE_KINDS = ["rent", "late_fee"] as const;
+export type InvoiceKind = (typeof INVOICE_KINDS)[number];
 export const INVOICE_DUE_STATUSES = ["unpaid", "partial", "paid", "overdue"] as const;
 export type InvoiceDueStatus = (typeof INVOICE_DUE_STATUSES)[number];
 
@@ -366,6 +368,22 @@ export interface InvoiceLine {
   rate_source: "override" | "structure";
 }
 
+/** How a late fee was reached (ClickUp E13-T6). The one line of a late-fee invoice. */
+export interface LateFeeLine {
+  type: "late_fee";
+  /** The rent invoice that was paid late. */
+  invoice_id: Uuid;
+  rule: "fixed" | "per_day";
+  /** Fixed fee, or fee per day. */
+  rate: Paise;
+  cap: Paise | null;
+  grace_days: number;
+  rent_due_date: IsoDate;
+  /** The day the rent was paid in full; null while it is still owed. */
+  settled_on: IsoDate | null;
+  days_late: number;
+}
+
 export interface Invoice {
   id: Uuid;
   hostel_id: Uuid;
@@ -378,8 +396,10 @@ export interface Invoice {
   void_reason: string | null;
   voided_at: IsoTimestamp | null;
   voided_by: Uuid | null;
-  /** How the amount was reached; see `InvoiceLine`. */
-  breakdown: InvoiceLine[];
+  /** How the amount was reached; see `InvoiceLine` and `LateFeeLine`. */
+  breakdown: InvoiceLine[] | LateFeeLine[];
+  kind: InvoiceKind;
+  late_fee_for: Uuid | null;
   created_by: Uuid | null;
   created_at: IsoTimestamp;
   updated_at: IsoTimestamp;
@@ -388,7 +408,15 @@ export interface Invoice {
 /** Invoices are generated, never hand-edited; due status derives from payments. */
 export type InvoiceInsert = Omit<
   Invoice,
-  Generated | "status" | "void_reason" | "voided_at" | "voided_by" | "created_by"
+  | Generated
+  | "status"
+  | "void_reason"
+  | "voided_at"
+  | "voided_by"
+  | "created_by"
+  // Only apply_late_fees writes these.
+  | "kind"
+  | "late_fee_for"
 >;
 
 export interface Payment {

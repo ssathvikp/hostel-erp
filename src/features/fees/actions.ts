@@ -15,6 +15,7 @@ import {
   formSuccess,
   formValues,
   generateInvoicesSchema,
+  lateFeeRuleSchema,
   paymentSchema,
   voidSchema,
   validateFormData,
@@ -28,6 +29,12 @@ const RATE_FIELDS = ["sharing_type", "monthly_amount", "effective_from"] as cons
 const GENERATE_FIELDS = ["period_month", "due_day"] as const;
 const PAYMENT_FIELDS = ["invoice_id", "amount", "paid_at", "mode", "reference"] as const;
 const VOID_FIELDS = ["id", "void_reason"] as const;
+const LATE_FEE_FIELDS = [
+  "late_fee_mode",
+  "late_fee_amount",
+  "late_fee_cap",
+  "late_fee_grace_days",
+] as const;
 
 /**
  * Plain-language messages for the rules the fee tables and functions
@@ -45,6 +52,10 @@ const RULE_MESSAGES: Record<string, string> = {
   invoice_has_payments:
     "This invoice has payments recorded against it. Void those payments first, then the invoice.",
   invoice_immutable: "Invoices cannot be edited. Void it and generate the month again.",
+  invoice_has_late_fee:
+    "This invoice has a late fee. Waive the late fee first, then void the invoice.",
+  late_fees_off: "Late fees are switched off. Turn them on in Settings → Fees first.",
+  not_owner: "Only the hostel owner can do this.",
   payment_future: "The payment date cannot be in the future.",
   payment_void: "This payment is already void. Refresh the page.",
   payment_immutable: "Payments cannot be edited. Void it and record it again.",
@@ -194,12 +205,16 @@ export async function voidInvoice(_previous: FormState, formData: FormData): Pro
     .update({ status: "void", void_reason: parsed.data.void_reason })
     .eq("id", parsed.data.id)
     .eq("hostel_id", hostelId)
-    .select("id");
+    .select("id, kind");
   if (error) return failure("voidInvoice", error, values);
   if (!data?.length) return formFailure(RULE_MESSAGES.invoice_not_found, values);
 
   revalidateFees();
-  return formSuccess("Invoice voided. You can generate the month again for this resident.");
+  return formSuccess(
+    data[0].kind === "late_fee"
+      ? "Late fee waived."
+      : "Invoice voided. You can generate the month again for this resident.",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -277,4 +292,81 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   revalidateFees();
   return formSuccess("Payment voided. It no longer counts towards any total.");
+}
+
+// ---------------------------------------------------------------------------
+// Late fees (ClickUp E13-T6)
+// ---------------------------------------------------------------------------
+
+export async function saveLateFeeRule(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, LATE_FEE_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+
+  const parsed = validateFormData(lateFeeRuleSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+
+  const rule = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("hostels")
+    .update({
+      late_fee_mode: rule.late_fee_mode,
+      late_fee_amount: rule.late_fee_mode === "off" ? null : rule.late_fee_amount,
+      late_fee_cap: rule.late_fee_mode === "per_day" ? rule.late_fee_cap : null,
+      late_fee_grace_days: rule.late_fee_grace_days,
+    })
+    .eq("id", hostel.id)
+    .select("id");
+  if (error) return failure("saveLateFeeRule", error, values);
+  if (!data?.length) return formFailure(RULE_MESSAGES.not_owner, values);
+
+  revalidatePath("/settings/fees");
+  revalidatePath("/fees");
+  return formSuccess(
+    rule.late_fee_mode === "off" ? "Late fees switched off." : "Late fee rule saved.",
+  );
+}
+
+interface LateFeeSummary {
+  applied: number;
+  total_amount: number;
+  waiting: number;
+}
+
+export async function applyLateFees(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("apply_late_fees", { p_hostel_id: hostel.id });
+  if (error) return failure("applyLateFees", error);
+
+  const summary = data as unknown as LateFeeSummary;
+  const parts = [
+    summary.applied > 0
+      ? `Added ${plural(summary.applied, "late fee")} worth ${formatPaise(summary.total_amount)}.`
+      : "No new late fees.",
+  ];
+  if (summary.waiting > 0) {
+    parts.push(
+      `${plural(summary.waiting, "invoice")} still ${summary.waiting === 1 ? "is" : "are"} unpaid; ${summary.waiting === 1 ? "its" : "their"} per-day fee is added once paid or once it reaches the cap.`,
+    );
+  }
+
+  revalidateFees();
+  return formSuccess(parts.join(" "));
 }

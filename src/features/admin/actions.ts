@@ -12,6 +12,7 @@ import {
   formFailure,
   formSuccess,
   formValues,
+  integer,
   isoDate,
   optional,
   requiredText,
@@ -30,6 +31,7 @@ const RULE_MESSAGES: Record<string, string> = {
   hostel_draft: "This hostel is still being set up and cannot be suspended.",
   suspension_reason_required: "Say why the hostel is suspended. The owner will see it.",
   not_platform_admin: "Only platform admins can do this.",
+  trial_days_range: "Choose between 7 and 180 days.",
 };
 
 function failure(action: string, error: PostgrestError, values?: Record<string, string>) {
@@ -110,4 +112,22 @@ export async function setHostelSuspended(
 
   revalidatePath("/admin", "layout");
   return formSuccess(suspend ? "Hostel suspended." : "Hostel restored.");
+}
+
+const trialDaysSchema = z.object({ trial_days: integer("Trial length", 7, 180) });
+
+/** The free trial every new hostel starts on (plan E15-T2). Existing trials keep their dates. */
+export async function setTrialDays(_previous: FormState, formData: FormData): Promise<FormState> {
+  const values = formValues(formData, ["trial_days"]);
+  const denied = await asAdmin(values);
+  if (denied) return denied;
+  const parsed = validateFormData(trialDaysSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_trial_days", { p_days: parsed.data.trial_days });
+  if (error) return failure("setTrialDays", error, values);
+
+  revalidatePath("/admin", "layout");
+  return formSuccess(`New hostels now start on a ${parsed.data.trial_days}-day trial.`);
 }

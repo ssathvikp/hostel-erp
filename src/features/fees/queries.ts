@@ -5,8 +5,10 @@ import type { createClient } from "@/lib/supabase/server";
 import { todayIst } from "@/lib/validation";
 import {
   SHARING_TYPES,
+  type InvoiceKind,
   type InvoiceDueStatus,
   type InvoiceLine,
+  type LateFeeLine,
   type PaymentMode,
   type SharingType,
 } from "@/types";
@@ -147,10 +149,14 @@ export interface InvoiceRow {
   /** Null for void invoices. */
   dueStatus: InvoiceDueStatus | null;
   voidReason: string | null;
+  /** rent, or late_fee (ClickUp E13-T6). */
+  kind: InvoiceKind;
+  /** For a late fee: the rent invoice that was paid late. */
+  lateFeeFor: string | null;
 }
 
 const INVOICE_COLUMNS =
-  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason";
+  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, kind, late_fee_for";
 
 type InvoiceBalanceRow = {
   id: string | null;
@@ -169,6 +175,8 @@ type InvoiceBalanceRow = {
   status: string | null;
   due_status: string | null;
   void_reason: string | null;
+  kind: string | null;
+  late_fee_for: string | null;
 };
 
 function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
@@ -189,6 +197,8 @@ function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
     status: row.status as InvoiceRow["status"],
     dueStatus: row.due_status as InvoiceDueStatus | null,
     voidReason: row.void_reason,
+    kind: row.kind === "late_fee" ? "late_fee" : "rent",
+    lateFeeFor: row.late_fee_for,
   };
 }
 
@@ -342,12 +352,24 @@ export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId
   if (detailError) throw detailError;
   if (!invoice || !detail) return null;
 
+  // A rent invoice links to its late fee, if one was charged.
+  const { data: lateFee, error: lateFeeError } = await supabase
+    .from("invoices")
+    .select("id, amount, status")
+    .eq("hostel_id", hostelId)
+    .eq("late_fee_for", invoiceId)
+    .maybeSingle();
+  if (lateFeeError) throw lateFeeError;
+
   return {
     ...toInvoiceRow(invoice),
-    breakdown: detail.breakdown as unknown as InvoiceLine[],
+    breakdown: detail.breakdown as unknown as (InvoiceLine | LateFeeLine)[],
     issuedAt: detail.created_at,
     voidedAt: detail.voided_at,
     payments,
+    lateFee: lateFee
+      ? { id: lateFee.id, amount: lateFee.amount, void: lateFee.status === "void" }
+      : null,
   };
 }
 
@@ -390,4 +412,34 @@ export async function getLetterhead(supabase: Supabase, hostelId: string) {
     .single();
   if (error) throw error;
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Late fees (ClickUp E13-T6)
+// ---------------------------------------------------------------------------
+
+export interface LateFeeRule {
+  mode: "off" | "fixed" | "per_day";
+  /** Fixed fee, or fee per day, in paise. */
+  amount: number | null;
+  cap: number | null;
+  graceDays: number;
+  /** Rent due on or after this day can attract a fee. */
+  since: string | null;
+}
+
+export async function getLateFeeRule(supabase: Supabase, hostelId: string): Promise<LateFeeRule> {
+  const { data, error } = await supabase
+    .from("hostels")
+    .select("late_fee_mode, late_fee_amount, late_fee_cap, late_fee_grace_days, late_fee_since")
+    .eq("id", hostelId)
+    .single();
+  if (error) throw error;
+  return {
+    mode: data.late_fee_mode as LateFeeRule["mode"],
+    amount: data.late_fee_amount,
+    cap: data.late_fee_cap,
+    graceDays: data.late_fee_grace_days,
+    since: data.late_fee_since,
+  };
 }

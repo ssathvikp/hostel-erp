@@ -7,7 +7,13 @@ import { Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/component
 import { documentNumber } from "@/features/fees/components/InvoiceDocument";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
-import { DUE_STATUS_LABELS, DUE_STATUS_TONES, PAYMENT_MODE_LABELS } from "@/features/fees/options";
+import { explainLateFee, isLateFeeLine } from "@/features/fees/late-fees";
+import {
+  DUE_STATUS_LABELS,
+  DUE_STATUS_TONES,
+  invoiceLabel,
+  PAYMENT_MODE_LABELS,
+} from "@/features/fees/options";
 import { getInvoice } from "@/features/fees/queries";
 import { receiptTotals } from "@/features/fees/receipt";
 import { SendButtons } from "@/features/notifications/components/SendButtons";
@@ -33,7 +39,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   if (!invoice) notFound();
 
   const isOwner = user.role === "owner";
-  const month = formatMonth(invoice.periodMonth);
+  const month = invoiceLabel(invoice);
+  const isLateFee = invoice.kind === "late_fee";
+  const lateFeeLine = isLateFee ? invoice.breakdown.find(isLateFeeLine) : undefined;
+  const liveLateFee = invoice.lateFee && !invoice.lateFee.void ? invoice.lateFee : null;
   const livePayments = invoice.payments.filter((payment) => !payment.voidedAt);
   // WhatsApp receipt text for each payment that still counts (EP-11), with
   // the balance as it stood after that payment (receiptTotals), not today's.
@@ -114,7 +123,36 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       {invoice.status === "void" && (
         <p className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Voided: {invoice.voidReason}. It does not count towards any balance.
+          {isLateFee ? "Waived" : "Voided"}: {invoice.voidReason}. It does not count towards any
+          balance.
+        </p>
+      )}
+
+      {isLateFee && (
+        <p className="text-sm text-slate-700">
+          {lateFeeLine && `${explainLateFee(lateFeeLine)} `}
+          {invoice.lateFeeFor && (
+            <Link
+              href={`/fees/${invoice.lateFeeFor}`}
+              className="font-medium text-brand-700 hover:underline"
+            >
+              View the rent invoice
+            </Link>
+          )}
+        </p>
+      )}
+
+      {invoice.lateFee && (
+        <p className="text-sm text-slate-700">
+          {invoice.lateFee.void
+            ? "A late fee was charged for this rent and waived. "
+            : `A late fee of ${formatPaise(invoice.lateFee.amount)} was charged because this rent was paid late. `}
+          <Link
+            href={`/fees/${invoice.lateFee.id}`}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            View the late fee
+          </Link>
         </p>
       )}
 
@@ -214,15 +252,28 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           className="rounded-lg border border-red-200 bg-white p-5 sm:p-6"
         >
           <h2 id="void-heading" className="text-base font-semibold text-slate-900">
-            Void this invoice
+            {isLateFee ? "Waive this late fee" : "Void this invoice"}
           </h2>
           <p className="mt-1 mb-4 text-sm text-slate-600">
             {livePayments.length > 0
-              ? "This invoice has payments. Void them first if the invoice was issued in error."
-              : "For an invoice issued in error. The month can then be generated again for this resident."}
+              ? `This ${isLateFee ? "late fee" : "invoice"} has payments. Void them first if it was charged in error.`
+              : isLateFee
+                ? "Say why it is waived. A waived late fee is never charged again for this rent."
+                : liveLateFee
+                  ? "This rent has a late fee. Waive the late fee first if the invoice was issued in error."
+                  : "For an invoice issued in error. The month can then be generated again for this resident."}
           </p>
-          {livePayments.length === 0 && (
-            <VoidDialog kind="invoice" id={invoice.id} subject={`invoice for ${month}`} size="md" />
+          {livePayments.length === 0 && !(liveLateFee && !isLateFee) && (
+            <VoidDialog
+              kind={isLateFee ? "lateFee" : "invoice"}
+              id={invoice.id}
+              subject={
+                isLateFee
+                  ? `late fee for ${formatMonth(invoice.periodMonth)}`
+                  : `invoice for ${month}`
+              }
+              size="md"
+            />
           )}
         </section>
       )}

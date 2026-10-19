@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge } from "@/components/ui";
 import { PlanForm } from "@/features/admin/components/PlanForm";
+import { SetupChecklist } from "@/features/hostels/components/SetupChecklist";
 import { SuspendForm } from "@/features/admin/components/SuspendForm";
 import { HOSTEL_STATUS_LABELS, HOSTEL_STATUS_TONES } from "@/features/admin/options";
 import { getAdminHostels, requirePlatformAdmin } from "@/features/admin/queries";
@@ -35,6 +36,8 @@ export default async function AdminHostelPage({ params }: { params: Promise<{ id
     ["Invoices this month", String(hostel.invoicesThisMonth)],
     ["Collected this month", formatPaise(hostel.collectedThisMonth)],
     ["Signed up", moment.format(new Date(hostel.createdAt))],
+    ["Referred by", hostel.referredByName ?? "—"],
+    ["Owners they referred", `${hostel.referrals} (${hostel.payingReferrals} paying)`],
     ["Last activity", hostel.lastActivityAt ? moment.format(new Date(hostel.lastActivityAt)) : "—"],
   ];
 
@@ -76,6 +79,16 @@ export default async function AdminHostelPage({ params }: { params: Promise<{ id
             </div>
           ))}
         </dl>
+      </section>
+
+      <section
+        aria-labelledby="setup-heading"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="setup-heading" className="mb-4 text-base font-semibold text-slate-900">
+          Set-up
+        </h2>
+        <SetupChecklist facts={hostel.setup} />
       </section>
 
       <section

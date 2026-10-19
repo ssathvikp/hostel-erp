@@ -18,6 +18,15 @@ const COPY = {
     description:
       "A void invoice stays on record but no longer counts towards any balance. You can then generate the month again for this resident.",
     confirm: "Void invoice",
+    button: "Void",
+  },
+  lateFee: {
+    action: voidInvoice,
+    title: "Waive this late fee",
+    description:
+      "A waived late fee stays on record but no longer counts towards any balance, and is never charged again for this rent.",
+    confirm: "Waive late fee",
+    button: "Waive",
   },
   payment: {
     action: voidPayment,
@@ -25,6 +34,7 @@ const COPY = {
     description:
       "Use this for a payment recorded by mistake or one that bounced. It stays on record, marked void, and no longer counts towards any total.",
     confirm: "Void payment",
+    button: "Void",
   },
   deposit: {
     action: voidDepositEntry,
@@ -32,10 +42,14 @@ const COPY = {
     description:
       "Use this for an entry recorded by mistake. It stays on record, marked void, and no longer counts towards the deposit held.",
     confirm: "Void entry",
+    button: "Void",
   },
 } as const;
 
-/** Voids an invoice, payment or deposit entry with a reason. Nothing is ever edited or deleted. */
+/**
+ * Voids an invoice, payment or deposit entry, or waives a late fee, with a
+ * reason. Nothing is ever edited or deleted.
+ */
 export function VoidDialog({
   kind,
   id,
@@ -64,9 +78,9 @@ export function VoidDialog({
         variant="secondary"
         size={size}
         onClick={() => setOpen(true)}
-        aria-label={`Void ${subject}`}
+        aria-label={`${copy.button} ${subject}`}
       >
-        Void
+        {copy.button}
       </Button>
       {state.status === "success" && (
         <span role="status" className="sr-only">

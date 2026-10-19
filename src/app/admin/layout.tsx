@@ -29,6 +29,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             </span>
             <span className="font-semibold text-slate-900">Hostel ERP admin</span>
           </Link>
+          <nav aria-label="Admin" className="flex items-center gap-4 text-sm font-medium">
+            <Link href="/admin" className="text-slate-700 hover:text-brand-700">
+              Hostels
+            </Link>
+            <Link href="/admin/metrics" className="text-slate-700 hover:text-brand-700">
+              Metrics
+            </Link>
+          </nav>
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <span className="hidden sm:inline">{user.email}</span>
             <form action={signOut}>
