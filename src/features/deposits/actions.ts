@@ -2,6 +2,7 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
@@ -14,10 +15,13 @@ import {
   formFailure,
   formSuccess,
   formValues,
+  optional,
+  rupees,
   validateFormData,
   voidSchema,
   type FormState,
 } from "@/lib/validation";
+import { SHARING_TYPES } from "@/types";
 
 import { DEPOSIT_KIND_LABELS } from "./options";
 
@@ -135,4 +139,52 @@ export async function voidDepositEntry(
 
   revalidateDeposits();
   return formSuccess("Entry voided. It no longer counts towards the deposit.");
+}
+
+/** The usual deposit per sharing type; blank removes it (ClickUp E13-T4). Owners only. */
+export async function saveDepositRates(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(
+    formData,
+    SHARING_TYPES.map((type) => `deposit_${type}`),
+  );
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const fields = Object.fromEntries(
+    SHARING_TYPES.map((type) => [`deposit_${type}`, optional(rupees("Deposit"))]),
+  );
+  const parsed = validateFormData(z.object(fields), formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+
+  const supabase = await createClient();
+  const rows = SHARING_TYPES.flatMap((type) => {
+    const amount = parsed.data[`deposit_${type}`] as number | null;
+    return amount ? [{ hostel_id: hostel.id, sharing_type: type, amount }] : [];
+  });
+  const cleared = SHARING_TYPES.filter((type) => !parsed.data[`deposit_${type}`]);
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from("deposit_rates")
+      .upsert(rows, { onConflict: "hostel_id,sharing_type" });
+    if (error) return unexpectedFailure("saveDepositRates", error, values);
+  }
+  if (cleared.length > 0) {
+    const { error } = await supabase
+      .from("deposit_rates")
+      .delete()
+      .eq("hostel_id", hostel.id)
+      .in("sharing_type", cleared);
+    if (error) return unexpectedFailure("saveDepositRates", error, values);
+  }
+  revalidatePath("/settings/fees");
+  revalidatePath("/residents", "layout");
+  revalidatePath("/rooms", "layout");
+  return formSuccess("Usual deposits saved.");
 }

@@ -11,6 +11,8 @@ export interface ReceiptPayment {
   /** When it was entered; orders payments received on the same day. */
   recordedAt: string;
   voidedAt: string | null;
+  /** Null for a cheque awaiting clearance, which is not yet paid. */
+  clearedAt?: string | null;
 }
 
 export function receiptTotals(
@@ -22,7 +24,10 @@ export function receiptTotals(
   const target = payments.find((payment) => payment.id === paymentId);
   if (!target) return { paidToDate: 0, balance: invoiceAmount };
   const paidToDate = payments
-    .filter((payment) => !payment.voidedAt && order(payment) <= order(target))
+    .filter(
+      (payment) =>
+        !payment.voidedAt && payment.clearedAt !== null && order(payment) <= order(target),
+    )
     .reduce((sum, payment) => sum + payment.amount, 0);
   return { paidToDate, balance: Math.max(0, invoiceAmount - paidToDate) };
 }

@@ -29,6 +29,7 @@ const ERASE_MESSAGES: Record<string, string> = {
   erase_balance_due: "This resident still owes rent. Record or void what is due first.",
   erase_deposit_held: "A security deposit is still held. Record the refund or deduction first.",
   erase_pending_charges: "This resident has charges not yet billed. Bill or void them first.",
+  erase_credit_held: "This resident has advance credit. Refund it or use it on an invoice first.",
 };
 
 /** Rules whose database message names the detail (here, the month to bill). */

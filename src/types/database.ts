@@ -615,6 +615,36 @@ export type Database = {
           },
         ];
       };
+      deposit_rates: {
+        Row: {
+          amount: number;
+          hostel_id: string;
+          sharing_type: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          hostel_id: string;
+          sharing_type: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          hostel_id?: string;
+          sharing_type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deposit_rates_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       document_counters: {
         Row: {
           fiscal_year: string;
@@ -1132,6 +1162,10 @@ export type Database = {
       payments: {
         Row: {
           amount: number;
+          cheque_bank: string | null;
+          cheque_number: string | null;
+          cleared_at: string | null;
+          cleared_by: string | null;
           created_at: string;
           hostel_id: string;
           id: string;
@@ -1149,6 +1183,10 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           amount: number;
+          cheque_bank?: string | null;
+          cheque_number?: string | null;
+          cleared_at?: string | null;
+          cleared_by?: string | null;
           created_at?: string;
           hostel_id: string;
           id?: string;
@@ -1165,6 +1203,10 @@ export type Database = {
         };
         Update: {
           amount?: number;
+          cheque_bank?: string | null;
+          cheque_number?: string | null;
+          cleared_at?: string | null;
+          cleared_by?: string | null;
           created_at?: string;
           hostel_id?: string;
           id?: string;
@@ -1180,6 +1222,13 @@ export type Database = {
           voided_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "payments_cleared_by_fkey";
+            columns: ["cleared_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "payments_hostel_id_fkey";
             columns: ["hostel_id"];
@@ -1526,6 +1575,111 @@ export type Database = {
           },
           {
             foreignKeyName: "resident_charges_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      resident_credit_entries: {
+        Row: {
+          amount: number;
+          created_at: string;
+          entry_date: string;
+          hostel_id: string;
+          id: string;
+          invoice_id: string | null;
+          kind: string;
+          mode: string | null;
+          payment_id: string | null;
+          recorded_by: string;
+          reference: string | null;
+          resident_id: string;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          created_at?: string;
+          entry_date: string;
+          hostel_id: string;
+          id?: string;
+          invoice_id?: string | null;
+          kind: string;
+          mode?: string | null;
+          payment_id?: string | null;
+          recorded_by?: string;
+          reference?: string | null;
+          resident_id: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          entry_date?: string;
+          hostel_id?: string;
+          id?: string;
+          invoice_id?: string | null;
+          kind?: string;
+          mode?: string | null;
+          payment_id?: string | null;
+          recorded_by?: string;
+          reference?: string | null;
+          resident_id?: string;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "resident_credit_entries_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_balances";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_invoice_fkey";
+            columns: ["hostel_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_payment_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "payments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_voided_by_fkey";
             columns: ["voided_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
@@ -2011,6 +2165,30 @@ export type Database = {
           },
         ];
       };
+      credit_balances: {
+        Row: {
+          held: number | null;
+          hostel_id: string | null;
+          resident_id: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "resident_credit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "resident_credit_entries_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+        ];
+      };
       deposit_balances: {
         Row: {
           collected: number | null;
@@ -2101,6 +2279,7 @@ export type Database = {
           kind: string | null;
           late_fee_for: string | null;
           paid: number | null;
+          pending_cheques: number | null;
           period_month: string | null;
           resident_email: string | null;
           resident_id: string | null;
@@ -2416,10 +2595,12 @@ export type Database = {
         };
         Returns: string;
       };
+      apply_credit: { Args: { p_resident_id: string }; Returns: number };
       apply_late_fees: { Args: { p_hostel_id: string }; Returns: Json };
       bill_charges_now: { Args: { p_resident_id: string }; Returns: string };
       bill_electricity: { Args: { p_hostel_id: string; p_period_month: string }; Returns: Json };
       billed_months: { Args: { p_hostel_id: string }; Returns: string[] };
+      clear_cheque: { Args: { p_payment_id: string }; Returns: undefined };
       create_rooms_bulk: {
         Args: {
           p_capacity: number;
@@ -2481,6 +2662,18 @@ export type Database = {
           occupied_beds: number;
           total_beds: number;
         }[];
+      };
+      record_payment: {
+        Args: {
+          p_amount: number;
+          p_cheque_bank?: string;
+          p_cheque_number?: string;
+          p_invoice_id: string;
+          p_mode: string;
+          p_paid_at: string;
+          p_reference?: string;
+        };
+        Returns: Json;
       };
       set_fee_head_price: {
         Args: {

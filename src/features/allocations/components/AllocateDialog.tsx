@@ -8,6 +8,8 @@ import { todayIst } from "@/lib/validation";
 import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
+import { PAYMENT_MODE_OPTIONS } from "@/features/fees/options";
+
 import { allocateBed } from "../actions";
 
 export interface AllocateChoice {
@@ -25,6 +27,8 @@ export interface AllocateModalProps {
   description?: string;
   fixed: { name: "resident_id" | "bed_id"; value: string };
   choice: AllocateChoice;
+  /** The hostel's usual deposits, e.g. "₹10,000 for double sharing" (ClickUp E13-T4). */
+  depositHint?: string;
 }
 
 /**
@@ -39,6 +43,7 @@ export function AllocateModal({
   description,
   fixed,
   choice,
+  depositHint,
 }: AllocateModalProps) {
   const [state, action, pending] = useActionState(allocateBed, initialFormState);
   const { shown, formKey } = useDialogState(state, open);
@@ -57,7 +62,7 @@ export function AllocateModal({
     <>
       {state.status === "success" && (
         <span role="status" className="sr-only">
-          {state.message}
+          {state.message} {state.warning}
         </span>
       )}
       <Modal
@@ -113,6 +118,31 @@ export function AllocateModal({
               hint="Optional. Leave blank to use the fee structure for this room's sharing type."
               error={shown.fieldErrors.rent_override?.[0]}
             />
+            <fieldset className="space-y-3 rounded-md border border-slate-200 p-3">
+              <legend className="px-1 text-sm font-medium text-slate-700">
+                Security deposit received now
+              </legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  id={`${formId}-deposit`}
+                  name="deposit_amount"
+                  label="Amount (₹)"
+                  inputMode="decimal"
+                  defaultValue={shown.values?.deposit_amount ?? ""}
+                  hint={depositHint ? `Usual: ${depositHint}.` : "Optional."}
+                  error={shown.fieldErrors.deposit_amount?.[0]}
+                />
+                <Select
+                  id={`${formId}-deposit-mode`}
+                  name="deposit_mode"
+                  label="Paid by"
+                  placeholder="Choose a mode"
+                  options={PAYMENT_MODE_OPTIONS}
+                  defaultValue={shown.values?.deposit_mode ?? ""}
+                  error={shown.fieldErrors.deposit_mode?.[0]}
+                />
+              </div>
+            </fieldset>
           </form>
         )}
       </Modal>

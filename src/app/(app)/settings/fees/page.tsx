@@ -9,6 +9,8 @@ import {
   FeeHeadPriceForm,
 } from "@/features/charges/components/FeeHeadForms";
 import { getElectricityRate, getFeeHeads, type FeeHeadPrice } from "@/features/charges/queries";
+import { DepositRatesForm } from "@/features/deposits/components/DepositRatesForm";
+import { depositHint, getDepositRates } from "@/features/deposits/queries";
 import { LateFeeRuleForm } from "@/features/fees/components/LateFeeRuleForm";
 import { RateForm } from "@/features/fees/components/RateForm";
 import { describeLateFeeRule } from "@/features/fees/late-fees";
@@ -30,13 +32,14 @@ const formatDay = (value: string) => day.format(new Date(value));
 export default async function FeeSettingsPage() {
   const { user, hostel } = await requireActiveHostel();
   const supabase = await createClient();
-  const [{ history, summaries }, reminderTemplate, lateFeeRule, heads, electricityRate] =
+  const [{ history, summaries }, reminderTemplate, lateFeeRule, heads, electricityRate, deposits] =
     await Promise.all([
       getRates(supabase, hostel.id),
       getReminderTemplate(supabase, hostel.id),
       getLateFeeRule(supabase, hostel.id),
       getFeeHeads(supabase, hostel.id),
       getElectricityRate(supabase, hostel.id),
+      getDepositRates(supabase, hostel.id),
     ]);
   const priceText = (prices: FeeHeadPrice[]) =>
     prices.length === 0
@@ -209,6 +212,22 @@ export default async function FeeSettingsPage() {
             </div>
           </div>
         )}
+      </section>
+
+      <section
+        id="deposits"
+        aria-labelledby="deposit-rates-heading"
+        className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+      >
+        <h2 id="deposit-rates-heading" className="text-base font-semibold text-slate-900">
+          Security deposit
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-slate-600">
+          {depositHint(deposits)
+            ? `The usual deposit: ${depositHint(deposits)}. It is suggested when a resident is given a bed; the amount can be changed for anyone.`
+            : "Set the usual deposit for each sharing type. It is suggested when a resident is given a bed."}
+        </p>
+        {isOwner && <DepositRatesForm rates={deposits} />}
       </section>
 
       <section

@@ -157,6 +157,7 @@ export function createUserFactory() {
         "data_rights_log",
         "reminder_log",
         "deposit_entries",
+        "resident_credit_entries",
         "payments",
         "allocation_fee_opt_outs",
         "electricity_bills",

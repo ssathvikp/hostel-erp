@@ -8,6 +8,7 @@ import {
   MANUAL_BED_STATUSES,
   DEPOSIT_ENTRY_KINDS,
   PAYMENT_MODES,
+  RENT_PAYMENT_MODES,
   RESIDENT_STATUSES,
   SHARING_TYPES,
   type IdProofType,
@@ -312,6 +313,20 @@ export const allocationSchema = z.object({
   rent_override: optional(rupees("Rent override")),
 });
 
+/**
+ * A security deposit taken when the bed is given (ClickUp E13-T4). Both
+ * fields or neither.
+ */
+export const depositAtAllocationSchema = z
+  .object({
+    deposit_amount: optional(rupees("Deposit")),
+    deposit_mode: optional(z.enum(PAYMENT_MODES, { error: "Choose a payment mode" })),
+  })
+  .refine((input) => input.deposit_amount === null || input.deposit_mode !== null, {
+    error: "Choose how the deposit was paid",
+    path: ["deposit_mode"],
+  });
+
 /** Reasons a user can give for vacating; "transferred" is set by transfers only. */
 export const VACATE_FORM_REASONS = ["moved_out", "evicted", "other"] as const;
 
@@ -389,13 +404,35 @@ export const paymentSchema = z
     invoice_id: uuid("Invoice"),
     amount: rupees("Amount"),
     paid_at: isoDate("Payment date"),
-    mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+    mode: z.enum(RENT_PAYMENT_MODES, { error: "Choose a payment mode" }),
     reference: optional(requiredText("Reference", 100)),
+    cheque_number: optional(requiredText("Cheque number", 20)),
+    cheque_bank: optional(requiredText("Bank", 100)),
   })
   .refine((payment) => payment.paid_at <= todayIst(), {
     error: "Payment date cannot be in the future",
     path: ["paid_at"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.cheque_number !== null, {
+    error: "Enter the cheque number",
+    path: ["cheque_number"],
+  })
+  .refine((payment) => payment.mode !== "cheque" || payment.cheque_bank !== null, {
+    error: "Enter the bank",
+    path: ["cheque_bank"],
   });
+
+/** An advance, or a refund of credit (ClickUp E13-T7). */
+export const creditEntrySchema = z.object({
+  resident_id: uuid("Resident"),
+  kind: z.enum(["advance", "refund"], { error: "Choose advance or refund" }),
+  amount: rupees("Amount"),
+  entry_date: isoDate("Date").refine((value) => value <= todayIst(), {
+    error: "The date cannot be in the future",
+  }),
+  mode: z.enum(PAYMENT_MODES, { error: "Choose a payment mode" }),
+  reference: optional(requiredText("Reference", 100)),
+});
 
 export const LATE_FEE_MODES = ["off", "fixed", "per_day"] as const;
 export type LateFeeMode = (typeof LATE_FEE_MODES)[number];

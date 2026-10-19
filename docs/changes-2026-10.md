@@ -436,3 +436,95 @@ take about 1.6 s every time after it, against a 1.5 s limit.
 
 The beds and stays are now `MATERIALIZED`, so each is read once. The test
 passes again.
+
+### Security deposit per sharing type (ClickUp E13-T4, the missing part)
+
+- **What:** Settings → Fees → Security deposit holds the usual deposit for
+  each sharing type.
+- **At allocation:** the allocate-bed dialog now has an optional "Security
+  deposit received now" amount and mode, with the usual amount as a hint, so
+  the deposit is asked for when the bed is given. The amount can be changed
+  for anyone.
+- **How it is recorded:** a deposit entered there goes into the existing
+  deposit ledger, against the new stay.
+- **Files:** `supabase/migrations/20261023090000_credit_cheques.sql` (`deposit_rates`),
+  `src/features/deposits/*`, `src/features/allocations/actions.ts`,
+  `components/AllocateDialog.tsx`, `src/app/(app)/residents/[id]/page.tsx`,
+  `src/app/(app)/rooms/[id]/page.tsx`.
+
+### Advances and resident credit balance (ClickUp E13-T7)
+
+- **The ledger:** `resident_credit_entries` is append-only. It holds advances
+  (money in), credit applied to invoices, and refunds (money out). Held
+  credit is derived and never goes negative, and entries for one resident
+  are serialised.
+- **Recording payments:** payments now go through `record_payment()`. A
+  payment above what is due records the balance as a payment and the rest as
+  an advance, in one transaction. A cheque cannot overpay, because credit
+  must be money in hand.
+- **Applying credit:**
+  - Credit is applied automatically when an invoice is issued, as a payment
+    of mode "Advance credit" with its own receipt number.
+  - "Use credit on open invoices" applies credit recorded after the invoices
+    were issued.
+  - Voiding a credit payment gives the credit back.
+  - Credit payments cannot be entered by hand.
+- **Permissions:** staff record advances; only owners refund credit or void
+  entries. A used advance cannot be voided, and a refund cannot exceed what
+  is held.
+- **Screens:**
+  - The resident page has an "Advance credit" card.
+  - The dashboard shows the total held.
+  - Erasing waits until credit is refunded or used.
+- **Files:** `src/features/fees/components/CreditForms.tsx`, `ResidentCredit.tsx`,
+  `src/features/fees/actions.ts` (`recordPayment`, `recordCreditEntry`, `voidCreditEntry`,
+  `applyCredit`), `src/features/dashboard/*`.
+
+### Cheque payments with clearance (ClickUp E13-T11)
+
+- **What:** "Cheque" is a payment mode, with cheque number and bank. A cheque
+  is recorded as pending: it does not count as paid until it is marked
+  cleared.
+- **Pending cheques:**
+  - They still count against what may be collected, so nobody collects
+    twice.
+  - The fee list shows "cheque pending", and the record-payment button
+    offers only the rest.
+  - Fees → Cheques lists them by deposit date.
+- **Clearing:** owners and staff mark a cheque cleared, through
+  `clear_cheque()`. Payments otherwise stay owner-only to change.
+- **Bounced cheques:** "Bounced" voids the cheque with a reason, so the rent
+  is due again, and can add a bounce charge that goes on the next invoice.
+- **How "paid" is counted:** only cleared payments count, everywhere money is
+  totalled: the invoice balance, receipts, the dashboard, the late-fee
+  settlement date and the admin figures. Each of those functions was copied
+  from its latest version with only that condition changed.
+- **Files:** `src/app/(app)/fees/cheques/page.tsx`, `src/features/fees/components/ClearChequeButton.tsx`,
+  `VoidDialog.tsx` (cheque variant), `PaymentDialog.tsx`, `receipt.ts`.
+
+### Tests
+
+- `tests/integration/credit-cheques.test.ts` (9 cases), covering:
+  - deposit rates;
+  - overpayment turning into credit;
+  - credit applied on issue, and restored when its payment is voided;
+  - no overpaying by cheque;
+  - refunds and permissions, no credit payments by hand, and used advances
+    that cannot be voided;
+  - the erase guard;
+  - a pending cheque that is not paid yet but blocks collecting again, then
+    counts once cleared (dashboard included);
+  - cheque number required, a bounced cheque voided, and cash that cannot be
+    "cleared".
+- `tests/unit/charges.test.ts`: cheque fields, and a pending cheque left out
+  of receipt totals.
+- `tests/e2e/credit-cheques.spec.ts`.
+- `tests/e2e/fees.spec.ts` changed: it used to check that overpaying was
+  refused, and now checks the advance-credit hint.
+
+### Bug caught by a test
+
+- **`apply_credit` broke the schema rule.** It was created as a `SECURITY
+DEFINER` function in the exposed `public` schema, which the schema-guard
+  test forbids. It now lives in `private` behind an invoker wrapper, like
+  every other function.

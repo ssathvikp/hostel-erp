@@ -12,10 +12,11 @@ import { VACATE_REASON_LABELS } from "@/features/allocations/options";
 import { DataRights } from "@/features/data-rights/components/DataRights";
 import { DepositDialog } from "@/features/deposits/components/DepositDialog";
 import { DepositLedger } from "@/features/deposits/components/DepositLedger";
-import { getResidentDeposit } from "@/features/deposits/queries";
+import { depositHint, getDepositRates, getResidentDeposit } from "@/features/deposits/queries";
 import { getAllocationEvents, getVacantBeds } from "@/features/allocations/queries";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { ResidentCharges } from "@/features/charges/components/ResidentCharges";
+import { ResidentCredit } from "@/features/fees/components/ResidentCredit";
 import { BalanceSentence, ResidentFees } from "@/features/fees/components/ResidentFees";
 import { invoiceLabel } from "@/features/fees/options";
 import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
@@ -96,6 +97,7 @@ export default async function ResidentPage({
     balance,
     invoices,
     deposit,
+    depositRates,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -111,6 +113,7 @@ export default async function ResidentPage({
     getResidentBalance(supabase, hostel.id, id),
     getResidentInvoices(supabase, hostel.id, id),
     getResidentDeposit(supabase, hostel.id, id),
+    getDepositRates(supabase, hostel.id),
   ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
@@ -128,15 +131,20 @@ export default async function ResidentPage({
   const allocatable = status === "active" || status === "notice";
   // Oldest first, so the payment dialog preselects the longest-owed month.
   const payable = invoices
-    .filter((invoice) => invoice.balance > 0)
+    .filter((invoice) => invoice.balance - invoice.pendingCheques > 0)
     .reverse()
     .map((invoice) => ({
       id: invoice.id,
       label: invoiceLabel(invoice),
-      balance: invoice.balance,
+      balance: invoice.balance - invoice.pendingCheques,
     }));
 
   const erased = resident.erased_at !== null;
+  const { data: creditHeld } = await supabase
+    .from("credit_balances")
+    .select("held")
+    .eq("resident_id", id)
+    .maybeSingle();
   const { count: pendingCharges } = await supabase
     .from("resident_charges")
     .select("id", { count: "exact", head: true })
@@ -150,6 +158,7 @@ export default async function ResidentPage({
     balance.outstanding > 0 && "Settle what they owe first.",
     deposit.balance.held > 0 && "Refund or deduct the security deposit first.",
     (pendingCharges ?? 0) > 0 && "Bill or void their pending charges first.",
+    (creditHeld?.held ?? 0) > 0 && "Refund or use their advance credit first.",
   ].filter((blocker): blocker is string => typeof blocker === "string");
 
   return (
@@ -226,6 +235,7 @@ export default async function ResidentPage({
               ) : allocatable ? (
                 <AllocateDialog
                   title={`Allocate a bed to ${resident.full_name}`}
+                  depositHint={depositHint(depositRates)}
                   fixed={{ name: "resident_id", value: resident.id }}
                   choice={{
                     name: "bed_id",
@@ -368,6 +378,17 @@ export default async function ResidentPage({
 
       <Card title="Fees" id="fees-heading">
         <ResidentFees balance={balance} invoices={invoices} />
+      </Card>
+
+      <Card title="Advance credit" id="credit-heading">
+        <ResidentCredit
+          residentId={resident.id}
+          residentName={resident.full_name}
+          hostelId={hostel.id}
+          isOwner={user.role === "owner"}
+          editable={!erased}
+          hasOpenInvoices={payable.length > 0}
+        />
       </Card>
 
       <Card title="Charges and discounts" id="charges-heading">

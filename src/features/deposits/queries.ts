@@ -2,8 +2,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { SHARING_TYPE_LABELS } from "@/features/rooms/options";
+import { formatPaise } from "@/lib/money";
 import type { Database } from "@/types/database";
-import type { DepositEntryKind, PaymentMode } from "@/types";
+import { SHARING_TYPES, type DepositEntryKind, type PaymentMode, type SharingType } from "@/types";
 
 import { isDepositKind } from "./options";
 
@@ -77,4 +79,28 @@ export async function getResidentDeposit(
         voidReason: row.void_reason,
       })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Usual deposit per sharing type (ClickUp E13-T4)
+// ---------------------------------------------------------------------------
+
+export async function getDepositRates(
+  supabase: SupabaseClient<Database>,
+  hostelId: string,
+): Promise<Partial<Record<SharingType, number>>> {
+  const { data, error } = await supabase
+    .from("deposit_rates")
+    .select("sharing_type, amount")
+    .eq("hostel_id", hostelId);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((row) => [row.sharing_type, row.amount]));
+}
+
+/** "₹10,000 for double, ₹8,000 for single", for the allocate dialog. */
+export function depositHint(rates: Partial<Record<SharingType, number>>): string | undefined {
+  const parts = SHARING_TYPES.filter((type) => rates[type]).map(
+    (type) => `${formatPaise(rates[type]!)} for ${SHARING_TYPE_LABELS[type].toLowerCase()}`,
+  );
+  return parts.length ? parts.join(", ") : undefined;
 }

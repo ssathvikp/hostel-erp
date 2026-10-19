@@ -7,6 +7,7 @@ import { Alert, Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/co
 import { AllocateDialog } from "@/features/allocations/components/AllocateDialog";
 import { AllocationHistory } from "@/features/allocations/components/AllocationHistory";
 import { getAllocationEvents, getUnallocatedResidents } from "@/features/allocations/queries";
+import { getDepositRates } from "@/features/deposits/queries";
 import { BedStatusControl } from "@/features/rooms/components/BedStatusControl";
 import { RoomDangerZone } from "@/features/rooms/components/RoomDangerZone";
 import {
@@ -16,6 +17,7 @@ import {
   SHARING_TYPE_LABELS,
 } from "@/features/rooms/options";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 import type { BedStatus, ManualBedStatus, SharingType, ViewRow } from "@/types";
@@ -59,6 +61,7 @@ export default async function RoomPage({
     { data: occupants, error: occupantsError },
     residents,
     events,
+    depositRates,
   ] = await Promise.all([
     supabase
       .from("rooms")
@@ -79,6 +82,7 @@ export default async function RoomPage({
       .eq("hostel_id", hostel.id),
     getUnallocatedResidents(supabase, hostel.id),
     getAllocationEvents(supabase, hostel.id, { roomId: id }),
+    getDepositRates(supabase, hostel.id),
   ]);
   if (error) throw error;
   if (bedsError) throw bedsError;
@@ -90,6 +94,7 @@ export default async function RoomPage({
   const rows = (beds ?? []) as BedRow[];
   const occupantByBed = new Map((occupants ?? []).map((o) => [o.bed_label, o]));
   const residentOptions = residents.map((r) => ({ value: r.id, label: r.label }));
+  const usualDeposit = depositRates[room.sharing_type as SharingType];
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -178,6 +183,7 @@ export default async function RoomPage({
                       {bed.status === "available" && (
                         <AllocateDialog
                           title={`Allocate bed ${bed.bed_label}`}
+                          depositHint={usualDeposit ? formatPaise(usualDeposit) : undefined}
                           fixed={{ name: "bed_id", value: bed.id }}
                           choice={{
                             name: "resident_id",

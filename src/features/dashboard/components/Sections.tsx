@@ -5,6 +5,7 @@ import { formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 
 import {
+  getCreditHeld,
   getDashboardMoney,
   getDepositsHeld,
   getOccupancyTrend,
@@ -70,11 +71,12 @@ export async function KpiSection({
   canAddRooms: boolean;
 }) {
   const supabase = await createClient();
-  const [occupancy, money, deposits, vacancy] = await Promise.all([
+  const [occupancy, money, deposits, vacancy, credit] = await Promise.all([
     getHostelOccupancy(supabase, hostelId),
     getDashboardMoney(supabase, hostelId, range),
     getDepositsHeld(supabase, hostelId),
     getVacancyCost(supabase, hostelId),
+    getCreditHeld(supabase, hostelId),
   ]);
   const period = `${formatDay(range.from)} – ${formatDay(range.to)}`;
 
@@ -157,6 +159,14 @@ export async function KpiSection({
             <span className="font-medium text-slate-900">{formatPaise(deposits.held)}</span> from{" "}
             {deposits.residents} {deposits.residents === 1 ? "resident" : "residents"}. This money
             is owed back unless deducted when they leave.
+          </p>
+        )}
+        {credit.held > 0 && (
+          <p className="mt-1 text-sm text-slate-600">
+            Advance credit held:{" "}
+            <span className="font-medium text-slate-900">{formatPaise(credit.held)}</span> from{" "}
+            {credit.residents} {credit.residents === 1 ? "resident" : "residents"}. It is used on
+            their next invoices.
           </p>
         )}
       </section>

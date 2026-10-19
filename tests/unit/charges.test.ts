@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { discountSchema, feeHeadPriceSchema, meterReadingSchema } from "@/lib/validation";
+import { receiptTotals } from "@/features/fees/receipt";
+import {
+  discountSchema,
+  feeHeadPriceSchema,
+  meterReadingSchema,
+  paymentSchema,
+} from "@/lib/validation";
 
 const RESIDENT = "00000000-0000-4000-8000-000000000001";
 
@@ -49,5 +55,46 @@ describe("meterReadingSchema", () => {
     expect(meterReadingSchema.parse({ ...row, reading: "1234.5" }).reading).toBe(1234.5);
     expect(meterReadingSchema.safeParse({ ...row, reading: "12.25" }).success).toBe(false);
     expect(meterReadingSchema.safeParse({ ...row, reading: "-1" }).success).toBe(false);
+  });
+});
+
+describe("paymentSchema with cheques", () => {
+  const base = {
+    invoice_id: RESIDENT,
+    amount: "5000",
+    paid_at: "2026-01-05",
+    mode: "cheque",
+    reference: "",
+  };
+  it("needs a cheque number and bank for a cheque only", () => {
+    expect(paymentSchema.safeParse(base).success).toBe(false);
+    expect(
+      paymentSchema.parse({ ...base, cheque_number: "001122", cheque_bank: "SBI" }),
+    ).toMatchObject({ cheque_number: "001122", cheque_bank: "SBI" });
+    expect(paymentSchema.parse({ ...base, mode: "upi" }).cheque_number).toBeNull();
+  });
+});
+
+describe("receiptTotals with a pending cheque", () => {
+  it("does not count an uncleared cheque as paid", () => {
+    const payments = [
+      {
+        id: "a",
+        amount: 3000,
+        paidAt: "2026-01-02",
+        recordedAt: "1",
+        voidedAt: null,
+        clearedAt: "x",
+      },
+      {
+        id: "b",
+        amount: 2000,
+        paidAt: "2026-01-03",
+        recordedAt: "2",
+        voidedAt: null,
+        clearedAt: null,
+      },
+    ];
+    expect(receiptTotals(8000, payments, "b")).toEqual({ paidToDate: 3000, balance: 5000 });
   });
 });

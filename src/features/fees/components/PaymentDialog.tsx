@@ -10,20 +10,21 @@ import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
 import { recordPayment } from "../actions";
-import { PAYMENT_MODE_OPTIONS } from "../options";
+import { RENT_PAYMENT_MODE_OPTIONS } from "../options";
 
 export interface PayableInvoice {
   id: string;
   /** e.g. "October 2026". */
   label: string;
-  /** Still due, in paise. */
+  /** Still to collect, in paise: the balance less any cheque awaiting clearance. */
   balance: number;
 }
 
 /**
  * Records money received against an invoice (E7-T4). Partial payments are
- * normal; the amount defaults to what is still due and the database refuses
- * anything above it.
+ * normal; the amount defaults to what is still due. Anything above it is
+ * kept as the resident's advance credit (ClickUp E13-T7); a cheque is
+ * recorded as pending until it clears (E13-T11).
  */
 export function PaymentDialog({
   residentName,
@@ -43,6 +44,7 @@ export function PaymentDialog({
   const [state, action, pending] = useActionState(recordPayment, initialFormState);
   const { shown, formKey } = useDialogState(state, open);
   const [invoiceId, setInvoiceId] = useState(invoices[0]?.id ?? "");
+  const [mode, setMode] = useState("");
   const today = todayIst();
   const formId = `payment-${invoices[0]?.id ?? "none"}`;
   const selected = invoices.find((invoice) => invoice.id === invoiceId) ?? invoices[0];
@@ -123,7 +125,11 @@ export function PaymentDialog({
               paiseToInput(selected.balance)
             }
             required
-            hint={`Up to ${formatPaise(selected.balance)}.`}
+            hint={
+              mode === "cheque"
+                ? `Up to ${formatPaise(selected.balance)}.`
+                : `${formatPaise(selected.balance)} is due. Anything more is kept as advance credit.`
+            }
             error={shown.fieldErrors.amount?.[0]}
           />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -142,12 +148,36 @@ export function PaymentDialog({
               name="mode"
               label="Mode"
               placeholder="Choose a mode"
-              options={PAYMENT_MODE_OPTIONS}
-              defaultValue={shown.values?.mode ?? ""}
+              options={RENT_PAYMENT_MODE_OPTIONS}
+              value={mode || shown.values?.mode || ""}
+              onChange={(event) => setMode(event.target.value)}
               required
               error={shown.fieldErrors.mode?.[0]}
             />
           </div>
+          {(mode || shown.values?.mode) === "cheque" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                id={`${formId}-cheque-number`}
+                name="cheque_number"
+                label="Cheque number"
+                inputMode="numeric"
+                maxLength={20}
+                required
+                defaultValue={shown.values?.cheque_number ?? ""}
+                error={shown.fieldErrors.cheque_number?.[0]}
+              />
+              <Input
+                id={`${formId}-cheque-bank`}
+                name="cheque_bank"
+                label="Bank"
+                maxLength={100}
+                required
+                defaultValue={shown.values?.cheque_bank ?? ""}
+                error={shown.fieldErrors.cheque_bank?.[0]}
+              />
+            </div>
+          )}
           <Input
             id={`${formId}-reference`}
             name="reference"

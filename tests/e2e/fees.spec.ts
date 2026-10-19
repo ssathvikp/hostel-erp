@@ -125,11 +125,12 @@ test("an owner sets a rate, bills a month, collects it in parts and prints proof
 
   await row.getByRole("button", { name: "Record payment for Priya Menon" }).click();
   dialog = page.getByRole("dialog", { name: "Record a payment from Priya Menon" });
-  await dialog.getByLabel(/^Amount/).fill("6000");
-  await dialog.getByLabel(/^Mode/).selectOption("cash");
-  await dialog.getByRole("button", { name: "Record payment" }).click();
-  await expect(dialog.getByText("Only ₹5,000 is still due on this invoice.")).toBeVisible();
+  // Paying more than is due keeps the extra as advance credit (ClickUp E13-T7).
+  await expect(
+    dialog.getByText("₹5,000 is due. Anything more is kept as advance credit."),
+  ).toBeVisible();
   await dialog.getByLabel(/^Amount/).fill("5000");
+  await dialog.getByLabel(/^Mode/).selectOption("cash");
   await dialog.getByRole("button", { name: "Record payment" }).click();
   await expect(dialog).toBeHidden();
   await expect(row.getByText("Paid", { exact: true })).toBeVisible();

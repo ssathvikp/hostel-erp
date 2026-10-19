@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Badge, buttonClass, Table, TBody, Td, Th, THead, Tr } from "@/components/ui";
+import { ClearChequeButton } from "@/features/fees/components/ClearChequeButton";
 import { PaymentDialog } from "@/features/fees/components/PaymentDialog";
 import { VoidDialog } from "@/features/fees/components/VoidDialog";
 import { explainLateFee, isLateFeeLine } from "@/features/fees/late-fees";
@@ -89,10 +90,16 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 >
                   Print invoice
                 </Link>
-                {invoice.balance > 0 && (
+                {invoice.balance - invoice.pendingCheques > 0 && (
                   <PaymentDialog
                     residentName={invoice.residentName}
-                    invoices={[{ id: invoice.id, label: month, balance: invoice.balance }]}
+                    invoices={[
+                      {
+                        id: invoice.id,
+                        label: month,
+                        balance: invoice.balance - invoice.pendingCheques,
+                      },
+                    ]}
                   />
                 )}
               </>
@@ -212,7 +219,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 <Tr key={payment.id} className={payment.voidedAt ? "text-slate-400" : undefined}>
                   <Td>{formatDay(payment.paidAt)}</Td>
                   <Td className="font-mono text-xs">{payment.receiptNumber}</Td>
-                  <Td>{PAYMENT_MODE_LABELS[payment.mode]}</Td>
+                  <Td>
+                    {PAYMENT_MODE_LABELS[payment.mode]}
+                    {payment.chequeNumber && (
+                      <span className="block text-xs text-slate-500">
+                        No. {payment.chequeNumber}, {payment.chequeBank}
+                      </span>
+                    )}
+                    {!payment.voidedAt && payment.mode === "cheque" && !payment.clearedAt && (
+                      <span className="block">
+                        <Badge tone="warning">Awaiting clearance</Badge>
+                      </span>
+                    )}
+                  </Td>
                   <Td>{payment.reference ?? "—"}</Td>
                   <Td className="text-right tabular-nums">
                     {payment.voidedAt ? (
@@ -234,6 +253,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         >
                           Receipt
                         </Link>
+                        {payment.mode === "cheque" && !payment.clearedAt && (
+                          <ClearChequeButton
+                            id={payment.id}
+                            subject={`cheque ${payment.chequeNumber ?? ""}`}
+                          />
+                        )}
                         <SendButtons
                           message={receipts.get(payment.id)!}
                           link={whatsAppLink(invoice.residentPhone, receipts.get(payment.id)!)}
@@ -248,7 +273,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         />
                         {isOwner && (
                           <VoidDialog
-                            kind="payment"
+                            kind={
+                              payment.mode === "cheque" && !payment.clearedAt ? "cheque" : "payment"
+                            }
                             id={payment.id}
                             subject={`payment of ${formatPaise(payment.amount)} on ${formatDay(payment.paidAt)}`}
                           />

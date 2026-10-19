@@ -145,8 +145,12 @@ export type InvoiceKind = (typeof INVOICE_KINDS)[number];
 export const INVOICE_DUE_STATUSES = ["unpaid", "partial", "paid", "overdue"] as const;
 export type InvoiceDueStatus = (typeof INVOICE_DUE_STATUSES)[number];
 
+/** Money in hand: how deposits and advances are paid. */
 export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
-export type PaymentMode = (typeof PAYMENT_MODES)[number];
+/** How rent may be paid: money in hand, or a cheque that clears later (ClickUp E13-T11). */
+export const RENT_PAYMENT_MODES = [...PAYMENT_MODES, "cheque"] as const;
+/** Every mode a payment row can show; "credit" is advance credit the app applied (E13-T7). */
+export type PaymentMode = (typeof RENT_PAYMENT_MODES)[number] | "credit";
 
 /** Security deposit ledger entries (EP-12). */
 export const DEPOSIT_ENTRY_KINDS = ["collected", "deduction", "refund"] as const;

@@ -6,13 +6,16 @@ import { revalidatePath } from "next/cache";
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
 import { formHostel } from "@/lib/hostels/form";
+import { formatPaise } from "@/lib/money";
 import { unexpectedFailure } from "@/lib/request-context";
 import { createClient } from "@/lib/supabase/server";
 import {
   allocationSchema,
+  depositAtAllocationSchema,
   formFailure,
   formSuccess,
   formValues,
+  todayIst,
   transferSchema,
   uuid,
   vacateSchema,
@@ -20,7 +23,14 @@ import {
   type FormState,
 } from "@/lib/validation";
 
-const ALLOCATE_FIELDS = ["resident_id", "bed_id", "start_date", "rent_override"] as const;
+const ALLOCATE_FIELDS = [
+  "resident_id",
+  "bed_id",
+  "start_date",
+  "rent_override",
+  "deposit_amount",
+  "deposit_mode",
+] as const;
 const VACATE_FIELDS = ["move_out_date", "vacate_reason", "mark_vacated"] as const;
 const TRANSFER_FIELDS = ["bed_id", "move_date", "rent_override"] as const;
 
@@ -92,12 +102,18 @@ export async function allocateBed(_previous: FormState, formData: FormData): Pro
   }
 
   const parsed = validateFormData(allocationSchema, formData);
-  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const deposit = validateFormData(depositAtAllocationSchema, formData);
+  if (!parsed.ok || !deposit.ok) {
+    return formFailure(undefined, values, {
+      ...(parsed.ok ? {} : parsed.fieldErrors),
+      ...(deposit.ok ? {} : deposit.fieldErrors),
+    });
+  }
   const hostel = await formHostel(formData);
   if ("error" in hostel) return formFailure(hostel.error, values);
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("allocate_bed", {
+  const { data: allocationId, error } = await supabase.rpc("allocate_bed", {
     p_resident_id: parsed.data.resident_id,
     p_bed_id: parsed.data.bed_id,
     p_start_date: parsed.data.start_date,
@@ -106,6 +122,27 @@ export async function allocateBed(_previous: FormState, formData: FormData): Pro
   if (error) return failure("allocateBed", error, values);
 
   revalidateOccupancy(parsed.data.resident_id);
+  if (deposit.data.deposit_amount && deposit.data.deposit_mode) {
+    // The money changed hands today; the bed is already given either way.
+    const { error: depositError } = await supabase.from("deposit_entries").insert({
+      hostel_id: hostel.id,
+      resident_id: parsed.data.resident_id,
+      allocation_id: allocationId,
+      kind: "collected",
+      amount: deposit.data.deposit_amount,
+      entry_date: todayIst(),
+      mode: deposit.data.deposit_mode,
+    });
+    if (depositError) {
+      return formSuccess(
+        "Bed allocated.",
+        "The security deposit could not be recorded. Record it under Security deposit.",
+      );
+    }
+    return formSuccess(
+      `Bed allocated and a security deposit of ${formatPaise(deposit.data.deposit_amount)} recorded.`,
+    );
+  }
   return formSuccess("Bed allocated.");
 }
 

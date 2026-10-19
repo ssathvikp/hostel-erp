@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AllocationEventAction } from "@/features/allocations/options";
+import { fetchAll } from "@/lib/pagination";
 import type { createClient } from "@/lib/supabase/server";
 import type { PaymentMode } from "@/types";
 
@@ -64,6 +65,27 @@ export async function getDepositsHeld(supabase: Supabase, hostelId: string): Pro
   if (error) throw error;
   const row = (data ?? {}) as Partial<DepositsHeld>;
   return { held: row.held ?? 0, residents: row.residents ?? 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Advance credit held (ClickUp E13-T7)
+// ---------------------------------------------------------------------------
+
+/** Paise held as residents' advance credit, and how many residents hold some. */
+export async function getCreditHeld(supabase: Supabase, hostelId: string) {
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from("credit_balances")
+      .select("resident_id, held")
+      .eq("hostel_id", hostelId)
+      .gt("held", 0)
+      .order("resident_id")
+      .range(from, to),
+  );
+  return {
+    held: rows.reduce((sum, row) => sum + (row.held ?? 0), 0),
+    residents: rows.length,
+  };
 }
 
 // ---------------------------------------------------------------------------

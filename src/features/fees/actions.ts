@@ -2,6 +2,7 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { AuthorizationError } from "@/lib/auth/roles";
 import { requireRole } from "@/lib/auth/session";
@@ -14,9 +15,13 @@ import {
   formFailure,
   formSuccess,
   formValues,
+  creditEntrySchema,
   generateInvoicesSchema,
   lateFeeRuleSchema,
+  optional,
   paymentSchema,
+  rupees,
+  todayIst,
   voidSchema,
   validateFormData,
   type FormState,
@@ -27,7 +32,15 @@ const FOREIGN_KEY_VIOLATION = "23503";
 
 const RATE_FIELDS = ["sharing_type", "monthly_amount", "effective_from"] as const;
 const GENERATE_FIELDS = ["period_month", "due_day"] as const;
-const PAYMENT_FIELDS = ["invoice_id", "amount", "paid_at", "mode", "reference"] as const;
+const PAYMENT_FIELDS = [
+  "invoice_id",
+  "amount",
+  "paid_at",
+  "mode",
+  "reference",
+  "cheque_number",
+  "cheque_bank",
+] as const;
 const VOID_FIELDS = ["id", "void_reason"] as const;
 const LATE_FEE_FIELDS = [
   "late_fee_mode",
@@ -59,6 +72,7 @@ const RULE_MESSAGES: Record<string, string> = {
   payment_future: "The payment date cannot be in the future.",
   payment_void: "This payment is already void. Refresh the page.",
   payment_immutable: "Payments cannot be edited. Void it and record it again.",
+  credit_payment_manual: "Advance credit is applied by the app, not recorded by hand.",
 };
 
 const SELF_EXPLAINING_HINTS = new Set(["overpayment", "fee_structure_later_exists"]);
@@ -240,40 +254,65 @@ export async function recordPayment(_previous: FormState, formData: FormData): P
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
   const hostel = await formHostel(formData);
   if ("error" in hostel) return formFailure(hostel.error, values);
-  const hostelId = hostel.id;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("payments").insert({ hostel_id: hostelId, ...parsed.data });
+  // Anything above what is due becomes advance credit (ClickUp E13-T7).
+  const { data, error } = await supabase.rpc("record_payment", {
+    p_invoice_id: parsed.data.invoice_id,
+    p_amount: parsed.data.amount,
+    p_paid_at: parsed.data.paid_at,
+    p_mode: parsed.data.mode,
+    p_reference: parsed.data.reference ?? undefined,
+    p_cheque_number: parsed.data.cheque_number ?? undefined,
+    p_cheque_bank: parsed.data.cheque_bank ?? undefined,
+  });
   if (error) {
     // The invoice belongs to another of the owner's hostels.
-    if (error.code === FOREIGN_KEY_VIOLATION) {
+    if (error.code === FOREIGN_KEY_VIOLATION || error.hint === "invoice_not_found") {
       return formFailure(RULE_MESSAGES.invoice_not_found, values);
     }
     if (error.hint === "overpayment") {
-      const { data } = await supabase
-        .from("invoice_balances")
-        .select("balance")
-        .eq("id", parsed.data.invoice_id)
-        .maybeSingle();
-      if (data?.balance != null) {
-        return formFailure(undefined, values, {
-          amount: [
-            data.balance > 0
-              ? `Only ${formatPaise(data.balance)} is still due on this invoice.`
-              : "This invoice is already paid in full.",
-          ],
-        });
-      }
+      return formFailure(undefined, values, { amount: [`${error.message}.`] });
     }
     return failure("recordPayment", error, values);
   }
 
+  const result = data as unknown as { paid: number; credit: number };
   revalidateFees();
-  return formSuccess(`Payment of ${formatPaise(parsed.data.amount)} recorded.`);
+  if (parsed.data.mode === "cheque") {
+    return formSuccess(
+      `Cheque for ${formatPaise(result.paid)} recorded as pending. Mark it cleared once the bank credits it.`,
+    );
+  }
+  return formSuccess(
+    result.credit > 0
+      ? `Payment of ${formatPaise(result.paid)} recorded. The extra ${formatPaise(result.credit)} is kept as advance credit.`
+      : `Payment of ${formatPaise(result.paid)} recorded.`,
+  );
+}
+
+/** Marks a pending cheque cleared: from now it counts as paid (ClickUp E13-T11). */
+export async function clearCheque(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("clear_cheque", { p_payment_id: id });
+  if (error) {
+    if (error.hint === "payment_not_found") {
+      return formFailure("This payment could not be found. Refresh the page.");
+    }
+    return failure("clearCheque", error);
+  }
+  revalidateFees();
+  return formSuccess("Cheque marked cleared.");
 }
 
 export async function voidPayment(_previous: FormState, formData: FormData): Promise<FormState> {
-  const values = formValues(formData, VOID_FIELDS);
+  const values = formValues(formData, [...VOID_FIELDS, "bounce_charge"]);
   try {
     await requireRole(["owner"]);
   } catch (error) {
@@ -282,6 +321,12 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
 
   const parsed = validateFormData(voidSchema, formData);
   if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  // A bounced cheque may carry a charge (ClickUp E13-T11).
+  const bounce = validateFormData(
+    z.object({ bounce_charge: optional(rupees("Bounce charge", { max: 10_000 })) }),
+    formData,
+  );
+  if (!bounce.ok) return formFailure(undefined, values, bounce.fieldErrors);
   const hostel = await formHostel(formData);
   if ("error" in hostel) return formFailure(hostel.error, values);
   const hostelId = hostel.id;
@@ -292,13 +337,35 @@ export async function voidPayment(_previous: FormState, formData: FormData): Pro
     .update({ void_reason: parsed.data.void_reason })
     .eq("id", parsed.data.id)
     .eq("hostel_id", hostelId)
-    .select("id");
+    .select("id, mode, cheque_number, invoices!payments_invoice_fkey(resident_id)");
   if (error) return failure("voidPayment", error, values);
   if (!data?.length)
     return formFailure("This payment could not be found. Refresh the page.", values);
 
+  const payment = data[0];
+  if (bounce.data.bounce_charge && payment.mode === "cheque" && payment.invoices) {
+    const { error: chargeError } = await supabase.from("resident_charges").insert({
+      hostel_id: hostelId,
+      resident_id: payment.invoices.resident_id,
+      description: `Cheque bounce charge (cheque ${payment.cheque_number})`,
+      amount: bounce.data.bounce_charge,
+      charge_date: todayIst(),
+    });
+    if (chargeError) {
+      revalidateFees();
+      return formSuccess(
+        "Cheque voided.",
+        "The bounce charge could not be added. Add it under the resident's charges.",
+      );
+    }
+  }
+
   revalidateFees();
-  return formSuccess("Payment voided. It no longer counts towards any total.");
+  return formSuccess(
+    payment.mode === "cheque"
+      ? `Cheque voided; the rent is due again.${bounce.data.bounce_charge ? ` A bounce charge of ${formatPaise(bounce.data.bounce_charge)} goes on the next invoice.` : ""}`
+      : "Payment voided. It no longer counts towards any total.",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -376,4 +443,110 @@ export async function applyLateFees(_previous: FormState, formData: FormData): P
 
   revalidateFees();
   return formSuccess(parts.join(" "));
+}
+
+// ---------------------------------------------------------------------------
+// Advance credit (ClickUp E13-T7)
+// ---------------------------------------------------------------------------
+
+const CREDIT_MESSAGES: Record<string, string> = {
+  credit_insufficient: "Not that much credit is held. Refresh the page.",
+  credit_used: "This advance has already been used on an invoice and cannot be voided.",
+  credit_void: "This entry is already void. Refresh the page.",
+  credit_applied_void: "Void the advance-credit payment on its invoice instead.",
+  resident_erased: "This resident's details were erased.",
+};
+
+/** An advance received (members), or a refund of credit (owners). */
+export async function recordCreditEntry(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, [
+    "resident_id",
+    "kind",
+    "amount",
+    "entry_date",
+    "mode",
+    "reference",
+  ]);
+  const kind = values.kind === "refund" ? "refund" : "advance";
+  try {
+    await requireRole(kind === "refund" ? ["owner"] : ["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(creditEntrySchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("resident_credit_entries").insert({
+    hostel_id: hostel.id,
+    resident_id: parsed.data.resident_id,
+    kind: parsed.data.kind,
+    amount: parsed.data.amount,
+    entry_date: parsed.data.entry_date,
+    mode: parsed.data.mode,
+    reference: parsed.data.reference,
+  });
+  if (error) {
+    const message = error.hint ? CREDIT_MESSAGES[error.hint] : undefined;
+    return message ? formFailure(message, values) : failure("recordCreditEntry", error, values);
+  }
+  revalidateFees();
+  return formSuccess(
+    parsed.data.kind === "refund"
+      ? `Refund of ${formatPaise(parsed.data.amount)} recorded.`
+      : `Advance of ${formatPaise(parsed.data.amount)} recorded. It is used on the next invoice.`,
+  );
+}
+
+export async function voidCreditEntry(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const values = formValues(formData, VOID_FIELDS);
+  try {
+    await requireRole(["owner"]);
+  } catch (error) {
+    return authorizationFailure(error, values);
+  }
+  const parsed = validateFormData(voidSchema, formData);
+  if (!parsed.ok) return formFailure(undefined, values, parsed.fieldErrors);
+  const hostel = await formHostel(formData);
+  if ("error" in hostel) return formFailure(hostel.error, values);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("resident_credit_entries")
+    .update({ void_reason: parsed.data.void_reason })
+    .eq("id", parsed.data.id)
+    .eq("hostel_id", hostel.id)
+    .select("id");
+  if (error) {
+    const message = error.hint ? CREDIT_MESSAGES[error.hint] : undefined;
+    return message ? formFailure(message, values) : failure("voidCreditEntry", error, values);
+  }
+  if (!data?.length) return formFailure("This entry could not be found. Refresh the page.", values);
+  revalidateFees();
+  return formSuccess("Entry voided.");
+}
+
+/** Uses held credit on the resident's open invoices, oldest first. */
+export async function applyCredit(_previous: FormState, formData: FormData): Promise<FormState> {
+  try {
+    await requireRole(["owner", "staff"]);
+  } catch (error) {
+    return authorizationFailure(error);
+  }
+  const residentId = String(formData.get("resident_id") ?? "");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("apply_credit", { p_resident_id: residentId });
+  if (error) return failure("applyCredit", error);
+  revalidateFees();
+  return data && data > 0
+    ? formSuccess(`${formatPaise(data)} of credit used on open invoices.`)
+    : formSuccess("Nothing was due, so no credit was used.");
 }

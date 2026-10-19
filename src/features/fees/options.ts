@@ -3,6 +3,7 @@ import { formatMonth } from "@/lib/money";
 import {
   INVOICE_DUE_STATUSES,
   PAYMENT_MODES,
+  RENT_PAYMENT_MODES,
   type InvoiceDueStatus,
   type InvoiceKind,
   type PaymentMode,
@@ -45,12 +46,20 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   upi: "UPI",
   bank_transfer: "Bank transfer",
   card: "Card",
+  cheque: "Cheque",
+  credit: "Advance credit",
 };
 
+/** Money-in-hand modes, for deposits and advances. */
 export const PAYMENT_MODE_OPTIONS: readonly SelectOption[] = PAYMENT_MODES.map((mode) => ({
   value: mode,
   label: PAYMENT_MODE_LABELS[mode],
 }));
+
+/** Modes for paying an invoice, cheque included. */
+export const RENT_PAYMENT_MODE_OPTIONS: readonly SelectOption[] = RENT_PAYMENT_MODES.map(
+  (mode) => ({ value: mode, label: PAYMENT_MODE_LABELS[mode] }),
+);
 
 /**
  * How an invoice is named everywhere: its month, and "late fee" for a late

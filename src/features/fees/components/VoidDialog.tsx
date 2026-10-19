@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 
 import { HostelField } from "@/components/shell/ActiveHostel";
-import { Alert, Button, Modal, Textarea } from "@/components/ui";
+import { Alert, Button, Input, Modal, Textarea } from "@/components/ui";
 import { useDialogState } from "@/lib/hooks/useDialogState";
 import { initialFormState } from "@/lib/validation/result";
 
@@ -35,6 +35,14 @@ const COPY = {
       "Use this for a payment recorded by mistake or one that bounced. It stays on record, marked void, and no longer counts towards any total.",
     confirm: "Void payment",
     button: "Void",
+  },
+  cheque: {
+    action: voidPayment,
+    title: "This cheque bounced",
+    description:
+      "The cheque is voided and stops counting as received; the rent is due again. You can add a bounce charge, which goes on the resident's next invoice.",
+    confirm: "Void cheque",
+    button: "Bounced",
   },
   deposit: {
     action: voidDepositEntry,
@@ -117,6 +125,17 @@ export function VoidDialog({
             required
             error={shown.fieldErrors.void_reason?.[0]}
           />
+          {kind === "cheque" && (
+            <Input
+              id={`${formId}-bounce`}
+              name="bounce_charge"
+              label="Bounce charge (₹)"
+              inputMode="decimal"
+              hint="Optional. Leave blank for none."
+              defaultValue={shown.values?.bounce_charge ?? ""}
+              error={shown.fieldErrors.bounce_charge?.[0]}
+            />
+          )}
         </form>
       </Modal>
     </>

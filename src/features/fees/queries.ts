@@ -155,10 +155,12 @@ export interface InvoiceRow {
   lateFeeFor: string | null;
   /** INV/26-27/00001: per hostel, per financial year (ClickUp E13-T9). */
   invoiceNumber: string;
+  /** Cheques received but not cleared: not paid yet, not to be collected again. */
+  pendingCheques: number;
 }
 
 const INVOICE_COLUMNS =
-  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, kind, late_fee_for, invoice_number";
+  "id, resident_id, resident_name, resident_phone, resident_email, room_id, room_number, bed_label, period_month, amount, paid, balance, due_date, status, due_status, void_reason, kind, late_fee_for, invoice_number, pending_cheques";
 
 type InvoiceBalanceRow = {
   id: string | null;
@@ -180,6 +182,7 @@ type InvoiceBalanceRow = {
   kind: string | null;
   late_fee_for: string | null;
   invoice_number: string | null;
+  pending_cheques: number | null;
 };
 
 function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
@@ -203,6 +206,7 @@ function toInvoiceRow(row: InvoiceBalanceRow): InvoiceRow {
     kind: (["late_fee", "charges"].includes(row.kind ?? "") ? row.kind : "rent") as InvoiceKind,
     lateFeeFor: row.late_fee_for,
     invoiceNumber: row.invoice_number ?? "",
+    pendingCheques: row.pending_cheques ?? 0,
   };
 }
 
@@ -335,6 +339,10 @@ export interface PaymentRow {
   voidReason: string | null;
   /** RCT/26-27/00001: per hostel, per financial year (ClickUp E13-T9). */
   receiptNumber: string;
+  chequeNumber: string | null;
+  chequeBank: string | null;
+  /** Null for a cheque that has not cleared yet. */
+  clearedAt: string | null;
 }
 
 export async function getInvoice(supabase: Supabase, hostelId: string, invoiceId: string) {
@@ -406,7 +414,7 @@ async function getInvoicePayments(
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name, receipt_number",
+      "id, amount, paid_at, mode, reference, created_at, voided_at, void_reason, recorded_by_name, receipt_number, cheque_number, cheque_bank, cleared_at",
     )
     .eq("hostel_id", hostelId)
     .eq("invoice_id", invoiceId)
@@ -424,6 +432,9 @@ async function getInvoicePayments(
     voidedAt: row.voided_at,
     voidReason: row.void_reason,
     receiptNumber: row.receipt_number,
+    chequeNumber: row.cheque_number,
+    chequeBank: row.cheque_bank,
+    clearedAt: row.cleared_at,
   }));
 }
 
@@ -466,4 +477,46 @@ export async function getLateFeeRule(supabase: Supabase, hostelId: string): Prom
     graceDays: data.late_fee_grace_days,
     since: data.late_fee_since,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Advance credit (ClickUp E13-T7)
+// ---------------------------------------------------------------------------
+
+export interface CreditEntryRow {
+  id: string;
+  kind: "advance" | "applied" | "refund";
+  amount: number;
+  entryDate: string;
+  mode: PaymentMode | null;
+  reference: string | null;
+  invoiceId: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+}
+
+export async function getResidentCredit(supabase: Supabase, hostelId: string, residentId: string) {
+  const { data, error } = await supabase
+    .from("resident_credit_entries")
+    .select("id, kind, amount, entry_date, mode, reference, invoice_id, voided_at, void_reason")
+    .eq("hostel_id", hostelId)
+    .eq("resident_id", residentId)
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const entries = (data ?? []).map((row): CreditEntryRow => ({
+    id: row.id,
+    kind: row.kind as CreditEntryRow["kind"],
+    amount: row.amount,
+    entryDate: row.entry_date,
+    mode: row.mode as PaymentMode | null,
+    reference: row.reference,
+    invoiceId: row.invoice_id,
+    voidedAt: row.voided_at,
+    voidReason: row.void_reason,
+  }));
+  const held = entries
+    .filter((entry) => !entry.voidedAt)
+    .reduce((sum, entry) => sum + (entry.kind === "advance" ? entry.amount : -entry.amount), 0);
+  return { held, entries };
 }
