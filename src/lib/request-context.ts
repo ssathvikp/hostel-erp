@@ -31,12 +31,35 @@ export async function logUnexpected(action: string, error: unknown): Promise<voi
   });
 }
 
-/** Logs the failure and returns the generic message for the form. */
+/**
+ * Rules that hold for every write, whichever form made it (ClickUp EP-14):
+ * the account is read-only, or a plan limit is reached. Their database
+ * message is written for the user.
+ */
+const ACCOUNT_HINTS = new Set(["account_read_only", "plan_limit"]);
+
+export const READ_ONLY_MESSAGE =
+  "This account is read-only, so nothing can be changed. The owner can choose a plan in Settings → Billing.";
+
+/** The message for an account-wide refusal, or null for any other error. */
+export function accountRuleMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const { code, hint, message } = error as { code?: string; hint?: string; message?: string };
+  if (code !== "P0001" || !hint || !ACCOUNT_HINTS.has(hint)) return null;
+  return hint === "account_read_only" ? READ_ONLY_MESSAGE : (message ?? null);
+}
+
+/**
+ * Logs the failure and returns the generic message for the form. A read-only
+ * account or a plan limit is not a failure: the user sees why instead.
+ */
 export async function unexpectedFailure(
   action: string,
   error: unknown,
   values?: Record<string, string>,
 ): Promise<FormState> {
+  const rule = accountRuleMessage(error);
+  if (rule) return formFailure(rule, values);
   await logUnexpected(action, error);
   return formFailure(UNEXPECTED_MESSAGE, values);
 }

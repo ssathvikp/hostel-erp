@@ -37,7 +37,7 @@ beforeAll(async () => {
 });
 
 describe("trial length", () => {
-  it("is set by platform admins only, and used for hostels created afterwards", async () => {
+  it("is set by platform admins only, and used for owners who start afterwards", async () => {
     for (const user of [owner, staff]) {
       const { error } = await user.client.rpc("admin_set_trial_days", { p_days: 45 });
       expect(error?.code).toBe(PERMISSION_DENIED);
@@ -48,7 +48,10 @@ describe("trial length", () => {
     expect(
       (await platformAdmin.client.rpc("admin_set_trial_days", { p_days: 45 })).error,
     ).toBeNull();
-    const { data, error } = await owner.client
+    // The trial belongs to the owner's account (ClickUp EP-14): a new owner's
+    // first hostel starts it (tests/integration/subscriptions.test.ts covers more).
+    const newcomer = await createUser();
+    const { data, error } = await newcomer.client
       .from("hostels")
       .insert({ name: `Trial length ${Date.now()}`, type: "boys", phone: "9876543210" })
       .select("trial_ends_at")

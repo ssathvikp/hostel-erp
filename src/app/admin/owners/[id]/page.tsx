@@ -13,6 +13,10 @@ import {
   requirePlatformAdmin,
 } from "@/features/admin/queries";
 import { AuditTable } from "@/features/admin/components/AuditTable";
+import { SubscriptionForm } from "@/features/billing/components/AdminBillingForms";
+import { SUBSCRIPTION_STATUS_LABELS, SUBSCRIPTION_STATUS_TONES } from "@/features/billing/options";
+import { getAdminSubscription, getPlans } from "@/features/billing/queries";
+import { formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 
@@ -37,7 +41,11 @@ export default async function AdminOwnerPage({ params }: { params: Promise<{ id:
   const owner = owners[0];
   if (!owner) notFound();
   const theirs = hostels.filter((hostel) => hostel.ownerEmail === owner.email);
-  const { entries: history } = await getAuditEntries(supabase, { targetUserId: id, limit: 20 });
+  const [{ entries: history }, subscription, plans] = await Promise.all([
+    getAuditEntries(supabase, { targetUserId: id, limit: 20 }),
+    getAdminSubscription(supabase, id),
+    getPlans(supabase),
+  ]);
 
   const facts: [string, string][] = [
     ["E-mail", owner.email],
@@ -70,6 +78,55 @@ export default async function AdminOwnerPage({ params }: { params: Promise<{ id:
           </div>
         ))}
       </dl>
+
+      {subscription && (
+        <section
+          aria-labelledby="owner-subscription"
+          className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-xs sm:p-6"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 id="owner-subscription" className="text-base font-semibold text-slate-900">
+              Subscription
+            </h2>
+            <Badge tone={SUBSCRIPTION_STATUS_TONES[subscription.effectiveStatus]}>
+              {SUBSCRIPTION_STATUS_LABELS[subscription.effectiveStatus]}
+            </Badge>
+          </div>
+          <p className="text-sm text-slate-600">
+            {plans.find((plan) => plan.id === subscription.planId)?.name ?? subscription.planId}
+            {subscription.priceMonthly > 0 &&
+              ` at ${formatPaise(subscription.priceMonthly)} a month`}{" "}
+            · {subscription.usage.beds} beds, {subscription.usage.hostels} hostels,{" "}
+            {subscription.usage.staff} staff
+          </p>
+          <SubscriptionForm
+            ownerId={id}
+            plans={plans}
+            current={{
+              planId: subscription.planId,
+              status: subscription.status,
+              trialEndsAt: subscription.trialEndsAt,
+              periodEnd: subscription.currentPeriodEnd,
+            }}
+          />
+          {subscription.events.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer font-medium text-brand-700">History</summary>
+              <ul className="mt-2 space-y-1 text-slate-700">
+                {subscription.events.map((event, index) => (
+                  <li key={index}>
+                    {moment.format(new Date(event.createdAt))}:{" "}
+                    {event.fromPlan ? `${event.fromPlan} → ` : ""}
+                    {event.toPlan}, {event.fromStatus ? `${event.fromStatus} → ` : ""}
+                    {event.toStatus}
+                    {event.reason && ` (${event.reason})`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="owner-hostels">
         <h2 id="owner-hostels" className="mb-3 text-base font-semibold text-slate-900">

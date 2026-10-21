@@ -169,6 +169,14 @@ export async function inviteStaff(_previous: FormState, formData: FormData): Pro
   if (openError) return unexpectedFailure("inviteStaff", openError, values);
   if (open) return alreadyInvited(values);
 
+  // The invitation is written with the service role, which the database's
+  // read-only and plan-limit rules do not limit; check them first as the owner.
+  const { error: limitError } = await supabase.rpc("check_account_can_add", {
+    p_hostel_id: hostel.id,
+    p_kind: "staff",
+  });
+  if (limitError) return unexpectedFailure("inviteStaff", limitError, values);
+
   const admin = createAdminClient();
   let account;
   try {

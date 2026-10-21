@@ -45,7 +45,8 @@ test("a new owner's onboarding screen", async ({ page }) => {
 });
 
 test("every signed-in screen with data on it", async ({ page }) => {
-  test.setTimeout(120_000);
+  // About 40 screens, each scanned in full.
+  test.setTimeout(240_000);
   const owner = await factory.createUser({ fullName: "Kiran Das" });
   const hostel = await factory.createHostel(owner.id, { name: "Access PG" });
   await factory.createUser({
@@ -138,6 +139,8 @@ test("every signed-in screen with data on it", async ({ page }) => {
     "/settings/staff",
     "/settings/workers",
     "/settings/complaints",
+    "/settings/billing",
+    "/legal/terms",
     "/fees/reports",
     "/fees/cheques",
     "/complaints",
@@ -171,6 +174,7 @@ test("the platform admin console and a suspended hostel", async ({ page, browser
     "/admin/owners",
     `/admin/owners/${owner.id}`,
     "/admin/metrics",
+    "/admin/plans",
     "/admin/announcements",
     "/admin/audit",
   ]) {

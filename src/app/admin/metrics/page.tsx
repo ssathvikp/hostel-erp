@@ -6,6 +6,7 @@ import { TrialDaysForm } from "@/features/admin/components/TrialDaysForm";
 import { getAdminMetrics, requirePlatformAdmin } from "@/features/admin/queries";
 import { formatMonth, formatPaise } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
+import { getRevenue } from "@/features/billing/queries";
 
 export const metadata: Metadata = { title: "Metrics" };
 
@@ -22,7 +23,8 @@ function percent(part: number, whole: number): string {
  */
 export default async function AdminMetricsPage() {
   await requirePlatformAdmin();
-  const metrics = await getAdminMetrics(await createClient());
+  const supabase = await createClient();
+  const [metrics, revenue] = await Promise.all([getAdminMetrics(supabase), getRevenue(supabase)]);
   const trialsEnded = metrics.trialsConverted + metrics.trialsLapsed;
 
   const tiles: [string, string, string?][] = [
@@ -78,6 +80,48 @@ export default async function AdminMetricsPage() {
           </div>
         ))}
       </dl>
+
+      <section aria-labelledby="revenue-heading" className="space-y-3">
+        <h2 id="revenue-heading" className="text-base font-semibold text-slate-900">
+          Revenue
+        </h2>
+        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {(
+            [
+              [
+                "Monthly recurring revenue",
+                formatPaise(revenue.mrr),
+                `${formatPaise(revenue.arr)} a year`,
+              ],
+              [
+                "Subscriptions",
+                String((revenue.byStatus.active ?? 0) + (revenue.byStatus.past_due ?? 0)),
+                `${revenue.byStatus.trialing ?? 0} trialing, ${revenue.byStatus.read_only ?? 0} read-only, ${revenue.byStatus.cancelled ?? 0} cancelled`,
+              ],
+              [
+                "Trial to paid",
+                revenue.trialToPaid === null ? "—" : `${revenue.trialToPaid}%`,
+                `${revenue.trialsConverted} of ${revenue.trialsStarted} trials`,
+              ],
+              [
+                "Churn this month",
+                revenue.churnThisMonth === null ? "—" : `${revenue.churnThisMonth}%`,
+                `${revenue.cancelledThisMonth} cancelled · ${revenue.pastDue} past due`,
+              ],
+            ] as const
+          ).map(([label, value, note]) => (
+            <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
+              <dt className="text-sm text-slate-500">{label}</dt>
+              <dd className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</dd>
+              <dd className="mt-0.5 text-xs text-slate-500">{note}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="text-xs text-slate-500">
+          From subscriptions set in the console. Failed payments appear once a payment gateway is
+          connected.
+        </p>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="min-w-0" aria-labelledby="signups-heading">

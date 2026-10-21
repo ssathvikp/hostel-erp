@@ -17,6 +17,7 @@ import {
   validateFormData,
   type FormState,
 } from "@/lib/validation";
+import { TERMS_VERSION } from "@/lib/legal";
 
 const RATE_LIMITED = "Too many attempts. Wait a minute and try again.";
 /** Matches private.my_referral_code(): 8 letters and digits, no I, O, 0 or 1. */
@@ -46,7 +47,9 @@ export async function signUp(_previous: FormState, formData: FormData): Promise<
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name, ...(referral_code && { referral_code }) } },
+    options: {
+      data: { full_name, terms_version: TERMS_VERSION, ...(referral_code && { referral_code }) },
+    },
   });
 
   if (error) {

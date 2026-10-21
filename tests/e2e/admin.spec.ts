@@ -133,7 +133,7 @@ test("an admin opens the support view with a reason, which the owner sees", asyn
   await inMain(page).getByRole("link", { name: "Kiran Owner" }).click();
   await expect(inMain(page).getByText("Help with their account")).toBeVisible();
   await page.getByLabel(/^Action/).selectOption("sign_out_everywhere");
-  await page.getByLabel(/^Reason/).fill("Lost their phone");
+  await page.locator("#support-action-reason").fill("Lost their phone");
   await page.getByRole("button", { name: "Do it" }).click();
   await expect(inMain(page).getByText("Signed out of every device.")).toBeVisible();
 

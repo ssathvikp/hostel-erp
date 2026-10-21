@@ -2043,6 +2043,58 @@ export type Database = {
           },
         ];
       };
+      plans: {
+        Row: {
+          active: boolean;
+          features: NonNullable<Json>;
+          gst_inclusive: boolean;
+          id: string;
+          max_beds: number | null;
+          max_hostels: number | null;
+          max_staff: number | null;
+          monthly_price: number;
+          name: string;
+          position: number;
+          pricing_basis: string;
+          public: boolean;
+          updated_at: string;
+          yearly_price: number | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          features?: NonNullable<Json>;
+          gst_inclusive?: boolean;
+          id: string;
+          max_beds?: number | null;
+          max_hostels?: number | null;
+          max_staff?: number | null;
+          monthly_price: number;
+          name: string;
+          position?: number;
+          pricing_basis?: string;
+          public?: boolean;
+          updated_at?: string;
+          yearly_price?: number | null;
+        };
+        Update: {
+          active?: boolean;
+          features?: NonNullable<Json>;
+          gst_inclusive?: boolean;
+          id?: string;
+          max_beds?: number | null;
+          max_hostels?: number | null;
+          max_staff?: number | null;
+          monthly_price?: number;
+          name?: string;
+          position?: number;
+          pricing_basis?: string;
+          public?: boolean;
+          updated_at?: string;
+          yearly_price?: number | null;
+        };
+        Relationships: [];
+      };
       platform_settings: {
         Row: {
           id: boolean;
@@ -2084,6 +2136,8 @@ export type Database = {
           referral_code: string | null;
           referred_by: string | null;
           role: string;
+          terms_accepted_at: string | null;
+          terms_version: string | null;
           updated_at: string;
         };
         ComputedFields: never;
@@ -2097,6 +2151,8 @@ export type Database = {
           referral_code?: string | null;
           referred_by?: string | null;
           role?: string;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -2109,6 +2165,8 @@ export type Database = {
           referral_code?: string | null;
           referred_by?: string | null;
           role?: string;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -2872,6 +2930,122 @@ export type Database = {
           },
         ];
       };
+      subscription_events: {
+        Row: {
+          actor_id: string | null;
+          created_at: string;
+          from_plan: string | null;
+          from_status: string | null;
+          id: string;
+          owner_id: string;
+          reason: string | null;
+          to_plan: string;
+          to_status: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          actor_id?: string | null;
+          created_at?: string;
+          from_plan?: string | null;
+          from_status?: string | null;
+          id?: string;
+          owner_id: string;
+          reason?: string | null;
+          to_plan: string;
+          to_status: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          created_at?: string;
+          from_plan?: string | null;
+          from_status?: string | null;
+          id?: string;
+          owner_id?: string;
+          reason?: string | null;
+          to_plan?: string;
+          to_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subscription_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscription_events_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      subscriptions: {
+        Row: {
+          beds_at_renewal: number | null;
+          cancel_at_period_end: boolean;
+          created_at: string;
+          current_period_end: string | null;
+          current_period_start: string | null;
+          gateway_customer_id: string | null;
+          gateway_subscription_id: string | null;
+          owner_id: string;
+          plan_id: string;
+          price_monthly: number;
+          status: string;
+          trial_ends_at: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          beds_at_renewal?: number | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          current_period_end?: string | null;
+          current_period_start?: string | null;
+          gateway_customer_id?: string | null;
+          gateway_subscription_id?: string | null;
+          owner_id: string;
+          plan_id: string;
+          price_monthly?: number;
+          status: string;
+          trial_ends_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          beds_at_renewal?: number | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          current_period_end?: string | null;
+          current_period_start?: string | null;
+          gateway_customer_id?: string | null;
+          gateway_subscription_id?: string | null;
+          owner_id?: string;
+          plan_id?: string;
+          price_monthly?: number;
+          status?: string;
+          trial_ends_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       support_access: {
         Row: {
           admin_id: string;
@@ -3513,6 +3687,7 @@ export type Database = {
         }[];
       };
       account_sign_out: { Args: { p_user_id: string }; Returns: undefined };
+      account_status: { Args: { p_hostel_id: string }; Returns: Json };
       admin_announcements: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -3615,8 +3790,37 @@ export type Database = {
         Args: { p_action: string; p_reason: string; p_user_id: string };
         Returns: undefined;
       };
+      admin_revenue: { Args: Record<PropertyKey, never>; Returns: Json };
+      admin_save_plan: {
+        Args: {
+          p_active: boolean;
+          p_gst_inclusive: boolean;
+          p_id: string;
+          p_max_beds: number;
+          p_max_hostels: number;
+          p_max_staff: number;
+          p_monthly_price: number;
+          p_name: string;
+          p_pricing_basis: string;
+          p_public: boolean;
+          p_reason: string;
+          p_yearly_price: number;
+        };
+        Returns: undefined;
+      };
       admin_set_plan: {
         Args: { p_hostel_id: string; p_plan: string; p_reason: string; p_trial_ends_at: string };
+        Returns: undefined;
+      };
+      admin_set_subscription: {
+        Args: {
+          p_owner_id: string;
+          p_period_end?: string;
+          p_plan_id: string;
+          p_reason?: string;
+          p_status: string;
+          p_trial_ends_at?: string;
+        };
         Returns: undefined;
       };
       admin_set_suspended: {
@@ -3628,6 +3832,7 @@ export type Database = {
         Args: { p_reason: string; p_user_id: string };
         Returns: undefined;
       };
+      admin_subscription: { Args: { p_owner_id: string }; Returns: Json };
       admin_support_snapshot: { Args: { p_hostel_id: string }; Returns: Json };
       allocate_bed: {
         Args: {
@@ -3643,6 +3848,7 @@ export type Database = {
       bill_charges_now: { Args: { p_resident_id: string }; Returns: string };
       bill_electricity: { Args: { p_hostel_id: string; p_period_month: string }; Returns: Json };
       billed_months: { Args: { p_hostel_id: string }; Returns: string[] };
+      check_account_can_add: { Args: { p_hostel_id: string; p_kind: string }; Returns: undefined };
       clear_cheque: { Args: { p_payment_id: string }; Returns: undefined };
       complaint_add_cost: {
         Args: {

@@ -92,14 +92,27 @@ describe("assertRole", () => {
 });
 
 describe("authentication schemas", () => {
-  const signup = { full_name: " Asha Rao ", email: " Asha@Example.COM ", password: "hostel2026" };
+  const signup = {
+    full_name: " Asha Rao ",
+    email: " Asha@Example.COM ",
+    password: "hostel2026",
+    accept_terms: "on",
+  };
 
   it("accepts a valid signup and normalises name and email", () => {
     expect(signupSchema.parse(signup)).toEqual({
       full_name: "Asha Rao",
       email: "asha@example.com",
       password: "hostel2026",
+      accept_terms: "on",
     });
+  });
+
+  it("needs the terms accepted (ClickUp EP-14 T11)", () => {
+    const result = validate(signupSchema, { ...signup, accept_terms: undefined });
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.fieldErrors.accept_terms).toEqual(["Agree to the terms to create an account"]);
   });
 
   it.each([

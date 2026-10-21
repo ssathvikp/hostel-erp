@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Alert } from "@/components/ui";
 import { daysBetween } from "@/lib/money";
 
@@ -7,8 +9,8 @@ export const TRIAL_WARNING_DAYS = 14;
 const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" });
 
 /**
- * Tells an owner their free trial is ending or has ended (EP-10). Nothing
- * is locked when it ends; the platform admin decides what happens next.
+ * Tells an owner their free trial is ending (EP-10, EP-14 T3). When it ends
+ * the account becomes read-only, and the read-only banner takes over.
  */
 export function TrialBanner({ trialEndsAt, today }: { trialEndsAt: string; today: string }) {
   const left = daysBetween(today, trialEndsAt);
@@ -28,7 +30,11 @@ export function TrialBanner({ trialEndsAt, today }: { trialEndsAt: string; today
       // Never on a printed invoice or receipt.
       className="mb-6 print:hidden"
     >
-      Contact Hostel ERP support to choose a plan and keep everything as it is.
+      <Link href="/settings/billing" className="font-medium underline">
+        Choose a plan
+      </Link>{" "}
+      to keep everything as it is. When the trial ends the account becomes read-only; nothing is
+      deleted.
     </Alert>
   );
 }

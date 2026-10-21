@@ -12,6 +12,7 @@ const TABS = [
   { href: "/settings/staff", label: "Staff", ownerOnly: true },
   { href: "/settings/workers", label: "Workers", ownerOnly: false },
   { href: "/settings/complaints", label: "Complaints", ownerOnly: true },
+  { href: "/settings/billing", label: "Billing", ownerOnly: true },
   { href: "/settings/referrals", label: "Refer", ownerOnly: true },
 ] as const;
 

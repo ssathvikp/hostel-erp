@@ -731,3 +731,95 @@ Migration: `supabase/migrations/20261025090000_complaints.sql`. Code:
   `tests/e2e/dialogs.spec.ts` caught it. That test now causes its failed attempt
   with a cheque for more than is due, because overpaying in cash became advance
   credit in 3c.
+
+## Phase 4: subscription billing groundwork, no gateway (ClickUp EP-14)
+
+Migration: `supabase/migrations/20261026090000_subscriptions.sql`. Code:
+`src/features/billing/`, `/settings/billing`, `/admin/plans`, the subscription
+section on `/admin/owners/[id]`, revenue on `/admin/metrics`, and `/legal/*`.
+
+- **T1: plans.**
+  - **Table:** `plans` holds prices in paise, pricing basis, limits on beds,
+    hostels and staff, feature flags, a GST-inclusive flag, offered and active.
+  - **Seeded:** Free (grandfathered), Starter, Growth and Pro, all at
+    **placeholder prices**. `docs/pricing.md` lists the decisions the owner
+    still has to make.
+  - **Admin:** `/admin/plans` uses `admin_save_plan`, which needs a reason and
+    is audited.
+- **T2: subscriptions.**
+  - **Table:** one `subscriptions` row per owner: plan, status (trialing,
+    active, past_due, read_only, cancelled), trial end, period, the price at
+    the time the plan was given, and empty gateway ids.
+  - **History:** every change goes to `subscription_events`, with the reason.
+  - **Changes:** made through `admin_set_subscription` (reason and audit).
+  - **Legacy columns:** `hostels.plan` and `trial_ends_at` stay, mirrored from
+    the subscription by a trigger, so existing screens, metrics and plan
+    history keep working.
+  - **Per-hostel plan form:** `admin_set_plan` now sets the owner's
+    subscription.
+  - **Migration of existing owners:** paid → Pro (it had no limits), free →
+    Free, trial → trial.
+- **T3: trial.**
+  - **Start:** an owner's first hostel starts a Pro trial of the length set in
+    Admin → Metrics. Later hostels follow the same subscription.
+  - **Banners:** the trial banner links to Billing. When the trial ends, the
+    account is read-only, worked out on the fly (no scheduled job needed), and
+    a read-only banner shows instead.
+  - **Not built:** trial reminder emails need an email provider.
+- **T4: plan limits.**
+  - **Triggers:** these refuse a new bed (or an un-archived one), hostel or
+    staff invitation past the limit, naming it ("Your Starter plan allows 50
+    beds").
+  - **Staff invitations:** these are written with the service role, so the
+    invite action first calls `check_account_can_add` as the owner.
+  - **Downgrades:** a downgrade below current usage is refused, listing what to
+    remove first.
+  - **Existing data:** nothing over a limit is hidden or deleted.
+  - **Usage display:** usage shows on Billing, warning at 80%.
+- **T9: read-only mode.**
+  - **Guard:** one trigger, `aa_account_writable`, sits on every tenant table
+    (27). It refuses users' writes, including writes made inside the app's
+    functions, when the owner's account cannot write.
+  - **Who is limited:** owner and staff alike. Platform admins, the service
+    role and job links are not.
+  - **Still allowed:** reads, printing, exports and erasing a resident's data.
+  - **Messages:** `unexpectedFailure` turns `account_read_only` and
+    `plan_limit` into plain messages in every form.
+  - **Lifting it:** an admin sets an active plan.
+- **T11: legal pages.**
+  - **Pages:** `/legal/terms`, `/legal/privacy`, `/legal/refunds` and
+    `/legal/contact`, linked from the sign-in and sign-up footer. Each is marked
+    **"Draft for review: not yet reviewed by a lawyer"**.
+  - **Sign-up:** the terms must be accepted at sign-up, and
+    `profiles.terms_version` and `terms_accepted_at` are recorded.
+- **Billing page (part of T7, owner only):**
+  - **Shown:** plan, status, trial or paid-until date, usage against limits,
+    and the plans on offer.
+  - **Changing plan:** done by contacting support for now.
+  - **Not built:** payment method, invoices and proration need the gateway.
+- **Revenue figures (T12 groundwork):** `admin_revenue` covers:
+  - MRR and ARR from active subscriptions' prices;
+  - counts by status and plan;
+  - trial-to-paid conversion and churn this month, from `subscription_events`;
+  - past-due accounts.
+    Failed payments wait for the gateway.
+- **Tests:**
+  - `tests/integration/subscriptions.test.ts` (10 cases): the trial at the
+    first hostel; admin-only changes with a reason, mirrored to hostels; the
+    price kept on a plan price change; the per-hostel form; read-only for owner
+    and staff with reads and erasure still allowed and the admin lifting it;
+    cancelled accounts and writes inside functions; the bed, hostel and staff
+    limits; downgrades refused without removing anything; admin-only revenue;
+    and the terms version.
+  - `tests/e2e/billing.spec.ts`: an owner's Billing page and read-only after a
+    lapsed trial; an admin lifting it, the Plans page and revenue; the terms
+    required at sign-up and the public terms page.
+  - The sign-up e2e steps tick the terms box. The trial-length test now creates
+    a new owner, because a trial belongs to the account.
+- **Not built (needs a gateway, email, a lawyer or a CA):**
+  - recurring payments, failed payments and dunning;
+  - coupons and annual billing;
+  - payment method and invoices on the Billing page;
+  - GST invoices;
+  - trial reminder emails;
+  - the final legal texts.

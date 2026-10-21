@@ -57,6 +57,7 @@ export const signupSchema = z.object({
   full_name: requiredText("Your name", 120),
   email,
   password: newPassword,
+  accept_terms: z.literal("on", { error: "Agree to the terms to create an account" }),
 });
 
 export const loginSchema = z.object({
