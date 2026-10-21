@@ -136,6 +136,13 @@ test("every signed-in screen with data on it", async ({ page }) => {
     "/settings/hostel",
     "/settings/fees",
     "/settings/staff",
+    "/settings/workers",
+    "/settings/complaints",
+    "/fees/reports",
+    "/fees/cheques",
+    "/complaints",
+    "/complaints/new",
+    "/complaints/reports",
   ]) {
     await expectNoViolations(page, path);
   }

@@ -22,6 +22,8 @@ import { createClient } from "@/lib/supabase/server";
 import { uuid } from "@/lib/validation";
 import type { BedStatus, ManualBedStatus, SharingType, ViewRow } from "@/types";
 import type { Database } from "@/types/database";
+import { OpenComplaints } from "@/features/complaints/components/OpenComplaints";
+import { getOpenComplaintsFor } from "@/features/complaints/queries";
 
 export const metadata: Metadata = { title: "Room" };
 
@@ -62,6 +64,7 @@ export default async function RoomPage({
     residents,
     events,
     depositRates,
+    complaints,
   ] = await Promise.all([
     supabase
       .from("rooms")
@@ -83,6 +86,7 @@ export default async function RoomPage({
     getUnallocatedResidents(supabase, hostel.id),
     getAllocationEvents(supabase, hostel.id, { roomId: id }),
     getDepositRates(supabase, hostel.id),
+    getOpenComplaintsFor(supabase, hostel.id, { roomId: id }),
   ]);
   if (error) throw error;
   if (bedsError) throw bedsError;
@@ -216,6 +220,17 @@ export default async function RoomPage({
           </Table>
         </section>
       )}
+
+      <section aria-labelledby="complaints-heading" className="space-y-3">
+        <h2 id="complaints-heading" className="text-base font-semibold text-slate-900">
+          Open complaints
+        </h2>
+        <OpenComplaints
+          rows={complaints}
+          raiseHref={`/complaints/new?room=${room.id}`}
+          caption={`Open complaints for room ${room.room_number}`}
+        />
+      </section>
 
       <section aria-labelledby="history-heading" className="space-y-3">
         <h2 id="history-heading" className="text-base font-semibold text-slate-900">

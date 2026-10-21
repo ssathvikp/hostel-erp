@@ -155,6 +155,11 @@ export function createUserFactory() {
       // Money rows protect the stays and people they name, so they go first.
       for (const table of [
         "settlements",
+        "complaint_payouts",
+        "complaint_costs",
+        "complaint_attachments",
+        "complaints",
+        "maintenance_schedules",
         "data_rights_log",
         "reminder_log",
         "deposit_entries",

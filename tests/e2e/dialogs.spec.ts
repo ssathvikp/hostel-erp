@@ -57,13 +57,18 @@ test("a payment dialog reopens without the last error or typed amount", async ({
   await page.getByRole("button", { name: "Record payment for Sana Mirza" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel(/^Amount/).fill("9000");
-  await dialog.getByLabel(/^Mode/).selectOption("cash");
+  // Cash beyond what is due becomes advance credit (E13-T7); a cheque for more
+  // than is due is still refused, which gives a failed attempt to reopen after.
+  await dialog.getByLabel(/^Mode/).selectOption("cheque");
+  await dialog.getByLabel(/^Cheque number/).fill("123456");
+  await dialog.getByLabel(/^Bank/).fill("SBI");
   await dialog.getByRole("button", { name: "Record payment" }).click();
-  await expect(dialog.getByText("Only ₹7,000 is still due on this invoice.")).toBeVisible();
+  const refused = dialog.getByText(/A cheque cannot be more than is due/);
+  await expect(refused).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel" }).click();
 
   await page.getByRole("button", { name: "Record payment for Sana Mirza" }).click();
-  await expect(dialog.getByText("Only ₹7,000 is still due on this invoice.")).toHaveCount(0);
+  await expect(refused).toHaveCount(0);
   await expect(dialog.getByLabel(/^Amount/)).toHaveValue("7000");
   await expect(dialog.getByLabel(/^Mode/)).toHaveValue("");
 });

@@ -451,6 +451,649 @@ export type Database = {
           },
         ];
       };
+      complaint_attachments: {
+        Row: {
+          complaint_id: string;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          mime_type: string;
+          path: string;
+          size_bytes: number;
+          stage: string;
+          uploaded_by: string | null;
+          via_job: boolean;
+        };
+        ComputedFields: never;
+        Insert: {
+          complaint_id: string;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          mime_type: string;
+          path: string;
+          size_bytes: number;
+          stage?: string;
+          uploaded_by?: string | null;
+          via_job?: boolean;
+        };
+        Update: {
+          complaint_id?: string;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          mime_type?: string;
+          path?: string;
+          size_bytes?: number;
+          stage?: string;
+          uploaded_by?: string | null;
+          via_job?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_attachments_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_overview";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_attachments_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaints";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_attachments_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_attachments_uploaded_by_fkey";
+            columns: ["uploaded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_categories: {
+        Row: {
+          active: boolean;
+          auto_route: boolean;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          name: string;
+          position: number;
+          trade: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          auto_route?: boolean;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          name: string;
+          position?: number;
+          trade: string;
+        };
+        Update: {
+          active?: boolean;
+          auto_route?: boolean;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          name?: string;
+          position?: number;
+          trade?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_categories_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_costs: {
+        Row: {
+          amount: number;
+          charge_id: string | null;
+          complaint_id: string;
+          created_at: string;
+          description: string | null;
+          hostel_id: string;
+          id: string;
+          kind: string;
+          payer: string;
+          recorded_by: string | null;
+          recorded_via_job: boolean;
+          void_reason: string | null;
+          voided_at: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          charge_id?: string | null;
+          complaint_id: string;
+          created_at?: string;
+          description?: string | null;
+          hostel_id: string;
+          id?: string;
+          kind: string;
+          payer?: string;
+          recorded_by?: string | null;
+          recorded_via_job?: boolean;
+          void_reason?: string | null;
+          voided_at?: string | null;
+        };
+        Update: {
+          amount?: number;
+          charge_id?: string | null;
+          complaint_id?: string;
+          created_at?: string;
+          description?: string | null;
+          hostel_id?: string;
+          id?: string;
+          kind?: string;
+          payer?: string;
+          recorded_by?: string | null;
+          recorded_via_job?: boolean;
+          void_reason?: string | null;
+          voided_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_costs_charge_id_fkey";
+            columns: ["charge_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_charges";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_costs_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_overview";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_costs_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaints";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_costs_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_costs_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_events: {
+        Row: {
+          actor_id: string | null;
+          actor_kind: string;
+          actor_name: string | null;
+          body: string | null;
+          complaint_id: string;
+          created_at: string;
+          from_status: string | null;
+          hostel_id: string;
+          id: string;
+          kind: string;
+          to_status: string | null;
+          worker_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          actor_id?: string | null;
+          actor_kind?: string;
+          actor_name?: string | null;
+          body?: string | null;
+          complaint_id: string;
+          created_at?: string;
+          from_status?: string | null;
+          hostel_id: string;
+          id?: string;
+          kind: string;
+          to_status?: string | null;
+          worker_id?: string | null;
+        };
+        Update: {
+          actor_id?: string | null;
+          actor_kind?: string;
+          actor_name?: string | null;
+          body?: string | null;
+          complaint_id?: string;
+          created_at?: string;
+          from_status?: string | null;
+          hostel_id?: string;
+          id?: string;
+          kind?: string;
+          to_status?: string | null;
+          worker_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_events_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_overview";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_events_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaints";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_events_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_events_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_job_hits: {
+        Row: {
+          at: string;
+          token_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          at?: string;
+          token_id: string;
+        };
+        Update: {
+          at?: string;
+          token_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_job_hits_token_id_fkey";
+            columns: ["token_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_job_tokens";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_job_tokens: {
+        Row: {
+          complaint_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          revoked_at: string | null;
+          state: string;
+          token_hash: string;
+          worker_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          complaint_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          revoked_at?: string | null;
+          state?: string;
+          token_hash: string;
+          worker_id: string;
+        };
+        Update: {
+          complaint_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          revoked_at?: string | null;
+          state?: string;
+          token_hash?: string;
+          worker_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_job_tokens_complaint_id_fkey";
+            columns: ["complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_overview";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_job_tokens_complaint_id_fkey";
+            columns: ["complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaints";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_job_tokens_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_job_tokens_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_payouts: {
+        Row: {
+          amount: number;
+          complaint_id: string;
+          created_at: string;
+          hostel_id: string;
+          id: string;
+          mode: string;
+          paid_at: string;
+          recorded_by: string | null;
+          reference: string | null;
+          worker_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount: number;
+          complaint_id: string;
+          created_at?: string;
+          hostel_id: string;
+          id?: string;
+          mode: string;
+          paid_at: string;
+          recorded_by?: string | null;
+          reference?: string | null;
+          worker_id: string;
+        };
+        Update: {
+          amount?: number;
+          complaint_id?: string;
+          created_at?: string;
+          hostel_id?: string;
+          id?: string;
+          mode?: string;
+          paid_at?: string;
+          recorded_by?: string | null;
+          reference?: string | null;
+          worker_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_payouts_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_overview";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_payouts_complaint_fkey";
+            columns: ["hostel_id", "complaint_id"];
+            isOneToOne: false;
+            referencedRelation: "complaints";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaint_payouts_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_payouts_recorded_by_fkey";
+            columns: ["recorded_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaint_payouts_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_targets: {
+        Row: {
+          hostel_id: string;
+          priority: string;
+          resolve_minutes: number;
+          respond_minutes: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          hostel_id: string;
+          priority: string;
+          resolve_minutes: number;
+          respond_minutes: number;
+        };
+        Update: {
+          hostel_id?: string;
+          priority?: string;
+          resolve_minutes?: number;
+          respond_minutes?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaint_targets_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaints: {
+        Row: {
+          area: string | null;
+          assigned_at: string | null;
+          bed_id: string | null;
+          category_id: string;
+          closed_at: string | null;
+          created_at: string;
+          description: string | null;
+          first_response_at: string | null;
+          hold_seconds: number;
+          hold_started_at: string | null;
+          hostel_id: string;
+          id: string;
+          kind: string;
+          needs_worker: boolean;
+          number: number;
+          priority: string;
+          raised_by: string | null;
+          raised_by_kind: string;
+          reopened_count: number;
+          resident_id: string | null;
+          resolved_at: string | null;
+          room_id: string | null;
+          schedule_id: string | null;
+          started_at: string | null;
+          status: string;
+          title: string;
+          updated_at: string;
+          worker_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          area?: string | null;
+          assigned_at?: string | null;
+          bed_id?: string | null;
+          category_id: string;
+          closed_at?: string | null;
+          created_at?: string;
+          description?: string | null;
+          first_response_at?: string | null;
+          hold_seconds?: number;
+          hold_started_at?: string | null;
+          hostel_id: string;
+          id?: string;
+          kind?: string;
+          needs_worker?: boolean;
+          number?: number;
+          priority?: string;
+          raised_by?: string | null;
+          raised_by_kind?: string;
+          reopened_count?: number;
+          resident_id?: string | null;
+          resolved_at?: string | null;
+          room_id?: string | null;
+          schedule_id?: string | null;
+          started_at?: string | null;
+          status?: string;
+          title: string;
+          updated_at?: string;
+          worker_id?: string | null;
+        };
+        Update: {
+          area?: string | null;
+          assigned_at?: string | null;
+          bed_id?: string | null;
+          category_id?: string;
+          closed_at?: string | null;
+          created_at?: string;
+          description?: string | null;
+          first_response_at?: string | null;
+          hold_seconds?: number;
+          hold_started_at?: string | null;
+          hostel_id?: string;
+          id?: string;
+          kind?: string;
+          needs_worker?: boolean;
+          number?: number;
+          priority?: string;
+          raised_by?: string | null;
+          raised_by_kind?: string;
+          reopened_count?: number;
+          resident_id?: string | null;
+          resolved_at?: string | null;
+          room_id?: string | null;
+          schedule_id?: string | null;
+          started_at?: string | null;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+          worker_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "complaints_bed_fkey";
+            columns: ["bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_bed_fkey";
+            columns: ["bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_category_fkey";
+            columns: ["hostel_id", "category_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_categories";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_raised_by_fkey";
+            columns: ["raised_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_schedule_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "maintenance_schedules";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       data_rights_log: {
         Row: {
           action: string;
@@ -882,6 +1525,7 @@ export type Database = {
           address: string | null;
           alt_phone: string | null;
           city: string | null;
+          complaints_share_resident_phone: boolean;
           created_at: string;
           electricity_unit_rate: number | null;
           email: string | null;
@@ -912,6 +1556,7 @@ export type Database = {
           address?: string | null;
           alt_phone?: string | null;
           city?: string | null;
+          complaints_share_resident_phone?: boolean;
           created_at?: string;
           electricity_unit_rate?: number | null;
           email?: string | null;
@@ -941,6 +1586,7 @@ export type Database = {
           address?: string | null;
           alt_phone?: string | null;
           city?: string | null;
+          complaints_share_resident_phone?: boolean;
           created_at?: string;
           electricity_unit_rate?: number | null;
           email?: string | null;
@@ -1166,6 +1812,84 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      maintenance_schedules: {
+        Row: {
+          active: boolean;
+          area: string | null;
+          category_id: string;
+          created_at: string;
+          description: string | null;
+          every_n: number;
+          hostel_id: string;
+          id: string;
+          next_due: string;
+          priority: string;
+          room_id: string | null;
+          title: string;
+          unit: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          area?: string | null;
+          category_id: string;
+          created_at?: string;
+          description?: string | null;
+          every_n: number;
+          hostel_id: string;
+          id?: string;
+          next_due: string;
+          priority?: string;
+          room_id?: string | null;
+          title: string;
+          unit: string;
+        };
+        Update: {
+          active?: boolean;
+          area?: string | null;
+          category_id?: string;
+          created_at?: string;
+          description?: string | null;
+          every_n?: number;
+          hostel_id?: string;
+          id?: string;
+          next_due?: string;
+          priority?: string;
+          room_id?: string | null;
+          title?: string;
+          unit?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_schedules_category_fkey";
+            columns: ["hostel_id", "category_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_categories";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "maintenance_schedules_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "maintenance_schedules_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "maintenance_schedules_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
           },
         ];
       };
@@ -2187,6 +2911,116 @@ export type Database = {
           },
         ];
       };
+      worker_unavailability: {
+        Row: {
+          created_at: string;
+          from_date: string;
+          id: string;
+          reason: string | null;
+          to_date: string;
+          worker_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          from_date: string;
+          id?: string;
+          reason?: string | null;
+          to_date: string;
+          worker_id: string;
+        };
+        Update: {
+          created_at?: string;
+          from_date?: string;
+          id?: string;
+          reason?: string | null;
+          to_date?: string;
+          worker_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "worker_unavailability_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workers: {
+        Row: {
+          active: boolean;
+          business_name: string | null;
+          call_out_charge: number | null;
+          created_at: string;
+          full_name: string;
+          hostel_id: string | null;
+          id: string;
+          kind: string;
+          notes: string | null;
+          owner_id: string;
+          phone: string;
+          preferred: boolean;
+          profile_id: string | null;
+          trades: string[];
+        };
+        ComputedFields: never;
+        Insert: {
+          active?: boolean;
+          business_name?: string | null;
+          call_out_charge?: number | null;
+          created_at?: string;
+          full_name: string;
+          hostel_id?: string | null;
+          id?: string;
+          kind: string;
+          notes?: string | null;
+          owner_id?: string;
+          phone: string;
+          preferred?: boolean;
+          profile_id?: string | null;
+          trades: string[];
+        };
+        Update: {
+          active?: boolean;
+          business_name?: string | null;
+          call_out_charge?: number | null;
+          created_at?: string;
+          full_name?: string;
+          hostel_id?: string | null;
+          id?: string;
+          kind?: string;
+          notes?: string | null;
+          owner_id?: string;
+          phone?: string;
+          preferred?: boolean;
+          profile_id?: string | null;
+          trades?: string[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workers_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workers_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workers_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       bed_states: {
@@ -2244,6 +3078,132 @@ export type Database = {
             columns: ["status_changed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      complaint_overview: {
+        Row: {
+          area: string | null;
+          assigned_at: string | null;
+          bed_id: string | null;
+          bed_label: string | null;
+          category_id: string | null;
+          category_name: string | null;
+          closed_at: string | null;
+          created_at: string | null;
+          description: string | null;
+          first_response_at: string | null;
+          floor: number | null;
+          held_seconds: number | null;
+          hold_seconds: number | null;
+          hold_started_at: string | null;
+          hostel_id: string | null;
+          id: string | null;
+          is_open: boolean | null;
+          kind: string | null;
+          needs_worker: boolean | null;
+          number: number | null;
+          priority: string | null;
+          raised_by: string | null;
+          raised_by_kind: string | null;
+          reopened_count: number | null;
+          resident_id: string | null;
+          resident_name: string | null;
+          resolve_by: string | null;
+          resolve_minutes: number | null;
+          resolved_at: string | null;
+          respond_by: string | null;
+          respond_minutes: number | null;
+          room_id: string | null;
+          room_number: string | null;
+          schedule_id: string | null;
+          started_at: string | null;
+          status: string | null;
+          title: string | null;
+          trade: string | null;
+          updated_at: string | null;
+          worker_id: string | null;
+          worker_kind: string | null;
+          worker_name: string | null;
+        };
+        ComputedFields: never;
+        Relationships: [
+          {
+            foreignKeyName: "complaints_bed_fkey";
+            columns: ["bed_id"];
+            isOneToOne: false;
+            referencedRelation: "bed_states";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_bed_fkey";
+            columns: ["bed_id"];
+            isOneToOne: false;
+            referencedRelation: "beds";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_category_fkey";
+            columns: ["hostel_id", "category_id"];
+            isOneToOne: false;
+            referencedRelation: "complaint_categories";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_raised_by_fkey";
+            columns: ["raised_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "room_inventory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_room_fkey";
+            columns: ["hostel_id", "room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "complaints_schedule_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "maintenance_schedules";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "complaints_worker_id_fkey";
+            columns: ["worker_id"];
+            isOneToOne: false;
+            referencedRelation: "workers";
             referencedColumns: ["id"];
           },
         ];
@@ -2684,6 +3644,33 @@ export type Database = {
       bill_electricity: { Args: { p_hostel_id: string; p_period_month: string }; Returns: Json };
       billed_months: { Args: { p_hostel_id: string }; Returns: string[] };
       clear_cheque: { Args: { p_payment_id: string }; Returns: undefined };
+      complaint_add_cost: {
+        Args: {
+          p_amount: number;
+          p_complaint_id: string;
+          p_description?: string;
+          p_kind: string;
+          p_payer?: string;
+        };
+        Returns: string;
+      };
+      complaint_assign: {
+        Args: { p_complaint_id: string; p_note?: string; p_worker_id: string };
+        Returns: undefined;
+      };
+      complaint_auto_route: { Args: { p_complaint_id: string }; Returns: string };
+      complaint_comment: { Args: { p_body: string; p_complaint_id: string }; Returns: undefined };
+      complaint_job_link: { Args: { p_complaint_id: string }; Returns: string };
+      complaint_report: {
+        Args: { p_from: string; p_hostel_id: string; p_to: string };
+        Returns: Json;
+      };
+      complaint_set_status: {
+        Args: { p_complaint_id: string; p_note?: string; p_status: string };
+        Returns: undefined;
+      };
+      complaint_void_cost: { Args: { p_cost_id: string; p_reason: string }; Returns: undefined };
+      create_due_maintenance: { Args: { p_hostel_id: string }; Returns: number };
       create_rooms_bulk: {
         Args: {
           p_capacity: number;
@@ -2734,6 +3721,11 @@ export type Database = {
           rooms_created: number;
         }[];
       };
+      job_update: {
+        Args: { p_action: string; p_charge?: number; p_note?: string; p_token: string };
+        Returns: string;
+      };
+      job_view: { Args: { p_token: string }; Returns: Json };
       my_referral_code: { Args: Record<PropertyKey, never>; Returns: string };
       my_referrals: { Args: Record<PropertyKey, never>; Returns: Json };
       occupancy_trend: {

@@ -60,7 +60,11 @@ export function PaymentDialog({
       <Button
         size={size}
         variant={variant}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // A reopened dialog starts clean, the chosen mode included.
+          setMode("");
+          setOpen(true);
+        }}
         aria-label={`Record payment for ${residentName}`}
       >
         {triggerLabel}

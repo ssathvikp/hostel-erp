@@ -1,22 +1,14 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert } from "@/components/ui";
 import { ShareLink } from "@/features/referrals/components/ShareLink";
 import { getReferralSummary } from "@/features/referrals/queries";
 import { requireActiveHostel } from "@/lib/hostels/active";
+import { siteOrigin } from "@/lib/site-origin";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Refer a hostel" };
-
-/** This deployment's address, from the request, for links that leave the app. */
-async function siteOrigin(): Promise<string> {
-  const list = await headers();
-  const host = list.get("x-forwarded-host") ?? list.get("host") ?? "localhost:3000";
-  const proto = list.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 /** Owners share a signup link; each referred hostel that pays earns a free month (plan E14-T12). */
 export default async function ReferralsPage() {

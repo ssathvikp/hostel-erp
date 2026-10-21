@@ -600,3 +600,134 @@ DEFINER` function in the exposed `public` schema, which the schema-guard
     used first and the leftover refunded; final-month re-billing; the rules.
   - `tests/unit/settlement.test.ts`: the form's arithmetic.
   - `tests/e2e/settlement.spec.ts`: desktop and mobile.
+
+## Phase 5: complaints and maintenance (ClickUp EP-15)
+
+Migration: `supabase/migrations/20261025090000_complaints.sql`. Code:
+`src/features/complaints/`, plus the pages under `src/app/(app)/complaints/`,
+`src/app/(app)/settings/workers`, `src/app/(app)/settings/complaints` and
+`src/app/job/[token]`.
+
+- **T1: records and lifecycle.**
+  - **Categories:** `complaint_categories` holds categories per hostel, seeded
+    with the 9 defaults (electrical, plumbing, carpentry and the rest), each
+    mapped to a trade.
+  - **Complaints:** `complaints` gives each complaint a number per hostel and
+    records the room, bed, common area, resident, priority and worker.
+  - **Statuses:** open, assigned, in progress, on hold, resolved, closed and
+    reopened. The database refuses any other move, and on hold and reopen
+    need a reason.
+  - **History:** every change is written to the append-only `complaint_events`
+    by the complaint functions. Members cannot update a complaint directly.
+  - **Bed status:** a complaint about a bed can mark that bed under maintenance.
+- **T2: raise and manage.**
+  - **Pages:** `/complaints` (filters, paging in the database, a late filter)
+    and `/complaints/new`, for a room, bed or common area, optionally on behalf
+    of a resident.
+  - **Complaint page:** `/complaints/[id]` shows the history, comments, status
+    and assignment.
+  - **Elsewhere:** open complaints appear on the room and resident pages, and
+    there is a nav item and a dashboard card (open, late, urgent, needs a
+    worker).
+- **T5: photos and video.**
+  - **Storage:** a private `complaint-media` bucket under
+    `<hostel>/<complaint>/`, holding up to 5 photos and 1 video per stage
+    (problem or fix).
+  - **Checks:** the real type is read from the bytes. Photos are shrunk in the
+    browser to 1600 px, videos are limited to 20 MB, and files are served
+    through 2-minute signed URLs.
+  - **Upload path:** uploads use route handlers, because videos are larger
+    than the server-action body limit.
+- **T6: workers.**
+  - **Kinds:** on-site staff of one hostel, or vendors shared across the
+    owner's hostels.
+  - **Details:** trades, call-out charge, a preferred flag, and time off
+    (`worker_unavailability`), all on `/settings/workers`. Only owners add
+    workers.
+- **T7: routing.** `private.route_complaint` runs as a complaint is saved.
+  - **Order:** an available on-site worker with the trade, then a preferred
+    vendor, then any vendor. The fewest open jobs wins a tie.
+  - **Exclusions:** workers on leave, or who declined this job, are skipped.
+  - **Safety:** routing takes a lock per hostel, so two complaints never pick
+    from stale counts.
+  - **No match:** the complaint is flagged "needs a worker".
+  - **Overrides:** auto-routing can be switched off per category, and a worker
+    can be assigned or reassigned by hand at any time. Every assignment is
+    logged.
+- **T8: job links.**
+  - **Sending:** "Send job link" makes a 64-hex-character token, stored only as
+    SHA-256. It is sent by WhatsApp (`wa.me`, the reminders pattern) or copied.
+  - **Worker page:** `/job/[token]` needs no account. It shows this one job and
+    lets the worker accept or decline, mark "on the way" and "started", then
+    "done" with a note, their charge and photos of the fix.
+  - **Expiry:** the link dies when the job is done, reassigned or a new link is
+    made.
+  - **Declines:** a decline routes the job to the next worker.
+  - **Privacy:** the resident's phone is hidden unless the owner allows it.
+  - **Rate limit:** 20 updates an hour per link.
+  - **Access:** the two functions the link calls live in their own
+    `job_link` schema, so the anonymous role never gets `private`.
+- **T9: costs.**
+  - **Recording:** labour, material and vendor charge, with who pays. A cost the
+    resident pays becomes a `resident_charges` row of category `repair`, billed
+    on their next invoice.
+  - **Voiding:** only owners can void a cost, which also voids its charge.
+    After the charge is invoiced, the invoice has to be voided first.
+  - **Payouts:** vendor payouts are a log only.
+- **T10: targets.**
+  - **Setup:** response and fix targets per priority (defaults 2/24 h urgent
+    through 48/168 h low), editable in `/settings/complaints`.
+  - **Clock:** time on hold is not counted.
+  - **Display:** "Due soon" and "Late" badges show in the list and on the
+    dashboard. No messages are sent, since there is no SMS or email provider
+    yet.
+- **T11: reports.** `public.complaint_report` (invoker) covers:
+  - counts and average response and fix times by category;
+  - counts by room and floor, and rooms with repeat problems;
+  - worker jobs, completions and declines;
+  - repair spend.
+    The `/complaints/reports` page has a CSV download of every complaint in the
+    dates chosen.
+- **T12: preventive maintenance.**
+  - **Schedules:** `maintenance_schedules` sets each task to repeat every N
+    days, weeks or months.
+  - **Creation:** `create_due_maintenance` runs when the complaints page opens.
+    It is idempotent per due date, creates 'scheduled' complaints that are
+    routed like any other, and moves each schedule to its next date.
+- **T13:** `docs/worker-network.md` compares partnering, building a vetted
+  network, and keeping each hostel's own vendors. It recommends the last for now
+  and is left for the owner to decide. Nothing is built.
+- **T14: security tests.** `tests/rls/complaints.test.ts` (18 cases) covers:
+  - routing order, load sharing, leave and no-match;
+  - every lifecycle rule;
+  - append-only history and no direct updates;
+  - the job-link view hiding the phone, the full update flow, the link dying
+    on done and on reassignment, guessed and malformed tokens, declines going
+    to the next worker, and the rate limit;
+  - resident-paid costs becoming charges, and the void rules;
+  - preventive maintenance once per due date;
+  - reports and cross-hostel refusal;
+  - cross-tenant isolation of complaints, history, costs, files and workers;
+  - other owners' workers refused, and staff unable to add workers;
+  - attachment limits and storage paths.
+    Also: `tests/unit/complaints.test.ts`, and `tests/e2e/complaints.spec.ts`
+    (owner, plumber and job link end to end, plus staff and the dashboard, on
+    desktop and mobile). The accessibility scan covers the new pages.
+- **Not built (needs an SMS provider with DLT templates):**
+  - T3 (residents raising complaints by QR code with an SMS one-time code);
+  - T4 (SMS status links and resident confirmation);
+  - the reminder and escalation messages in T10.
+- **Bugs caught by tests:**
+  - **`worker_serves` returned NULL for shared vendors.** Its "not serves"
+    check then let another owner's vendor be assigned. Fixed with `coalesce`.
+  - **The workers select policy used a subquery that cannot see a row being
+    inserted.** Inserts that returned the new row were refused. The policy is
+    now written against the row's own columns.
+  - **Staff could add vendors as their own.** Adding workers is now refused for
+    anyone who is not an owner.
+- **Fix: the payment dialog kept its last mode.** Since cheques were added
+  (3c), "Mode" is a controlled field, and closing the dialog left it set
+  (for example to cheque). It is now cleared each time the dialog opens.
+  `tests/e2e/dialogs.spec.ts` caught it. That test now causes its failed attempt
+  with a cheque for more than is due, because overpaying in cash became advance
+  credit in 3c.

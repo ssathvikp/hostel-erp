@@ -22,6 +22,8 @@ import { invoiceLabel } from "@/features/fees/options";
 import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
 import { getSettledStays } from "@/features/settlement/queries";
+import { OpenComplaints } from "@/features/complaints/components/OpenComplaints";
+import { getOpenComplaintsFor } from "@/features/complaints/queries";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
 import {
   GENDER_LABELS,
@@ -100,6 +102,7 @@ export default async function ResidentPage({
     deposit,
     depositRates,
     settled,
+    complaints,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -117,6 +120,7 @@ export default async function ResidentPage({
     getResidentDeposit(supabase, hostel.id, id),
     getDepositRates(supabase, hostel.id),
     getSettledStays(supabase, hostel.id, id),
+    getOpenComplaintsFor(supabase, hostel.id, { residentId: id }),
   ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
@@ -397,6 +401,14 @@ export default async function ResidentPage({
 
         <h3 className="mt-6 mb-3 text-sm font-semibold text-slate-900">Activity log</h3>
         <AllocationHistory events={events} show="bed" caption="Allocation activity log" />
+      </Card>
+
+      <Card title="Open complaints" id="complaints-heading">
+        <OpenComplaints
+          rows={complaints}
+          raiseHref={`/complaints/new?resident=${resident.id}`}
+          caption={`Open complaints for ${resident.full_name}`}
+        />
       </Card>
 
       <Card title="Fees" id="fees-heading">

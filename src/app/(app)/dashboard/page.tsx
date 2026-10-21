@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Alert } from "@/components/ui";
+import { ComplaintQueue } from "@/features/complaints/components/ComplaintQueue";
 import { RangeFilter } from "@/features/dashboard/components/RangeFilter";
 import {
   KpiSection,
@@ -95,6 +96,9 @@ export default async function DashboardPage({
           }
         >
           <WorkQueueSection hostelId={hostel.id} today={today} />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton />}>
+          <ComplaintQueue hostelId={hostel.id} />
         </Suspense>
       </div>
     </>
