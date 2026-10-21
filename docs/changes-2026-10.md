@@ -558,3 +558,45 @@ DEFINER` function in the exposed `public` schema, which the schema-guard
   and bad input. `tests/e2e/reports.spec.ts` checks the owner's view and CSV
   contents, and that staff are redirected from the page and get 403 on the
   downloads.
+
+## Phase 3e: move-out settlement statement (ClickUp E13-T8)
+
+- **What:** each closed stay gets "Settle move-out" in the resident's allocation
+  history. That opens `/residents/[id]/settlement/[allocationId]`, where the
+  owner:
+  - **re-bills the final month** for the nights held, if its rent invoice was
+    issued for more. The invoice is voided and issued again. This only happens
+    when the invoice has no payments or live late fee; otherwise the page says
+    why, so the owner can void those first.
+  - **enters up to three deductions** from the deposit, each with a reason.
+  - **chooses whether the deposit pays what is still due.** Each use is a payment
+    of the new mode `deposit` on the invoice plus a matching deposit deduction
+    (`deposit_entries.payment_id`). Voiding the payment gives the deposit back.
+  - **sees a live summary** and picks how any refund is paid.
+- **One transaction:** `settle_move_out` re-bills, applies held credit, takes the
+  deductions, uses the deposit for dues, then refunds what is left of the deposit
+  and the credit. It saves a statement in `settlements`, one per stay, never
+  edited. The net figure is positive when the resident still owes and negative
+  for a refund.
+- **Statement:** once settled, the page shows a printable statement on the
+  invoice letterhead.
+- **Rules:**
+  - owners only (staff get 42501);
+  - the stay must be closed, and a transfer is not a move-out;
+  - one settlement per stay;
+  - a refund needs a mode;
+  - deposit payments cannot be entered by hand (`deposit_payment_manual`).
+- **Reports:** deposit payments are not counted as money in, the same as credit.
+- **Files:**
+  - `supabase/migrations/20261024090000_settlement.sql`, which adds
+    `bill_resident_month`, `settlement_preview` and `settle_move_out`;
+  - `src/features/settlement/` (`totals.ts`, `queries.ts`, `actions.ts`,
+    `SettlementForm`, `SettlementStatement`);
+  - the page, the allocation history column, `settlementSchema`, and the
+    `deposit` payment mode.
+- **Tests:**
+  - `tests/integration/settlement.test.ts` (6 cases): refund after deductions;
+    the deposit paying dues and coming back when that payment is voided; credit
+    used first and the leftover refunded; final-month re-billing; the rules.
+  - `tests/unit/settlement.test.ts`: the form's arithmetic.
+  - `tests/e2e/settlement.spec.ts`: desktop and mobile.

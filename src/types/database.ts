@@ -524,6 +524,7 @@ export type Database = {
           id: string;
           kind: string;
           mode: string | null;
+          payment_id: string | null;
           reason: string | null;
           recorded_by: string;
           recorded_by_name: string | null;
@@ -543,6 +544,7 @@ export type Database = {
           id?: string;
           kind: string;
           mode?: string | null;
+          payment_id?: string | null;
           reason?: string | null;
           recorded_by?: string;
           recorded_by_name?: string | null;
@@ -561,6 +563,7 @@ export type Database = {
           id?: string;
           kind?: string;
           mode?: string | null;
+          payment_id?: string | null;
           reason?: string | null;
           recorded_by?: string;
           recorded_by_name?: string | null;
@@ -583,6 +586,13 @@ export type Database = {
             columns: ["hostel_id"];
             isOneToOne: false;
             referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deposit_entries_payment_id_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "payments";
             referencedColumns: ["id"];
           },
           {
@@ -1990,6 +2000,79 @@ export type Database = {
           },
         ];
       };
+      settlements: {
+        Row: {
+          allocation_id: string;
+          hostel_id: string;
+          id: string;
+          net_amount: number;
+          resident_id: string;
+          settled_at: string;
+          settled_by: string;
+          settled_by_name: string | null;
+          statement: NonNullable<Json>;
+        };
+        ComputedFields: never;
+        Insert: {
+          allocation_id: string;
+          hostel_id: string;
+          id?: string;
+          net_amount: number;
+          resident_id: string;
+          settled_at?: string;
+          settled_by?: string;
+          settled_by_name?: string | null;
+          statement: NonNullable<Json>;
+        };
+        Update: {
+          allocation_id?: string;
+          hostel_id?: string;
+          id?: string;
+          net_amount?: number;
+          resident_id?: string;
+          settled_at?: string;
+          settled_by?: string;
+          settled_by_name?: string | null;
+          statement?: NonNullable<Json>;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "settlements_allocation_fkey";
+            columns: ["hostel_id", "allocation_id"];
+            isOneToOne: false;
+            referencedRelation: "allocations";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "settlements_hostel_id_fkey";
+            columns: ["hostel_id"];
+            isOneToOne: false;
+            referencedRelation: "hostels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "settlements_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "resident_directory";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "settlements_resident_fkey";
+            columns: ["hostel_id", "resident_id"];
+            isOneToOne: false;
+            referencedRelation: "residents";
+            referencedColumns: ["hostel_id", "id"];
+          },
+          {
+            foreignKeyName: "settlements_settled_by_fkey";
+            columns: ["settled_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       staff_invitations: {
         Row: {
           accepted_at: string | null;
@@ -2693,6 +2776,18 @@ export type Database = {
         };
         Returns: string;
       };
+      settle_move_out: {
+        Args: {
+          p_allocation_id: string;
+          p_deductions?: Json;
+          p_rebill?: boolean;
+          p_refund_mode?: string;
+          p_refund_reference?: string;
+          p_use_deposit?: boolean;
+        };
+        Returns: string;
+      };
+      settlement_preview: { Args: { p_allocation_id: string }; Returns: Json };
       transfer_allocation: {
         Args: {
           p_allocation_id: string;

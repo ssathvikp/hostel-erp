@@ -21,6 +21,7 @@ import { BalanceSentence, ResidentFees } from "@/features/fees/components/Reside
 import { invoiceLabel } from "@/features/fees/options";
 import { getResidentBalance, getResidentInvoices } from "@/features/fees/queries";
 import { IdProofUpload } from "@/features/residents/components/IdProofUpload";
+import { getSettledStays } from "@/features/settlement/queries";
 import { ResidentStatusControl } from "@/features/residents/components/ResidentStatusControl";
 import {
   GENDER_LABELS,
@@ -98,6 +99,7 @@ export default async function ResidentPage({
     invoices,
     deposit,
     depositRates,
+    settled,
   ] = await Promise.all([
     supabase.from("residents").select("*").eq("id", id).eq("hostel_id", hostel.id).maybeSingle(),
     supabase
@@ -114,6 +116,7 @@ export default async function ResidentPage({
     getResidentInvoices(supabase, hostel.id, id),
     getResidentDeposit(supabase, hostel.id, id),
     getDepositRates(supabase, hostel.id),
+    getSettledStays(supabase, hostel.id, id),
   ]);
   if (error) throw error;
   if (allocationsError) throw allocationsError;
@@ -353,6 +356,7 @@ export default async function ResidentPage({
                 <Th>From</Th>
                 <Th>To</Th>
                 <Th>Reason</Th>
+                <Th>Settlement</Th>
               </tr>
             </THead>
             <TBody>
@@ -365,6 +369,25 @@ export default async function ResidentPage({
                     {allocation.vacate_reason
                       ? VACATE_REASON_LABELS[allocation.vacate_reason as VacateReason]
                       : "—"}
+                  </Td>
+                  <Td>
+                    {settled.has(allocation.id) ? (
+                      <Link
+                        href={`/residents/${resident.id}/settlement/${allocation.id}`}
+                        className="text-brand-700 hover:underline"
+                      >
+                        Statement
+                      </Link>
+                    ) : allocation.end_date && allocation.vacate_reason !== "transferred" ? (
+                      <Link
+                        href={`/residents/${resident.id}/settlement/${allocation.id}`}
+                        className="text-brand-700 hover:underline"
+                      >
+                        {user.role === "owner" ? "Settle move-out" : "Not settled"}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
                   </Td>
                 </Tr>
               ))}

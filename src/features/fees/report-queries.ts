@@ -9,7 +9,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /**
  * Money received between two dates (inclusive): payments in hand (cheques once
- * cleared; credit applied to an invoice is not new money) and advances kept as
+ * cleared; credit or deposit applied to an invoice is not new money) and advances kept as
  * credit. Voided entries are left out.
  */
 export async function getMoneyIn(
@@ -26,7 +26,7 @@ export async function getMoneyIn(
         .eq("hostel_id", hostelId)
         .gte("paid_at", from)
         .lte("paid_at", to)
-        .neq("mode", "credit")
+        .not("mode", "in", "(credit,deposit)")
         .not("cleared_at", "is", null)
         .is("voided_at", null)
         .order("id")

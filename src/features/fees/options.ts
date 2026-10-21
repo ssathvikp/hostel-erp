@@ -48,6 +48,7 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   card: "Card",
   cheque: "Cheque",
   credit: "Advance credit",
+  deposit: "Security deposit",
 };
 
 /** Money-in-hand modes, for deposits and advances. */

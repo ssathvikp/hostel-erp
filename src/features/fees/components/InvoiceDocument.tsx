@@ -11,7 +11,7 @@ const day = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "U
 const formatDay = (value: string) => day.format(new Date(value.slice(0, 10)));
 const issued = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" });
 
-interface Letterhead {
+export interface Letterhead {
   name: string;
   address: string | null;
   city: string | null;
@@ -22,7 +22,16 @@ interface Letterhead {
   gstin: string | null;
 }
 
-function Header({ hostel, title, number }: { hostel: Letterhead; title: string; number: string }) {
+/** The hostel's letterhead and the document's title and number. */
+export function DocumentHeader({
+  hostel,
+  title,
+  number,
+}: {
+  hostel: Letterhead;
+  title: string;
+  number: string;
+}) {
   const address = [hostel.address, hostel.city, hostel.state, hostel.pincode]
     .filter(Boolean)
     .join(", ");
@@ -110,7 +119,7 @@ export function InvoiceDocument({
 
   return (
     <article className="space-y-6 text-slate-900">
-      <Header
+      <DocumentHeader
         hostel={hostel}
         title={
           invoice.kind === "late_fee"
@@ -280,7 +289,7 @@ export function ReceiptDocument({
   const totals = receiptTotals(invoice.amount, invoice.payments, payment.id);
   return (
     <article className="space-y-6 text-slate-900">
-      <Header
+      <DocumentHeader
         hostel={hostel}
         title={payment.voidedAt ? "Receipt (void)" : "Payment receipt"}
         number={payment.receiptNumber}

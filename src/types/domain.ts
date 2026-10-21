@@ -150,7 +150,8 @@ export const PAYMENT_MODES = ["cash", "upi", "bank_transfer", "card"] as const;
 /** How rent may be paid: money in hand, or a cheque that clears later (ClickUp E13-T11). */
 export const RENT_PAYMENT_MODES = [...PAYMENT_MODES, "cheque"] as const;
 /** Every mode a payment row can show; "credit" is advance credit the app applied (E13-T7). */
-export type PaymentMode = (typeof RENT_PAYMENT_MODES)[number] | "credit";
+/** Credit and deposit payments are made by the app, never recorded by hand. */
+export type PaymentMode = (typeof RENT_PAYMENT_MODES)[number] | "credit" | "deposit";
 
 /** Security deposit ledger entries (EP-12). */
 export const DEPOSIT_ENTRY_KINDS = ["collected", "deduction", "refund"] as const;

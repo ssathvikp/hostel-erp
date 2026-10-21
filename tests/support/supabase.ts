@@ -154,6 +154,7 @@ export function createUserFactory() {
     if (hostelIds.length > 0) {
       // Money rows protect the stays and people they name, so they go first.
       for (const table of [
+        "settlements",
         "data_rights_log",
         "reminder_log",
         "deposit_entries",

@@ -612,3 +612,63 @@ export const depositEntrySchema = z
   );
 
 export type DepositEntryInput = z.output<typeof depositEntrySchema>;
+
+/** How many deduction rows the move-out settlement form offers (E13-T8). */
+export const SETTLEMENT_DEDUCTION_ROWS = 3;
+
+const checkbox = z
+  .literal("on")
+  .optional()
+  .transform((value) => value === "on");
+
+/**
+ * Move-out settlement (E13-T8): deductions from the deposit (each with a
+ * reason), whether to re-bill the final month and let the deposit pay dues,
+ * and how any refund is paid.
+ */
+export const settlementSchema = z
+  .object({
+    allocation_id: uuid("Stay"),
+    deduction_amount_1: optional(rupees("Deduction")),
+    deduction_reason_1: optional(requiredText("Reason", 200)),
+    deduction_amount_2: optional(rupees("Deduction")),
+    deduction_reason_2: optional(requiredText("Reason", 200)),
+    deduction_amount_3: optional(rupees("Deduction")),
+    deduction_reason_3: optional(requiredText("Reason", 200)),
+    rebill: checkbox,
+    use_deposit: checkbox,
+    refund_mode: optional(z.enum(PAYMENT_MODES, { error: "Choose how the refund is paid" })),
+    refund_reference: optional(requiredText("Reference", 100)),
+  })
+  .superRefine((input, context) => {
+    for (const row of [1, 2, 3] as const) {
+      const amount = input[`deduction_amount_${row}`];
+      const reason = input[`deduction_reason_${row}`];
+      if (amount !== null && reason === null) {
+        context.addIssue({
+          code: "custom",
+          message: "Say what this is for",
+          path: [`deduction_reason_${row}`],
+        });
+      }
+      if (amount === null && reason !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "Enter the amount",
+          path: [`deduction_amount_${row}`],
+        });
+      }
+    }
+  })
+  .transform((input) => ({
+    allocation_id: input.allocation_id,
+    deductions: ([1, 2, 3] as const).flatMap((row) => {
+      const amount = input[`deduction_amount_${row}`];
+      const reason = input[`deduction_reason_${row}`];
+      return amount !== null && reason !== null ? [{ amount, reason }] : [];
+    }),
+    rebill: input.rebill,
+    use_deposit: input.use_deposit,
+    refund_mode: input.refund_mode,
+    refund_reference: input.refund_reference,
+  }));
